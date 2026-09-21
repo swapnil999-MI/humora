@@ -1,0 +1,43 @@
+# Binaries
+bin/
+/server
+/worker
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.out
+*.test
+
+# Environment files
+.env
+infra/local/.env.local
+infra/dev/.env.dev
+
+# Air / Live reload temporary files
+tmp/
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node / Web artifacts
+web/node_modules/
+web/dist/
+
+# Logs
+*.log

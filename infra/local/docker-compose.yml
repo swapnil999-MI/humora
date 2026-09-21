@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ../..
+      dockerfile: infra/local/dockerfile.local
+    container_name: humora-backend-local
+    restart: always
+    ports:
+      - "8090:8090"
+    volumes:
+      - ../..:/app
+    env_file:
+      - .env.local
+    environment:
+      - ENV_FILE_PATH=infra/local/.env.local
+      - PORT=8090
+    command: [ "sh", "/app/infra/local/start.sh" ]
+    networks:
+      - paylogic-infra_default
+
+networks:
+  paylogic-infra_default:
+    external: true

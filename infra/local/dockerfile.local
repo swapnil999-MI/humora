@@ -1,0 +1,18 @@
+FROM golang:1.27-alpine
+
+# Install git, curl, build-base, and bash
+RUN apk add --no-cache git curl build-base bash
+
+WORKDIR /app
+
+# Install Atlas CLI
+RUN curl -sSf https://atlasgo.sh | sh
+
+# Install Air for hot reloading
+RUN go install github.com/air-verse/air@latest
+
+# Copy go.mod and go.sum
+COPY go.mod go.sum* ./
+RUN go mod download || true
+
+CMD ["air", "-c", "infra/local/air.toml"]
