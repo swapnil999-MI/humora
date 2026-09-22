@@ -157,7 +157,7 @@ export const SubNavPane: React.FC = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <ShieldCheck size={15} strokeWidth={1.8} />
-                  <span>Approvals Desk</span>
+                  <span>Founder Approvals Console</span>
                 </div>
                 {pendingApprovalsCount > 0 && (
                   <span className="nav-badge">
