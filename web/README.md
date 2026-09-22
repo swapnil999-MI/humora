@@ -178,16 +178,23 @@ Enterprise real-time team communication and sprint collaboration hub engineered 
   - Click on the top chat header to open the WhatsApp slide-over info drawer.
   - Hero profile card with large circular emblem, title, creation date / role, and quick action tiles (**Voice Call**, **Video Call**, **Search**).
   - Media, Links and Docs summary tile (`18 Files >`).
+  - **Group Sprint Tasks Section**: Itemized preview of assigned sprint deliverables (`PAY-101`, `ENG-204`, etc.) with 1-click inspection chips that open the Task Inspector right inside the chat workspace.
   - **Members Roster with Direct Calling & Messaging**:
     - Member search bar with real-time roster filtering.
     - Detailed list of all members with online status and roles.
     - Direct 1-click action buttons on every member card: 💬 Direct Message (opens 1:1 DM immediately), 📞 Voice Call, 📹 Video Call.
-- **Active Call Floating Overlay**:
-  - Live call modal with animated pulsing rings, live duration counter (`Connected • 00:24`), animated audio waveform frequency bars, mute/unmute microphone toggle, and red end-call button.
-- **Interactive Sprint Task Tagging & Worklog Sync**:
-  - Embedded manager-assigned ticket cards with status pills, priority tags, and manager attribution.
-  - **1-Click Quick Worklog**: `+ Quick Log 30m` directly logs work into the biometric attendance reconciliation ledger.
-  - **1-Click Deep Inspection**: "Inspect Task" opens the full PeopleOS `IssueDrawer` slide-over.
+- **Dedicated Right-Side Task Inspector Drawer (`.task-inspector-drawer`)**:
+  - Clicking "Inspect" on any embedded task in the chat stream or clicking any task in the right-side Sprint Tasks drawer immediately opens the in-context **Task Inspector Drawer** without leaving the chat conversation.
+  - **Top Bar**: Monospace key badge (`⚡ PAY-101`), Priority badge (`URGENT 🚨` / `HIGH`), Maximize to full board drawer button, and Close button.
+  - **Tab Navigation**: `Overview`, `Worklogs & Sync`, `Chat Context`.
+  - **Interactive Workflow Status Pills**: Instant 1-click state switching between `To Do`, `In Progress`, `Review`, and `Done` with celebratory toast feedback.
+  - **Manager & Assignee Matrix**: "Assigned by Sarah Jenkins (VP of Engineering)" with lead badge and assignee online indicator.
+  - **Biometric Attendance & Timesheet Worklog Sync**: Visual progress bar (`3.5h / 8.0h logged` • `44% Synced`) with 1-click quick log buttons (`+15m`, `+30m`, `+1h`, `+2h`).
+  - **Live Focus Stopwatch**: Integrated ticking timer (`HH:MM:SS`) with Start, Pause, Reset, and "Save Session" buttons to log time spent directly while in chat.
+  - **Live Chat Updates**: "Post Live Update to Chat" button drops real-time progress snippets directly into the channel.
+- **Sprint Tasks Roster Drawer**:
+  - Triggered via the **`⚡ Sprint Tasks (4)`** button in the chat header or from the WhatsApp header menu.
+  - Displays all squad deliverables with priority indicators, progress bars, and 1-click inspection triggers.
 - **Audio Voice Notes & Waveform Player**:
   - Voice notes with animated 24-frequency bar waveforms, play/pause controls (`▶ / ⏸`), live elapsed playback timers, and transcriptions.
   - Document & PDF cards with download triggers and extension indicators.
