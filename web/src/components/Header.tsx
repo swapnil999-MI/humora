@@ -4,6 +4,7 @@ import { setCreateIssueOpen, navigateToPage, toggleNotificationDrawer } from '..
 import { recordPunch } from '../store/hrmsSlice';
 import { GoogleSearchBar } from './GoogleSearchBar';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
+import { PeopleOSLogo } from './PeopleOSLogo';
 import {
   Kanban,
   Search,
@@ -122,8 +123,28 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
         transition: 'background-color var(--transition-smooth), border-color var(--transition-smooth)',
       }}
     >
-      {/* Left: Contextual Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+      {/* Left: PeopleOS Brand Emblem + Contextual Breadcrumb */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '13px' }}>
+        <button
+          type="button"
+          onClick={() => dispatch(navigateToPage('hub'))}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '2px 0',
+            display: 'flex',
+            alignItems: 'center',
+            cursor: 'pointer',
+            borderRadius: 'var(--radius-sm)',
+            transition: 'opacity var(--transition-fast)',
+          }}
+          title="PeopleOS Platform Home (My Workday Hub)"
+        >
+          <PeopleOSLogo size={26} showBrandName brandTextSize={15} subText="Enterprise" />
+        </button>
+
+        <div style={{ width: '1px', height: '18px', background: 'var(--border-subtle)' }} />
+
         {workspace === 'employee' ? (
           <>
             <button

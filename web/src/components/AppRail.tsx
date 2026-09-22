@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/store';
 import { navigateToPage, setWorkspace, toggleSidebar } from '../store/uiSlice';
 import { logout } from '../store/authSlice';
+import { PeopleOSLogo } from './PeopleOSLogo';
 import {
   Kanban,
   Search,
@@ -53,22 +54,23 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
         <button
           type="button"
           style={{
-            width: '34px',
-            height: '34px',
+            width: '38px',
+            height: '38px',
             borderRadius: 'var(--radius-md)',
-            background: 'var(--text-primary)',
-            border: 'none',
+            background: 'var(--surface-3)',
+            border: '1px solid var(--border-hairline)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             boxShadow: 'var(--shadow-sm)',
             cursor: 'pointer',
-            transition: 'transform var(--transition-fast)',
+            transition: 'transform var(--transition-fast), border-color var(--transition-fast)',
+            padding: 0,
           }}
-          title="Humora Enterprise Platform"
+          title="PeopleOS Platform (My Workday Hub)"
           onClick={() => dispatch(navigateToPage('hub'))}
         >
-          <Building2 size={18} color="var(--surface-0)" strokeWidth={2} />
+          <PeopleOSLogo size={24} />
         </button>
 
         <div style={{ width: '28px', height: '1px', background: 'var(--border-hairline)' }} />

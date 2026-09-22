@@ -9,6 +9,7 @@ import {
 import { recordPunch } from '../../store/hrmsSlice';
 import { addToast, setWorkspace, navigateToPage } from '../../store/uiSlice';
 import { StatusGlyph, PriorityGlyph } from '../../components/StatusGlyph';
+import { PeopleOSLogo } from '../../components/PeopleOSLogo';
 import {
   Clock,
   Play,
@@ -22,6 +23,8 @@ import {
   Sparkles,
   Layers,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Check,
   Plus,
   Calendar,
@@ -50,6 +53,17 @@ export const MyWorkdayHub: React.FC = () => {
   const [isSubmittingPunch, setIsSubmittingPunch] = useState<boolean>(false);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState<boolean>(false);
   const [submissionNotes, setSubmissionNotes] = useState<string>('');
+  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({
+    '2026-09-15': true,
+    '2026-09-16': true,
+    '2026-09-17': true,
+    '2026-09-18': true,
+    '2026-09-19': true,
+  });
+
+  const toggleDayExpansion = (date: string) => {
+    setExpandedDays((prev) => ({ ...prev, [date]: !prev[date] }));
+  };
 
   // Live stopwatch for real-time feedback
   const [hubElapsedSeconds, setHubElapsedSeconds] = useState(0);
@@ -167,20 +181,25 @@ export const MyWorkdayHub: React.FC = () => {
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span
+            <div
               style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
                 fontSize: '11px',
-                fontWeight: 600,
+                fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.06em',
                 color: 'var(--accent-primary)',
                 background: 'var(--accent-primary-subtle)',
-                padding: '2px 8px',
+                padding: '3px 9px',
                 borderRadius: 'var(--radius-sm)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
               }}
             >
-              My Workday Hub
-            </span>
+              <PeopleOSLogo size={14} />
+              <span>PeopleOS &bull; My Workday Hub</span>
+            </div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: 'long',
@@ -561,7 +580,7 @@ export const MyWorkdayHub: React.FC = () => {
               gap: '20px',
             }}
           >
-            {/* Block Header & Comprehensive Summary Counters */}
+            {/* Block Header & Summary Metric Counters */}
             <div
               style={{
                 display: 'flex',
@@ -576,19 +595,19 @@ export const MyWorkdayHub: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div
                   style={{
-                    width: '42px',
-                    height: '42px',
+                    width: '44px',
+                    height: '44px',
                     borderRadius: 'var(--radius-md)',
                     background: 'rgba(245, 158, 11, 0.12)',
-                    border: '1px solid rgba(245, 158, 11, 0.28)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: 'var(--accent-primary)',
                     flexShrink: 0,
+                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.12)',
                   }}
                 >
-                  <FileCheck2 size={22} strokeWidth={2} />
+                  <PeopleOSLogo size={24} />
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -632,7 +651,7 @@ export const MyWorkdayHub: React.FC = () => {
                     </span>
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>
-                    Week of {weeklyTimesheet?.week_start_date || 'Current Cycle'} &bull; Daily audit reconciling attendance biometric punches with agile sprint worklogs
+                    Week of {weeklyTimesheet?.week_start_date || 'Current Cycle'} &bull; Daily audit reconciling attendance biometric shifts with agile sprint worklogs
                   </div>
                 </div>
               </div>
@@ -742,348 +761,445 @@ export const MyWorkdayHub: React.FC = () => {
               </div>
             </div>
 
-            {/* Vertical Day-Wise Reconciliation Ledger */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {days.map((day) => {
-                const isWeekend = day.status === 'weekend';
-                const isUnderLogged = day.status === 'under_logged';
-                const isOverLogged = day.status === 'over_logged';
-                const isSynced = day.status === 'synced';
-
-                const dayRatio = day.clocked_hours > 0
-                  ? Math.min(100, Math.round((day.logged_hours / day.clocked_hours) * 100))
-                  : (day.logged_hours > 0 ? 100 : 0);
-
-                return (
-                  <div
-                    key={day.date}
-                    className="reconciliation-day-row"
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                      padding: '14px 18px',
-                      borderRadius: 'var(--radius-md)',
-                      background: isWeekend
-                        ? 'rgba(255, 255, 255, 0.015)'
-                        : isUnderLogged
-                        ? 'rgba(245, 158, 11, 0.035)'
-                        : 'var(--surface-2)',
-                      border: isUnderLogged
-                        ? '1px solid rgba(245, 158, 11, 0.32)'
-                        : '1px solid var(--border-hairline)',
-                      transition: 'all var(--transition-fast)',
-                    }}
-                  >
-                    {/* Primary Row Header: Day identification, metrics comparison, and variance status */}
-                    <div
+            {/* Vertical Day-Wise Reconciliation Ledger Table */}
+            <div style={{ overflowX: 'auto', width: '100%' }}>
+              <div style={{ minWidth: '920px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {/* Column Headers for Tabular Day-Wise Vertical Alignment */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '190px 130px 130px 180px 130px 1fr',
+                    alignItems: 'center',
+                    padding: '8px 16px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    color: 'var(--text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    background: 'var(--surface-1)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-hairline)',
+                  }}
+                >
+                  <div>Day & Date</div>
+                  <div>Shift Attendance</div>
+                  <div>Sprint Worklogs</div>
+                  <div>Sync Ratio</div>
+                  <div>Net Variance</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Audit Status</span>
+                    <button
+                      type="button"
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: '12px',
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: 'var(--accent-primary)',
+                        cursor: 'pointer',
+                        padding: '2px 6px',
+                      }}
+                      onClick={() => {
+                        const allExpanded = days.every((d) => expandedDays[d.date]);
+                        const next: Record<string, boolean> = {};
+                        days.forEach((d) => {
+                          next[d.date] = !allExpanded;
+                        });
+                        setExpandedDays(next);
                       }}
                     >
-                      {/* Left: Day & Date Pill with Status */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '220px' }}>
-                        <span
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            padding: '3px 8px',
-                            borderRadius: 'var(--radius-xs)',
-                            background: isWeekend ? 'var(--surface-3)' : 'rgba(245, 158, 11, 0.12)',
-                            color: isWeekend ? 'var(--text-muted)' : 'var(--accent-primary)',
-                            border: `1px solid ${isWeekend ? 'var(--border-hairline)' : 'rgba(245, 158, 11, 0.25)'}`,
-                          }}
-                        >
-                          {day.day_of_week.slice(0, 3).toUpperCase()}
-                        </span>
+                      {days.every((d) => expandedDays[d.date]) ? 'Collapse All' : 'Expand All'}
+                    </button>
+                  </div>
+                </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: isWeekend ? 'var(--text-muted)' : 'var(--text-primary)' }}>
-                            {day.day_of_week}
-                          </span>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                            {day.date}
-                          </span>
-                        </div>
+                {/* Day Rows (Strict Vertical Alignment Across Columns) */}
+                {days.map((day) => {
+                  const isWeekend = day.status === 'weekend';
+                  const isUnderLogged = day.status === 'under_logged';
+                  const isOverLogged = day.status === 'over_logged';
+                  const isSynced = day.status === 'synced';
+                  const isExpanded = !!expandedDays[day.date];
+                  const hasWorklogs = day.worklogs && day.worklogs.length > 0;
 
-                        {/* Status Badge */}
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            padding: '2px 8px',
-                            borderRadius: '999px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            background: isWeekend
-                              ? 'var(--surface-3)'
-                              : isUnderLogged
-                              ? 'rgba(245, 158, 11, 0.12)'
-                              : isOverLogged
-                              ? 'rgba(245, 158, 11, 0.18)'
-                              : 'rgba(16, 185, 129, 0.12)',
-                            color: isWeekend
-                              ? 'var(--text-muted)'
-                              : isUnderLogged
-                              ? 'var(--accent-primary)'
-                              : isOverLogged
-                              ? 'var(--accent-primary)'
-                              : '#10b981',
-                            border: `1px solid ${
-                              isWeekend
-                                ? 'var(--border-hairline)'
-                                : isUnderLogged
-                                ? 'rgba(245, 158, 11, 0.3)'
-                                : isOverLogged
-                                ? 'rgba(245, 158, 11, 0.3)'
-                                : 'rgba(16, 185, 129, 0.3)'
-                            }`,
-                          }}
-                        >
-                          {isWeekend ? (
-                            'Rest Day'
-                          ) : isUnderLogged ? (
-                            <>
-                              <AlertTriangle size={11} />
-                              Deficit
-                            </>
-                          ) : isOverLogged ? (
-                            <>
-                              <TrendingUp size={11} />
-                              Surplus
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle2 size={11} />
-                              100% Synced
-                            </>
-                          )}
-                        </span>
-                      </div>
+                  const dayRatio = day.clocked_hours > 0
+                    ? Math.min(100, Math.round((day.logged_hours / day.clocked_hours) * 100))
+                    : (day.logged_hours > 0 ? 100 : 0);
 
-                      {/* Middle: Clocked vs. Logged Dual Readout with Ratio Progress */}
+                  return (
+                    <div
+                      key={day.date}
+                      className="reconciliation-day-row"
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        borderRadius: 'var(--radius-md)',
+                        background: isWeekend
+                          ? 'rgba(255, 255, 255, 0.012)'
+                          : isUnderLogged
+                          ? 'rgba(245, 158, 11, 0.04)'
+                          : 'var(--surface-2)',
+                        border: isUnderLogged
+                          ? '1px solid rgba(245, 158, 11, 0.35)'
+                          : '1px solid var(--border-hairline)',
+                        transition: 'all var(--transition-fast)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Day Header Row with exact vertical grid alignment */}
                       <div
                         style={{
-                          display: 'flex',
+                          display: 'grid',
+                          gridTemplateColumns: '190px 130px 130px 180px 130px 1fr',
                           alignItems: 'center',
-                          gap: '24px',
-                          flex: 1,
-                          justifyContent: 'center',
-                          minWidth: '260px',
+                          padding: '12px 16px',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Clock size={13} color="var(--text-muted)" />
-                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                            Clocked:{' '}
-                            <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                              {day.clocked_hours.toFixed(1)}h
-                            </strong>
+                        {/* Col 1: Day Code, Name, and Date */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '2px 7px',
+                              borderRadius: 'var(--radius-xs)',
+                              background: isWeekend ? 'var(--surface-3)' : 'rgba(245, 158, 11, 0.12)',
+                              color: isWeekend ? 'var(--text-muted)' : 'var(--accent-primary)',
+                              border: `1px solid ${isWeekend ? 'var(--border-hairline)' : 'rgba(245, 158, 11, 0.25)'}`,
+                              minWidth: '36px',
+                              textAlign: 'center',
+                            }}
+                          >
+                            {day.day_of_week.slice(0, 3).toUpperCase()}
                           </span>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Layers size={13} color="var(--text-muted)" />
-                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                            Logged:{' '}
-                            <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                              {day.logged_hours.toFixed(1)}h
-                            </strong>
-                          </span>
-                        </div>
-
-                        {/* Visual Ratio Progress Bar */}
-                        {!isWeekend && day.clocked_hours > 0 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '130px' }}>
-                            <div
-                              style={{
-                                flex: 1,
-                                height: '5px',
-                                borderRadius: '999px',
-                                background: 'var(--surface-3)',
-                                overflow: 'hidden',
-                              }}
-                              title={`${dayRatio}% reconciled`}
-                            >
-                              <div
-                                style={{
-                                  height: '100%',
-                                  width: `${dayRatio}%`,
-                                  background: isUnderLogged ? 'var(--accent-primary)' : '#10b981',
-                                }}
-                              />
-                            </div>
-                            <span
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                color: isUnderLogged ? 'var(--accent-primary)' : '#10b981',
-                                minWidth: '32px',
-                                textAlign: 'right',
-                              }}
-                            >
-                              {dayRatio}%
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: isWeekend ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                              {day.day_of_week}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              {day.date}
                             </span>
                           </div>
-                        )}
-                      </div>
+                        </div>
 
-                      {/* Right: Net Variance and Quick Action */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'flex-end' }}>
-                        <span
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            fontFamily: 'var(--font-mono)',
-                            color: isWeekend
-                              ? 'var(--text-muted)'
-                              : day.variance_hours < 0
-                              ? 'var(--accent-primary)'
+                        {/* Col 2: Clocked Shift Hours */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Clock size={13} color={isWeekend ? 'var(--text-dim)' : 'var(--accent-primary)'} />
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: isWeekend ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                            {isWeekend ? '0.0h' : `${day.clocked_hours.toFixed(1)}h`}
+                          </span>
+                        </div>
+
+                        {/* Col 3: Sprint Logged Hours */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Layers size={13} color={isWeekend ? 'var(--text-dim)' : 'var(--text-secondary)'} />
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: isWeekend ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                            {isWeekend ? '0.0h' : `${day.logged_hours.toFixed(1)}h`}
+                          </span>
+                        </div>
+
+                        {/* Col 4: Fidelity Progress Bar & Ratio */}
+                        <div>
+                          {isWeekend ? (
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Weekend Rest</span>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '150px' }}>
+                              <div
+                                style={{
+                                  flex: 1,
+                                  height: '5px',
+                                  borderRadius: '999px',
+                                  background: 'var(--surface-3)',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    height: '100%',
+                                    width: `${dayRatio}%`,
+                                    background: isUnderLogged ? 'var(--accent-primary)' : '#10b981',
+                                  }}
+                                />
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  color: isUnderLogged ? 'var(--accent-primary)' : '#10b981',
+                                  minWidth: '36px',
+                                  textAlign: 'right',
+                                }}
+                              >
+                                {dayRatio}%
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Col 5: Variance Badge */}
+                        <div>
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              color: isWeekend
+                                ? 'var(--text-muted)'
+                                : day.variance_hours < 0
+                                ? 'var(--accent-primary)'
+                                : day.variance_hours > 0
+                                ? '#10b981'
+                                : 'var(--text-secondary)',
+                            }}
+                          >
+                            {isWeekend
+                              ? '—'
                               : day.variance_hours > 0
-                              ? '#10b981'
-                              : 'var(--text-secondary)',
-                          }}
-                        >
-                          {isWeekend
-                            ? '—'
-                            : day.variance_hours > 0
-                            ? `+${day.variance_hours.toFixed(1)}h var`
-                            : day.variance_hours < 0
-                            ? `${day.variance_hours.toFixed(1)}h var`
-                            : '0.0h var'}
-                        </span>
+                              ? `+${day.variance_hours.toFixed(1)}h`
+                              : day.variance_hours < 0
+                              ? `${day.variance_hours.toFixed(1)}h`
+                              : '0.0h bal'}
+                          </span>
+                        </div>
 
-                        {isUnderLogged && (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm"
+                        {/* Col 6: Audit Status Badge & Actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                          <span
                             style={{
                               fontSize: '11px',
-                              padding: '3px 10px',
+                              fontWeight: 600,
+                              padding: '2px 8px',
+                              borderRadius: '999px',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '4px',
+                              background: isWeekend
+                                ? 'var(--surface-3)'
+                                : isUnderLogged
+                                ? 'rgba(245, 158, 11, 0.12)'
+                                : isOverLogged
+                                ? 'rgba(245, 158, 11, 0.18)'
+                                : 'rgba(16, 185, 129, 0.12)',
+                              color: isWeekend
+                                ? 'var(--text-muted)'
+                                : isUnderLogged
+                                ? 'var(--accent-primary)'
+                                : isOverLogged
+                                ? 'var(--accent-primary)'
+                                : '#10b981',
+                              border: `1px solid ${
+                                isWeekend
+                                  ? 'var(--border-hairline)'
+                                  : isUnderLogged
+                                  ? 'rgba(245, 158, 11, 0.3)'
+                                  : isOverLogged
+                                  ? 'rgba(245, 158, 11, 0.3)'
+                                  : 'rgba(16, 185, 129, 0.3)'
+                              }`,
                             }}
-                            onClick={() => {
-                              dispatch(setWorkspace('work'));
-                              dispatch(navigateToPage('kanban'));
-                            }}
-                            title="Jump to Kanban to log agile ticket work"
                           >
-                            <Plus size={12} strokeWidth={2} />
-                            <span>Log Work</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                            {isWeekend ? (
+                              'Rest Day'
+                            ) : isUnderLogged ? (
+                              <>
+                                <AlertTriangle size={11} />
+                                Deficit
+                              </>
+                            ) : isOverLogged ? (
+                              <>
+                                <TrendingUp size={11} />
+                                Surplus
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 size={11} />
+                                Synced
+                              </>
+                            )}
+                          </span>
 
-                    {/* Sub-Section: Logged Sprint Tickets / Status Guidance */}
-                    {day.worklogs && day.worklogs.length > 0 ? (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          flexWrap: 'wrap',
-                          paddingTop: '8px',
-                          borderTop: '1px solid var(--border-hairline)',
-                        }}
-                      >
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>
-                          Worklogs ({day.worklogs.length}):
-                        </span>
-                        {day.worklogs.map((wl) => (
-                          <div
-                            key={wl.issue_id}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              padding: '3px 10px',
-                              borderRadius: 'var(--radius-xs)',
-                              background: 'var(--surface-3)',
-                              border: '1px solid var(--border-hairline)',
-                              fontSize: '11px',
-                              color: 'var(--text-primary)',
-                            }}
-                            title={wl.issue_title}
-                          >
-                            <span
-                              style={{
-                                fontFamily: 'var(--font-mono)',
-                                fontWeight: 700,
-                                color: 'var(--accent-primary)',
-                              }}
-                            >
-                              {wl.issue_key}
-                            </span>
-                            <span
-                              style={{
-                                maxWidth: '240px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                color: 'var(--text-secondary)',
-                              }}
-                            >
-                              {wl.issue_title}
-                            </span>
-                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                              {wl.hours}h
-                            </span>
-                            {wl.is_billable && (
-                              <span
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {isUnderLogged && (
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
                                 style={{
-                                  fontSize: '9.5px',
-                                  padding: '1px 5px',
-                                  borderRadius: '3px',
-                                  background: 'rgba(245, 158, 11, 0.12)',
-                                  color: 'var(--accent-primary)',
-                                  fontWeight: 600,
+                                  fontSize: '11px',
+                                  padding: '3px 9px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
                                 }}
+                                onClick={() => {
+                                  dispatch(setWorkspace('work'));
+                                  dispatch(navigateToPage('kanban'));
+                                }}
+                                title="Jump to Kanban board to log agile ticket hours"
                               >
-                                Billable
-                              </span>
+                                <Plus size={11} strokeWidth={2} />
+                                <span>Log Work</span>
+                              </button>
+                            )}
+
+                            {(hasWorklogs || (!isWeekend && day.clocked_hours > 0)) && (
+                              <button
+                                type="button"
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--text-muted)',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  borderRadius: 'var(--radius-xs)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                                onClick={() => toggleDayExpansion(day.date)}
+                                title={isExpanded ? 'Hide worklog tickets' : 'Show worklog tickets'}
+                              >
+                                {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                              </button>
                             )}
                           </div>
-                        ))}
+                        </div>
                       </div>
-                    ) : !isWeekend && day.clocked_hours > 0 ? (
-                      <div
-                        style={{
-                          fontSize: '11.5px',
-                          color: 'var(--accent-primary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          paddingTop: '6px',
-                          borderTop: '1px solid var(--border-hairline)',
-                        }}
-                      >
-                        <AlertCircle size={12} />
-                        <span>Biometric shift presence recorded ({day.clocked_hours.toFixed(1)}h), but no agile sprint worklogs logged yet for this day.</span>
-                      </div>
-                    ) : isWeekend ? (
-                      <div
-                        style={{
-                          fontSize: '11px',
-                          color: 'var(--text-muted)',
-                          paddingTop: '6px',
-                          borderTop: '1px solid var(--border-hairline)',
-                        }}
-                      >
-                        Weekend scheduled rest period &bull; Biometric and sprint ticket reconciliation inactive.
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
+
+                      {/* Expandable Worklogs Breakdown Ledger */}
+                      {isExpanded && (
+                        <div
+                          style={{
+                            padding: '10px 16px 12px 16px',
+                            background: 'var(--surface-1)',
+                            borderTop: '1px solid var(--border-hairline)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                          }}
+                        >
+                          {hasWorklogs ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                Itemized Agile Sprint Deliverables ({day.worklogs!.length}):
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {day.worklogs!.map((wl) => (
+                                  <div
+                                    key={wl.issue_id}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '6px 12px',
+                                      borderRadius: 'var(--radius-xs)',
+                                      background: 'var(--surface-2)',
+                                      border: '1px solid var(--border-hairline)',
+                                      fontSize: '12px',
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                      <span
+                                        style={{
+                                          fontFamily: 'var(--font-mono)',
+                                          fontWeight: 700,
+                                          fontSize: '11px',
+                                          color: 'var(--accent-primary)',
+                                        }}
+                                      >
+                                        {wl.issue_key}
+                                      </span>
+                                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                                        {wl.issue_title}
+                                      </span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                      {wl.is_billable && (
+                                        <span
+                                          style={{
+                                            fontSize: '10px',
+                                            padding: '1px 6px',
+                                            borderRadius: '3px',
+                                            background: 'rgba(245, 158, 11, 0.12)',
+                                            color: 'var(--accent-primary)',
+                                            fontWeight: 600,
+                                          }}
+                                        >
+                                          Billable
+                                        </span>
+                                      )}
+                                      <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontSize: '12px' }}>
+                                        {wl.hours} hrs
+                                      </strong>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : !isWeekend && day.clocked_hours > 0 ? (
+                            <div
+                              style={{
+                                fontSize: '11.5px',
+                                color: 'var(--accent-primary)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '6px 10px',
+                                background: 'rgba(245, 158, 11, 0.08)',
+                                borderRadius: 'var(--radius-xs)',
+                              }}
+                            >
+                              <AlertCircle size={13} />
+                              <span>Biometric shift presence recorded ({day.clocked_hours.toFixed(1)}h), but no agile sprint worklogs logged yet for this day.</span>
+                            </div>
+                          ) : isWeekend ? (
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              Weekend scheduled rest period &bull; Biometric and sprint ticket reconciliation inactive.
+                            </div>
+                          ) : null}
+
+                          {isUnderLogged && hasWorklogs && (
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                fontSize: '11px',
+                                color: 'var(--accent-primary)',
+                                padding: '5px 10px',
+                                background: 'rgba(245, 158, 11, 0.08)',
+                                borderRadius: 'var(--radius-xs)',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <AlertTriangle size={12} />
+                                <span>Unallocated Variance: <strong>{Math.abs(day.variance_hours).toFixed(1)}h</strong> shift time pending agile ticket reconciliation.</span>
+                              </div>
+                              <button
+                                type="button"
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--accent-primary)',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  textDecoration: 'underline',
+                                }}
+                                onClick={() => {
+                                  dispatch(setWorkspace('work'));
+                                  dispatch(navigateToPage('kanban'));
+                                }}
+                              >
+                                Reconcile on Kanban &rarr;
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Timesheet Submission / Approval Action Ribbon */}
