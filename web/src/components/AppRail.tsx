@@ -13,7 +13,7 @@ import {
   Building2,
 } from 'lucide-react';
 
-export const AppRail: React.FC<{ onOpenCommandPalette: () => void }> = ({
+export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
   onOpenCommandPalette,
 }) => {
   const dispatch = useAppDispatch();
@@ -108,11 +108,14 @@ export const AppRail: React.FC<{ onOpenCommandPalette: () => void }> = ({
           </button>
         </div>
 
-        {/* Command Palette Trigger */}
+        {/* Search Bar Focus Trigger */}
         <button
           type="button"
           className="app-rail-btn"
-          onClick={onOpenCommandPalette}
+          onClick={() => {
+            if (onOpenCommandPalette) onOpenCommandPalette();
+            else window.dispatchEvent(new CustomEvent('focus-header-search'));
+          }}
           title="Universal Search (Cmd+K)"
         >
           <Search size={18} strokeWidth={1.8} />

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/store';
 import { setCreateIssueOpen } from '../store/uiSlice';
 import { recordPunch } from '../store/hrmsSlice';
+import { GoogleSearchBar } from './GoogleSearchBar';
 import {
   Kanban,
   Search,
@@ -15,9 +16,7 @@ import {
   Moon,
 } from 'lucide-react';
 
-export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
-  onOpenCommandPalette,
-}) => {
+export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
   const dispatch = useAppDispatch();
   const { workspace, activePage } = useAppSelector((state) => state.ui);
   const { attendanceSummary, isPunching } = useAppSelector((state) => state.hrms);
@@ -148,22 +147,8 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
         )}
       </div>
 
-      {/* Center: High-Level Search Bar Trigger */}
-      <button
-        type="button"
-        className="header-search-bar"
-        onClick={onOpenCommandPalette}
-        title="Universal Quick Search (Cmd+K)"
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Search size={14} strokeWidth={2} color="var(--accent-primary)" />
-          <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Search employees, tickets, sprints...</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <kbd className="cmd-k-kbd">&#8984;</kbd>
-          <kbd className="cmd-k-kbd">K</kbd>
-        </div>
-      </button>
+      {/* Center: High-Level Google-Style Search Bar with Attached Dropdown */}
+      <GoogleSearchBar />
 
       {/* Right: Workforce Clock Widget & Action Trigger */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

@@ -17,7 +17,6 @@ import { AppRail } from './components/AppRail';
 import { SubNavPane } from './components/SubNavPane';
 import { Header } from './components/Header';
 import { ToastContainer } from './components/ToastContainer';
-import { CommandPalette } from './components/CommandPalette';
 
 // Pages & Router
 import { PageRouter } from './pages/PageRouter';
@@ -33,8 +32,6 @@ import { RegularizationModal } from './views/hrms/RegularizationModal';
 export const App: React.FC = () => {
   const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
-
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   // Candidate self-service onboarding token from URL params
   const urlParams = new URLSearchParams(window.location.search);
@@ -85,10 +82,10 @@ export const App: React.FC = () => {
   // Global Keyboard Navigation (Cmd+K, Cmd+\, Alt+0, Alt+1, Alt+2, C)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Toggle Command Palette with Cmd+K or Ctrl+K
+      // Focus Header Google Search Bar with Cmd+K or Ctrl+K
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setIsCommandPaletteOpen((prev) => !prev);
+        window.dispatchEvent(new CustomEvent('focus-header-search'));
         return;
       }
 
@@ -153,7 +150,7 @@ export const App: React.FC = () => {
       }}
     >
       {/* Tier 1: 64px Persistent Leftmost App Rail */}
-      <AppRail onOpenCommandPalette={() => setIsCommandPaletteOpen(true)} />
+      <AppRail />
 
       {/* Tier 2: 230px Collapsible Sub-Navigation Pane */}
       <SubNavPane />
@@ -170,7 +167,7 @@ export const App: React.FC = () => {
         }}
       >
         {/* Top Header & Breadcrumbs */}
-        <Header onOpenCommandPalette={() => setIsCommandPaletteOpen(true)} />
+        <Header />
 
         {/* Dynamic Redux-Driven Page Canvas */}
         <main
@@ -185,12 +182,6 @@ export const App: React.FC = () => {
           <PageRouter onOpenCandidateWizard={(tok) => setCandidateWizardToken(tok)} />
         </main>
       </div>
-
-      {/* Universal Raycast-Grade Command Palette */}
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-      />
 
       {/* Fullscreen Candidate Portal Simulation Overlay */}
       {candidateWizardToken && (
