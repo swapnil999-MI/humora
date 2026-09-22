@@ -1448,47 +1448,6 @@ export const PulseDesk: React.FC = () => {
               <Search size={18} />
             </button>
 
-            {/* Sprint Tasks Drawer Trigger */}
-            <button
-              onClick={() => {
-                setIsTasksListDrawerOpen((prev) => !prev);
-                setInspectedTask(null);
-                setIsInfoDrawerOpen(false);
-                setIsPinnedDrawerOpen(false);
-                setActiveThreadMessage(null);
-              }}
-              className="btn btn-ghost"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '20px',
-                background: isTasksListDrawerOpen || inspectedTask ? 'rgba(245, 158, 11, 0.18)' : 'rgba(255, 255, 255, 0.05)',
-                border: isTasksListDrawerOpen || inspectedTask ? '1px solid rgba(245, 158, 11, 0.45)' : '1px solid var(--border-subtle)',
-                color: isTasksListDrawerOpen || inspectedTask ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                fontSize: '12px',
-                fontWeight: 700,
-              }}
-              title="View Sprint Tasks for this group"
-            >
-              <Zap size={14} color="var(--accent-primary)" />
-              <span>Sprint Tasks</span>
-              <span
-                style={{
-                  background: 'var(--accent-primary)',
-                  color: '#000000',
-                  fontSize: '10px',
-                  fontWeight: 800,
-                  borderRadius: '10px',
-                  padding: '1px 6px',
-                  marginLeft: '2px',
-                }}
-              >
-                {availableSprintTasks.length}
-              </span>
-            </button>
-
             {/* Three-Dot Chat Options Menu */}
             <button
               onClick={() => setIsChatHeaderMenuOpen((p) => !p)}
