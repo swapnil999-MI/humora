@@ -201,11 +201,12 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                     fontSize: '11px',
                     fontWeight: 700,
                     textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
                     padding: '2px 8px',
                     borderRadius: '12px',
-                    background: 'rgba(16, 185, 129, 0.15)',
-                    color: '#34d399',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    background: 'var(--accent-primary-subtle)',
+                    color: 'var(--accent-primary)',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
                   }}
                 >
                   Statutory Engine Active
@@ -250,7 +251,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Calendar size={18} color="#818cf8" />
+              <Calendar size={18} color="var(--accent-primary)" />
               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Payroll Period:</span>
               <select
                 value={selectedMonth}
@@ -337,11 +338,11 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                   width: '36px',
                   height: '36px',
                   borderRadius: '50%',
-                  background: 'rgba(16, 185, 129, 0.2)',
+                  background: 'rgba(245, 158, 11, 0.2)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#34d399',
+                  color: 'var(--accent-primary)',
                 }}
               >
                 <CheckCircle2 size={20} />
@@ -350,7 +351,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                 <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
                   Payroll Run Successfully Executed & Locked!
                 </div>
-                <div style={{ fontSize: '12px', color: '#a7f3d0', marginTop: '2px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                   {executionResult.message} Official payslips have been generated with net amounts written in words and made visible to all employees.
                 </div>
               </div>
@@ -361,7 +362,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
           {isLoadingPreview && (
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
               <div style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>
-                <Sparkles size={28} color="#818cf8" />
+                <Sparkles size={28} color="var(--accent-primary)" />
               </div>
               <p style={{ marginTop: '12px', fontSize: '13px' }}>
                 Analyzing biometric attendance, approved leaves, and tax regimes...
@@ -425,7 +426,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
                     Prorated Gross
                   </div>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#818cf8', marginTop: '4px' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }}>
                     {formatINR(previewData.total_gross)}
                   </div>
                 </div>
@@ -441,23 +442,23 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
                     Statutory Deductions
                   </div>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#f87171', marginTop: '4px' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--accent-rose)', marginTop: '4px' }}>
                     {formatINR(previewData.total_deductions)}
                   </div>
                 </div>
 
                 <div
                   style={{
-                    background: 'rgba(16, 185, 129, 0.08)',
-                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
                     borderRadius: '10px',
                     padding: '14px 18px',
                   }}
                 >
-                  <div style={{ fontSize: '11px', color: '#6ee7b7', fontWeight: 600, textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--accent-primary)', fontWeight: 600, textTransform: 'uppercase' }}>
                     Net Disbursable Pay
                   </div>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#34d399', marginTop: '4px' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--accent-primary)', marginTop: '4px' }}>
                     {formatINR(previewData.total_net)}
                   </div>
                 </div>
@@ -547,7 +548,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                           <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                             <span
                               style={{
-                                color: emp.lop_days > 0 ? '#f87171' : '#34d399',
+                                color: emp.lop_days > 0 ? 'var(--accent-rose)' : 'var(--text-secondary)',
                                 fontWeight: 700,
                               }}
                             >
@@ -555,7 +556,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                             </span>
                           </td>
 
-                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 600, color: '#34d399' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 600, color: 'var(--text-primary)' }}>
                             {emp.payable_days} / {emp.total_days}
                           </td>
 
@@ -563,18 +564,18 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                             {formatINR(emp.monthly_base_gross)}
                           </td>
 
-                          <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 600, color: '#818cf8' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 600, color: 'var(--text-primary)' }}>
                             {formatINR(emp.gross_earnings)}
                           </td>
 
-                          <td style={{ padding: '12px 14px', textAlign: 'right', color: '#f87171' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--accent-rose)' }}>
                             - {formatINR(emp.total_deductions)}
                             <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                               PF:{formatINR(emp.pf_deduction)} PT:{formatINR(emp.pt_deduction)} TDS:{formatINR(emp.tds_deduction)}
                             </div>
                           </td>
 
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#34d399', fontSize: '13px' }}>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: 'var(--accent-primary)', fontSize: '13px' }}>
                             {formatINR(emp.net_pay)}
                           </td>
                         </tr>
@@ -599,7 +600,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-            <ShieldCheck size={16} color="#34d399" />
+            <ShieldCheck size={16} color="var(--accent-primary)" />
             <span>Biometric attendance & leave policies synced automatically.</span>
           </div>
 

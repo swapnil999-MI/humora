@@ -89,8 +89,8 @@ export const PayslipDocumentModal: React.FC<PayslipDocumentModalProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <FileText size={18} color="#818cf8" />
-            <span style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
+            <FileText size={18} color="var(--accent-primary)" />
+            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
               Official Payslip — {payslip.pay_period}
             </span>
             <span
@@ -98,11 +98,12 @@ export const PayslipDocumentModal: React.FC<PayslipDocumentModalProps> = ({
                 fontSize: '11px',
                 fontWeight: 700,
                 textTransform: 'uppercase',
+                letterSpacing: '0.04em',
                 padding: '2px 8px',
                 borderRadius: '10px',
-                background: 'rgba(16, 185, 129, 0.12)',
-                color: '#34d399',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
+                background: 'var(--accent-primary-subtle)',
+                color: 'var(--accent-primary)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
               }}
             >
               {payslip.status}
@@ -123,7 +124,7 @@ export const PayslipDocumentModal: React.FC<PayslipDocumentModalProps> = ({
                 borderRadius: '6px',
               }}
             >
-              <Printer size={14} color="#818cf8" />
+              <Printer size={14} color="var(--accent-primary)" />
               <span>Print</span>
             </button>
             <button
