@@ -499,30 +499,21 @@ export const MyWorkdayHub: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '13px' }}>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Clocked Hours</span>
-              <strong style={{ color: '#fff' }}>{(weeklyTimesheet?.total_clocked_hours || 0).toFixed(1)}h</strong>
+              <strong style={{ color: 'var(--text-primary)' }}>{(weeklyTimesheet?.total_clocked_hours || 0).toFixed(1)}h</strong>
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Logged Tickets</span>
-              <strong style={{ color: '#818cf8' }}>{(weeklyTimesheet?.total_logged_hours || 0).toFixed(1)}h</strong>
+              <strong style={{ color: 'var(--text-primary)' }}>{(weeklyTimesheet?.total_logged_hours || 0).toFixed(1)}h</strong>
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Net Variance</span>
-              <strong
-                style={{
-                  color:
-                    (weeklyTimesheet?.variance_hours || 0) > 4
-                      ? '#f59e0b'
-                      : (weeklyTimesheet?.variance_hours || 0) < 0
-                      ? '#ef4444'
-                      : '#10b981',
-                }}
-              >
+              <strong style={{ color: 'var(--text-primary)' }}>
                 {(weeklyTimesheet?.variance_hours || 0) > 0 ? `+${(weeklyTimesheet?.variance_hours || 0).toFixed(1)}h` : `${(weeklyTimesheet?.variance_hours || 0).toFixed(1)}h`}
               </strong>
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Sync Fidelity</span>
-              <strong style={{ color: (weeklyTimesheet?.sync_percentage || 0) >= 80 ? '#10b981' : '#f59e0b' }}>
+              <strong style={{ color: 'var(--text-primary)' }}>
                 {weeklyTimesheet?.sync_percentage || 0}%
               </strong>
             </div>
@@ -578,16 +569,16 @@ export const MyWorkdayHub: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Clock:</span>
-                    <strong style={{ color: '#fff' }}>{day.clocked_hours.toFixed(1)}h</strong>
+                    <strong style={{ color: 'var(--text-primary)' }}>{day.clocked_hours.toFixed(1)}h</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Log:</span>
-                    <strong style={{ color: '#818cf8' }}>{day.logged_hours.toFixed(1)}h</strong>
+                    <strong style={{ color: 'var(--text-primary)' }}>{day.logged_hours.toFixed(1)}h</strong>
                   </div>
                   {day.clocked_hours > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Var:</span>
-                      <span style={{ color: isUnderLogged ? '#f59e0b' : '#34d399', fontWeight: 600 }}>
+                      <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
                         {day.variance_hours > 0 ? `+${day.variance_hours.toFixed(1)}h` : `${day.variance_hours.toFixed(1)}h`}
                       </span>
                     </div>
@@ -606,18 +597,11 @@ export const MyWorkdayHub: React.FC = () => {
                       textTransform: 'uppercase',
                       background: isWeekend
                         ? 'var(--surface-hover)'
-                        : isUnderLogged
-                        ? 'var(--accent-amber-subtle)'
-                        : isOverLogged
-                        ? 'var(--accent-subtle)'
-                        : 'var(--accent-emerald-subtle)',
+                        : 'var(--surface-3)',
                       color: isWeekend
                         ? 'var(--text-muted)'
-                        : isUnderLogged
-                        ? 'var(--accent-amber)'
-                        : isOverLogged
-                        ? 'var(--accent-primary)'
-                        : 'var(--accent-emerald)',
+                        : 'var(--text-primary)',
+                      border: '1px solid var(--border-subtle)',
                     }}
                   >
                     {isWeekend ? 'Off' : isUnderLogged ? 'Deficit' : isOverLogged ? 'Over' : 'Synced'}
@@ -643,7 +627,7 @@ export const MyWorkdayHub: React.FC = () => {
                         }}
                         title={wl.issue_title}
                       >
-                        <span style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{wl.issue_key}</span>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{wl.issue_key}</span>
                         <span>{wl.hours}h</span>
                       </div>
                     ))}
@@ -671,9 +655,9 @@ export const MyWorkdayHub: React.FC = () => {
         >
           {weeklyTimesheet?.submission_status === 'approved' ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <ShieldCheck size={18} color="#10b981" />
+              <ShieldCheck size={18} color="var(--text-primary)" />
               <div style={{ fontSize: '13px' }}>
-                <span style={{ color: '#34d399', fontWeight: 600 }}>Timesheet Officially Approved</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Timesheet Officially Approved</span>
                 {weeklyTimesheet.reviewed_by && (
                   <span style={{ color: 'var(--text-secondary)' }}> &bull; Reviewed by {weeklyTimesheet.reviewed_by}</span>
                 )}
@@ -686,8 +670,8 @@ export const MyWorkdayHub: React.FC = () => {
             </div>
           ) : weeklyTimesheet?.submission_status === 'submitted' ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Clock size={18} color="#f59e0b" />
-              <div style={{ fontSize: '13px', color: '#fbbf24' }}>
+              <Clock size={18} color="var(--text-secondary)" />
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
                 <strong>Awaiting Manager Review</strong> &bull; Submitted on{' '}
                 {weeklyTimesheet.submitted_at ? new Date(weeklyTimesheet.submitted_at).toLocaleDateString() : 'Today'}
               </div>

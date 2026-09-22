@@ -172,8 +172,9 @@ export const BacklogView: React.FC = () => {
               style={{
                 padding: '8px',
                 borderRadius: '10px',
-                background: isOvercommitted ? 'rgba(239, 68, 68, 0.15)' : 'rgba(99, 102, 241, 0.2)',
-                color: isOvercommitted ? '#f87171' : '#818cf8',
+                background: 'var(--surface-3)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-hairline)',
               }}
             >
               {isOvercommitted ? <ShieldAlert size={18} /> : <TrendingUp size={18} />}
@@ -189,9 +190,9 @@ export const BacklogView: React.FC = () => {
                     padding: '2px 8px',
                     borderRadius: '12px',
                     fontWeight: 600,
-                    background: isOvercommitted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.15)',
-                    color: isOvercommitted ? '#f87171' : '#34d399',
-                    border: `1px solid ${isOvercommitted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                    background: 'var(--surface-3)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-subtle)',
                   }}
                 >
                   {isOvercommitted ? 'Overcommitted Deficit' : 'Capacity Balanced'}
@@ -210,23 +211,23 @@ export const BacklogView: React.FC = () => {
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Approved PTO</span>
-              <strong style={{ color: leaveDeductionHours > 0 ? '#f59e0b' : 'var(--text-muted)' }}>
+              <strong style={{ color: 'var(--text-primary)' }}>
                 -{leaveDeductionHours}h
               </strong>
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Net Available</span>
-              <strong style={{ color: '#10b981' }}>{netHours}h</strong>
+              <strong style={{ color: 'var(--text-primary)' }}>{netHours}h</strong>
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Committed</span>
-              <strong style={{ color: isOvercommitted ? '#ef4444' : '#6366f1' }}>
+              <strong style={{ color: 'var(--text-primary)' }}>
                 {committedHours}h ({committedPoints} pts)
               </strong>
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Utilization</span>
-              <strong style={{ color: isOvercommitted ? '#ef4444' : '#10b981' }}>
+              <strong style={{ color: 'var(--text-primary)' }}>
                 {utilizationPct}%
               </strong>
             </div>
@@ -258,9 +259,7 @@ export const BacklogView: React.FC = () => {
             style={{
               height: '100%',
               width: `${Math.min(100, utilizationPct)}%`,
-              background: isOvercommitted
-                ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
-                : 'linear-gradient(90deg, #6366f1, #10b981)',
+              background: 'var(--text-primary)',
               transition: 'width 0.5s ease',
             }}
           />
@@ -273,16 +272,16 @@ export const BacklogView: React.FC = () => {
               marginTop: '12px',
               padding: '10px 14px',
               borderRadius: '8px',
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
+              background: 'var(--surface-3)',
+              border: '1px solid var(--border-strong)',
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
               fontSize: '12px',
-              color: '#fca5a5',
+              color: 'var(--text-primary)',
             }}
           >
-            <AlertCircle size={15} style={{ flexShrink: 0, color: '#ef4444' }} />
+            <AlertCircle size={15} style={{ flexShrink: 0, color: 'var(--text-primary)' }} />
             <span>{sprintCapacity.alert_message}</span>
           </div>
         )}
@@ -343,57 +342,45 @@ export const BacklogView: React.FC = () => {
                     </div>
                   </div>
 
-                  {eng.has_conflict ? (
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        background: 'rgba(239, 68, 68, 0.2)',
-                        color: '#f87171',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Conflict
-                    </span>
-                  ) : (
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        background: 'rgba(16, 185, 129, 0.15)',
-                        color: '#34d399',
-                      }}
-                    >
-                      Available
-                    </span>
-                  )}
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      background: 'var(--surface-3)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--border-subtle)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {eng.has_conflict ? 'Conflict' : 'Available'}
+                  </span>
                 </div>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: '11px',
-                    color: 'var(--text-secondary)',
-                    padding: '6px 8px',
-                    borderRadius: '6px',
-                    background: 'rgba(0, 0, 0, 0.2)',
-                  }}
-                >
-                  <div>Net Bandwidth: <strong style={{ color: '#fff' }}>{eng.net_capacity_hours}h</strong></div>
-                  <div>Committed: <strong style={{ color: eng.has_conflict ? '#f87171' : '#818cf8' }}>{eng.committed_hours}h ({eng.committed_points}p)</strong></div>
-                  {eng.approved_leave_days > 0 && (
-                    <div style={{ color: '#f59e0b' }}>PTO: {eng.approved_leave_days}d</div>
-                  )}
-                </div>
-
-                {eng.has_conflict && eng.conflict_reason && (
-                  <div style={{ fontSize: '11px', color: '#fca5a5', fontStyle: 'italic' }}>
-                    &bull; {eng.conflict_reason}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '11px',
+                      color: 'var(--text-secondary)',
+                      padding: '6px 8px',
+                      borderRadius: '6px',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border-hairline)',
+                    }}
+                  >
+                    <div>Net Bandwidth: <strong style={{ color: 'var(--text-primary)' }}>{eng.net_capacity_hours}h</strong></div>
+                    <div>Committed: <strong style={{ color: 'var(--text-primary)' }}>{eng.committed_hours}h ({eng.committed_points}p)</strong></div>
+                    {eng.approved_leave_days > 0 && (
+                      <div style={{ color: 'var(--text-secondary)' }}>PTO: {eng.approved_leave_days}d</div>
+                    )}
                   </div>
-                )}
+
+                  {eng.has_conflict && eng.conflict_reason && (
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      &bull; {eng.conflict_reason}
+                    </div>
+                  )}
               </div>
             ))}
           </div>
@@ -636,8 +623,9 @@ const IssueRow: React.FC<{ issue: any }> = ({ issue }) => {
             style={{
               padding: '2px 7px',
               borderRadius: '9999px',
-              background: 'rgba(99, 102, 241, 0.2)',
-              color: '#818cf8',
+              background: 'var(--surface-hover)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-hairline)',
               fontSize: '11px',
               fontWeight: 700,
             }}

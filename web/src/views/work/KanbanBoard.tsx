@@ -219,12 +219,12 @@ const KanbanColumnComponent: React.FC<ColumnProps> = ({ column, isOnline }) => {
       className="kanban-column"
       style={{
         borderColor: isOver
-          ? 'var(--accent-primary)'
+          ? 'var(--text-primary)'
           : isOverWip
-          ? '#ef4444'
+          ? 'var(--border-strong)'
           : 'var(--border-hairline)',
         background: isOver
-          ? 'rgba(94, 106, 210, 0.08)'
+          ? 'var(--surface-hover)'
           : 'var(--surface-2)',
         borderRadius: 'var(--radius-md)',
       }}
@@ -286,13 +286,13 @@ const KanbanCardComponent: React.FC<{ issue: Issue; isOnline: boolean }> = ({ is
   const getIssueIcon = (type: string) => {
     switch (type) {
       case 'bug':
-        return <Bug size={13} color="#ef4444" />;
+        return <Bug size={13} color="var(--text-primary)" />;
       case 'epic':
-        return <Sparkles size={13} color="#a855f7" />;
+        return <Sparkles size={13} color="var(--text-primary)" />;
       case 'story':
-        return <Bookmark size={13} color="#10b981" />;
+        return <Bookmark size={13} color="var(--text-primary)" />;
       default:
-        return <CheckSquare size={13} color="var(--accent-primary)" />;
+        return <CheckSquare size={13} color="var(--text-primary)" />;
     }
   };
 
@@ -434,7 +434,7 @@ const KanbanCardComponent: React.FC<{ issue: Issue; isOnline: boolean }> = ({ is
                 right: '-2px',
                 width: '6px',
                 height: '6px',
-                border: '1px solid #111420',
+                border: '1px solid var(--surface-1)',
               }}
               title={isOnline ? 'Currently Checked In' : 'Away / Checked Out'}
             />

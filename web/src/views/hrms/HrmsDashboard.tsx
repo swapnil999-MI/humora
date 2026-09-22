@@ -180,7 +180,7 @@ export const HrmsDashboard: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#818cf8',
+                color: 'var(--text-primary)',
               }}
             >
               <CalendarDays size={20} />
@@ -235,7 +235,7 @@ export const HrmsDashboard: React.FC = () => {
         <div
           style={{
             background: 'var(--surface-1)',
-            border: pendingLeavesCount > 0 ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--border-hairline)',
+            border: '1px solid var(--border-hairline)',
             borderRadius: '12px',
             padding: '18px 20px',
             display: 'flex',
@@ -244,12 +244,12 @@ export const HrmsDashboard: React.FC = () => {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '11px', color: pendingLeavesCount > 0 ? '#fbbf24' : 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
               Pending Approvals
             </span>
-            <Clock size={16} color={pendingLeavesCount > 0 ? '#f59e0b' : 'var(--text-muted)'} />
+            <Clock size={16} color="var(--text-muted)" />
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: pendingLeavesCount > 0 ? '#fbbf24' : 'var(--text-primary)', marginTop: '8px' }}>
+          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
             {pendingLeavesCount}{' '}
             <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>Requests</span>
           </div>
@@ -295,7 +295,7 @@ export const HrmsDashboard: React.FC = () => {
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
               Upcoming Holidays
             </span>
-            <Gift size={16} color="#c084fc" />
+            <Gift size={16} color="var(--text-secondary)" />
           </div>
           <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
             {upcomingHolidays.length}{' '}
@@ -352,9 +352,10 @@ export const HrmsDashboard: React.FC = () => {
                         padding: '2px 8px',
                         borderRadius: '4px',
                         background: 'var(--surface-3)',
-                        color: '#818cf8',
+                        color: 'var(--text-secondary)',
                         fontFamily: 'monospace',
                         fontWeight: 600,
+                        border: '1px solid var(--border-subtle)',
                       }}
                     >
                       {bal.leave_type_code}
@@ -389,12 +390,7 @@ export const HrmsDashboard: React.FC = () => {
                         style={{
                           height: '100%',
                           width: `${usedPercent}%`,
-                          background:
-                            bal.leave_type_code === 'PL'
-                              ? 'var(--accent-primary)'
-                              : bal.leave_type_code === 'CL'
-                              ? 'var(--accent-emerald)'
-                              : '#f59e0b',
+                          background: 'var(--text-primary)',
                           borderRadius: '6px',
                         }}
                       />
@@ -445,7 +441,7 @@ export const HrmsDashboard: React.FC = () => {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <PartyPopper size={18} color="#c084fc" />
+              <PartyPopper size={18} color="var(--text-primary)" />
               <h3 style={{ fontSize: '15px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                 Upcoming Company Holidays
               </h3>
@@ -470,8 +466,9 @@ export const HrmsDashboard: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div
                     style={{
-                      background: 'rgba(168, 85, 247, 0.12)',
-                      color: '#c084fc',
+                      background: 'var(--surface-3)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border-subtle)',
                       borderRadius: '6px',
                       padding: '4px 8px',
                       textAlign: 'center',
@@ -501,8 +498,9 @@ export const HrmsDashboard: React.FC = () => {
                     fontSize: '11px',
                     padding: '3px 8px',
                     borderRadius: '4px',
-                    background: holiday.daysAway <= 30 ? 'rgba(245, 158, 11, 0.15)' : 'var(--surface-3)',
-                    color: holiday.daysAway <= 30 ? '#fbbf24' : 'var(--text-secondary)',
+                    background: 'var(--surface-3)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-subtle)',
                     fontWeight: 600,
                   }}
                 >
@@ -583,18 +581,9 @@ export const HrmsDashboard: React.FC = () => {
                       borderRadius: '4px',
                       textTransform: 'uppercase',
                       fontWeight: 600,
-                      background:
-                        l.status === 'approved'
-                          ? 'rgba(16, 185, 129, 0.15)'
-                          : l.status === 'pending'
-                          ? 'rgba(245, 158, 11, 0.15)'
-                          : 'rgba(239, 68, 68, 0.15)',
-                      color:
-                        l.status === 'approved'
-                          ? '#34d399'
-                          : l.status === 'pending'
-                          ? '#fbbf24'
-                          : '#f87171',
+                      background: 'var(--surface-3)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--border-subtle)',
                     }}
                   >
                     {l.status}
@@ -691,7 +680,7 @@ export const HrmsDashboard: React.FC = () => {
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{leave.total_days}</span>
                       {leave.sandwich_days_added > 0 && (
-                        <span style={{ fontSize: '10px', color: '#fbbf24', marginLeft: '6px' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '6px' }}>
                           (+{leave.sandwich_days_added} sandwich)
                         </span>
                       )}
@@ -707,18 +696,9 @@ export const HrmsDashboard: React.FC = () => {
                           borderRadius: '4px',
                           textTransform: 'uppercase',
                           fontWeight: 700,
-                          background:
-                            leave.status === 'approved'
-                              ? 'rgba(16, 185, 129, 0.15)'
-                              : leave.status === 'pending'
-                              ? 'rgba(245, 158, 11, 0.15)'
-                              : 'rgba(239, 68, 68, 0.15)',
-                          color:
-                            leave.status === 'approved'
-                              ? '#34d399'
-                              : leave.status === 'pending'
-                              ? '#fbbf24'
-                              : '#f87171',
+                          background: 'var(--surface-3)',
+                          color: 'var(--text-secondary)',
+                          border: '1px solid var(--border-subtle)',
                         }}
                       >
                         {leave.status}
@@ -856,7 +836,7 @@ export const HrmsDashboard: React.FC = () => {
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Projected Balance Remaining:</span>
-                    <span style={{ color: currentPreview.projected_balance >= 0 ? '#34d399' : '#f87171', fontWeight: 600 }}>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                       {currentPreview.projected_balance} days
                     </span>
                   </div>
@@ -864,8 +844,9 @@ export const HrmsDashboard: React.FC = () => {
                   {currentPreview.sandwich_rule_active && (
                     <div
                       style={{
-                        background: 'rgba(245, 158, 11, 0.1)',
-                        color: '#fbbf24',
+                        background: 'var(--surface-3)',
+                        color: 'var(--text-secondary)',
+                        border: '1px solid var(--border-subtle)',
                         padding: '4px 8px',
                         borderRadius: '4px',
                         fontSize: '11px',

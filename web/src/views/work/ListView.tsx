@@ -58,14 +58,14 @@ export const ListView: React.FC = () => {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'bug':
-        return <AlertCircle size={14} color="#ef4444" />;
+        return <AlertCircle size={14} color="var(--text-primary)" />;
       case 'epic':
-        return <Sparkles size={14} color="#a855f7" />;
+        return <Sparkles size={14} color="var(--text-primary)" />;
       case 'story':
-        return <Bookmark size={14} color="#10b981" />;
+        return <Bookmark size={14} color="var(--text-primary)" />;
       case 'task':
       default:
-        return <CheckSquare size={14} color="var(--accent-primary)" />;
+        return <CheckSquare size={14} color="var(--text-primary)" />;
     }
   };
 

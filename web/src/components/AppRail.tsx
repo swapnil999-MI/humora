@@ -39,19 +39,19 @@ export const AppRail: React.FC<{ onOpenCommandPalette: () => void }> = ({
             width: '34px',
             height: '34px',
             borderRadius: 'var(--radius-md)',
-            background: 'var(--accent-primary)',
+            background: 'var(--text-primary)',
             border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 6px var(--accent-ring)',
+            boxShadow: 'var(--shadow-sm)',
             cursor: 'pointer',
             transition: 'transform var(--transition-fast)',
           }}
           title="Humora Enterprise Platform"
           onClick={() => dispatch(navigateToPage('hub'))}
         >
-          <Building2 size={18} color="#ffffff" strokeWidth={2} />
+          <Building2 size={18} color="var(--surface-0)" strokeWidth={2} />
         </button>
 
         <div style={{ width: '28px', height: '1px', background: 'var(--border-hairline)' }} />
@@ -83,13 +83,12 @@ export const AppRail: React.FC<{ onOpenCommandPalette: () => void }> = ({
               <span
                 style={{
                   position: 'absolute',
-                  top: '5px',
-                  right: '5px',
-                  width: '8px',
-                  height: '8px',
+                  top: '6px',
+                  right: '6px',
+                  width: '6px',
+                  height: '6px',
                   borderRadius: '50%',
-                  background: 'var(--accent-amber)',
-                  boxShadow: '0 0 6px var(--accent-amber)',
+                  background: 'var(--text-primary)',
                 }}
               />
             )}
@@ -141,13 +140,13 @@ export const AppRail: React.FC<{ onOpenCommandPalette: () => void }> = ({
               width: '32px',
               height: '32px',
               borderRadius: '50%',
-              background: activePage === 'profile' ? 'var(--accent-primary)' : 'var(--surface-hover)',
+              background: activePage === 'profile' ? 'var(--text-primary)' : 'var(--surface-3)',
               border: '1px solid var(--border-subtle)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 700,
-              color: activePage === 'profile' ? '#ffffff' : 'var(--text-primary)',
+              color: activePage === 'profile' ? 'var(--surface-0)' : 'var(--text-primary)',
               fontSize: '12px',
               cursor: 'pointer',
               boxShadow: 'var(--shadow-xs)',

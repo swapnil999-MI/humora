@@ -85,16 +85,7 @@ export const SubNavPane: React.FC = () => {
                   <span>My Leaves & Absence</span>
                 </div>
                 {myPendingLeavesCount > 0 && (
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      padding: '1px 6px',
-                      borderRadius: 'var(--radius-xs)',
-                      background: 'var(--accent-amber-subtle)',
-                      color: 'var(--accent-amber)',
-                      fontWeight: 700,
-                    }}
-                  >
+                  <span className="nav-badge">
                     {myPendingLeavesCount}
                   </span>
                 )}
@@ -160,16 +151,7 @@ export const SubNavPane: React.FC = () => {
                   <span>Approvals Desk</span>
                 </div>
                 {pendingApprovalsCount > 0 && (
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      padding: '1px 6px',
-                      borderRadius: 'var(--radius-xs)',
-                      background: 'var(--accent-amber)',
-                      color: '#000000',
-                      fontWeight: 700,
-                    }}
-                  >
+                  <span className="nav-badge">
                     {pendingApprovalsCount}
                   </span>
                 )}
@@ -295,7 +277,7 @@ export const SubNavPane: React.FC = () => {
                   <ListFilter size={15} strokeWidth={1.8} />
                   <span>High-Density List</span>
                 </div>
-                <span className="mono-tag" style={{ color: 'var(--accent-primary)' }}>
+                <span className="mono-tag">
                   TAB
                 </span>
               </button>

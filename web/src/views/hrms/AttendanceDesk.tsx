@@ -408,8 +408,8 @@ export const AttendanceDesk: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        background: '#121212',
-        color: '#e2e8f0',
+        background: 'var(--surface-0)',
+        color: 'var(--text-primary)',
         fontFamily: 'var(--font-sans)',
         overflow: 'hidden',
         userSelect: 'none',
@@ -422,8 +422,8 @@ export const AttendanceDesk: React.FC = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 24px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          background: '#181818',
+          borderBottom: '1px solid var(--border-hairline)',
+          background: 'var(--surface-1)',
           height: '48px',
           flexShrink: 0,
         }}
@@ -434,7 +434,7 @@ export const AttendanceDesk: React.FC = () => {
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: activeTab === 'summary' ? '2px solid #3b82f6' : '2px solid transparent',
+              borderBottom: activeTab === 'summary' ? '2px solid var(--text-primary)' : '2px solid transparent',
               color: activeTab === 'summary' ? 'var(--text-primary)' : 'var(--text-muted)',
               fontSize: '13px',
               fontWeight: 600,
@@ -453,7 +453,7 @@ export const AttendanceDesk: React.FC = () => {
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: activeTab === 'regularization' ? '2px solid #3b82f6' : '2px solid transparent',
+              borderBottom: activeTab === 'regularization' ? '2px solid var(--text-primary)' : '2px solid transparent',
               color: activeTab === 'regularization' ? 'var(--text-primary)' : 'var(--text-muted)',
               fontSize: '13px',
               fontWeight: 500,
@@ -467,16 +467,7 @@ export const AttendanceDesk: React.FC = () => {
           >
             <span>Regularization</span>
             {myRegularizations.filter((r) => r.status === 'pending').length > 0 && (
-              <span
-                style={{
-                  background: '#f59e0b',
-                  color: '#000',
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  padding: '1px 5px',
-                  borderRadius: '10px',
-                }}
-              >
+              <span className="nav-badge">
                 {myRegularizations.filter((r) => r.status === 'pending').length}
               </span>
             )}
@@ -487,7 +478,7 @@ export const AttendanceDesk: React.FC = () => {
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: activeTab === 'onduty' ? '2px solid #3b82f6' : '2px solid transparent',
+              borderBottom: activeTab === 'onduty' ? '2px solid var(--text-primary)' : '2px solid transparent',
               color: activeTab === 'onduty' ? 'var(--text-primary)' : 'var(--text-muted)',
               fontSize: '13px',
               fontWeight: 500,
@@ -510,22 +501,22 @@ export const AttendanceDesk: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              background: '#222222',
+              background: 'var(--surface-2)',
               borderRadius: '6px',
               padding: '4px 10px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              border: '1px solid var(--border-hairline)',
             }}
           >
             <button
               onClick={handlePrevWeek}
-              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
             >
               <ChevronLeft size={15} />
             </button>
 
             <button
               onClick={handleCurrentWeek}
-              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
               title="Current Week"
             >
               <CalendarIcon size={14} />
@@ -533,12 +524,12 @@ export const AttendanceDesk: React.FC = () => {
 
             <button
               onClick={handleNextWeek}
-              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
             >
               <ChevronRight size={15} />
             </button>
 
-            <span style={{ fontSize: '12px', fontWeight: 500, color: '#e2e8f0', marginLeft: '4px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', marginLeft: '4px' }}>
               {dateRangeString}
             </span>
           </div>
@@ -547,17 +538,17 @@ export const AttendanceDesk: React.FC = () => {
           <div
             style={{
               display: 'flex',
-              background: '#222222',
+              background: 'var(--surface-2)',
               borderRadius: '6px',
               padding: '2px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              border: '1px solid var(--border-hairline)',
             }}
           >
             <button
               onClick={() => setViewMode('list')}
               style={{
-                background: viewMode === 'list' ? '#3b82f6' : 'transparent',
-                color: viewMode === 'list' ? 'var(--text-primary)' : 'var(--text-muted)',
+                background: viewMode === 'list' ? 'var(--text-primary)' : 'transparent',
+                color: viewMode === 'list' ? 'var(--surface-0)' : 'var(--text-muted)',
                 border: 'none',
                 borderRadius: '4px',
                 padding: '4px 8px',
@@ -573,8 +564,8 @@ export const AttendanceDesk: React.FC = () => {
             <button
               onClick={() => setViewMode('matrix')}
               style={{
-                background: viewMode === 'matrix' ? '#3b82f6' : 'transparent',
-                color: viewMode === 'matrix' ? 'var(--text-primary)' : 'var(--text-muted)',
+                background: viewMode === 'matrix' ? 'var(--text-primary)' : 'transparent',
+                color: viewMode === 'matrix' ? 'var(--surface-0)' : 'var(--text-muted)',
                 border: 'none',
                 borderRadius: '4px',
                 padding: '4px 8px',
@@ -590,8 +581,8 @@ export const AttendanceDesk: React.FC = () => {
             <button
               onClick={() => setViewMode('calendar')}
               style={{
-                background: viewMode === 'calendar' ? '#3b82f6' : 'transparent',
-                color: viewMode === 'calendar' ? 'var(--text-primary)' : 'var(--text-muted)',
+                background: viewMode === 'calendar' ? 'var(--text-primary)' : 'transparent',
+                color: viewMode === 'calendar' ? 'var(--surface-0)' : 'var(--text-muted)',
                 border: 'none',
                 borderRadius: '4px',
                 padding: '4px 8px',
@@ -610,8 +601,8 @@ export const AttendanceDesk: React.FC = () => {
             <button
               onClick={() => setIsRequestMenuOpen((prev) => !prev)}
               style={{
-                background: '#0284c7',
-                color: '#ffffff',
+                background: 'var(--text-primary)',
+                color: 'var(--surface-0)',
                 border: 'none',
                 borderRadius: '6px',
                 padding: '6px 14px',
@@ -634,10 +625,10 @@ export const AttendanceDesk: React.FC = () => {
                   top: '100%',
                   right: 0,
                   marginTop: '6px',
-                  background: '#222222',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border-subtle)',
                   borderRadius: '8px',
-                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
+                  boxShadow: 'var(--shadow-popover)',
                   minWidth: '220px',
                   zIndex: 200,
                   padding: '6px',
@@ -655,7 +646,7 @@ export const AttendanceDesk: React.FC = () => {
                     borderRadius: '6px',
                     border: 'none',
                     background: 'transparent',
-                    color: '#e2e8f0',
+                    color: 'var(--text-primary)',
                     fontSize: '12px',
                     textAlign: 'left',
                     cursor: 'pointer',
@@ -663,10 +654,10 @@ export const AttendanceDesk: React.FC = () => {
                     alignItems: 'center',
                     gap: '8px',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#333333')}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <FileCheck2 size={14} color="#fbbf24" />
+                  <FileCheck2 size={14} color="var(--text-primary)" />
                   <span>Request Regularization</span>
                 </button>
 
@@ -682,7 +673,7 @@ export const AttendanceDesk: React.FC = () => {
                     borderRadius: '6px',
                     border: 'none',
                     background: 'transparent',
-                    color: '#e2e8f0',
+                    color: 'var(--text-primary)',
                     fontSize: '12px',
                     textAlign: 'left',
                     cursor: 'pointer',
@@ -690,10 +681,10 @@ export const AttendanceDesk: React.FC = () => {
                     alignItems: 'center',
                     gap: '8px',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#333333')}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <Briefcase size={14} color="#818cf8" />
+                  <Briefcase size={14} color="var(--text-primary)" />
                   <span>Apply for On Duty</span>
                 </button>
 
@@ -709,7 +700,7 @@ export const AttendanceDesk: React.FC = () => {
                     borderRadius: '6px',
                     border: 'none',
                     background: 'transparent',
-                    color: '#e2e8f0',
+                    color: 'var(--text-primary)',
                     fontSize: '12px',
                     textAlign: 'left',
                     cursor: 'pointer',
@@ -717,10 +708,10 @@ export const AttendanceDesk: React.FC = () => {
                     alignItems: 'center',
                     gap: '8px',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#333333')}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <Laptop size={14} color="#34d399" />
+                  <Laptop size={14} color="var(--text-primary)" />
                   <span>Apply for WFH</span>
                 </button>
               </div>
@@ -730,10 +721,10 @@ export const AttendanceDesk: React.FC = () => {
           <button
             style={{
               background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              border: '1px solid var(--border-hairline)',
               borderRadius: '6px',
               padding: '6px',
-              color: '#94a3b8',
+              color: 'var(--text-muted)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -747,7 +738,7 @@ export const AttendanceDesk: React.FC = () => {
       {/* 2. Main Content Viewport */}
       {activeTab === 'summary' && (
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-          {/* Active Shift & Check-Out Banner (Matches Screenshot exactly) */}
+          {/* Active Shift & Check-Out Banner */}
           <div
             style={{
               padding: '16px 24px',
@@ -755,11 +746,12 @@ export const AttendanceDesk: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '20px',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+              borderBottom: '1px solid var(--border-hairline)',
+              background: 'var(--surface-1)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                 General [ 10:00 AM - 7:00 PM ]
               </div>
 
@@ -769,12 +761,12 @@ export const AttendanceDesk: React.FC = () => {
                 value={punchNotes}
                 onChange={(e) => setPunchNotes(e.target.value)}
                 style={{
-                  background: '#1a1a1a',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border-hairline)',
                   borderRadius: '6px',
                   padding: '8px 14px',
                   fontSize: '12px',
-                  color: '#e2e8f0',
+                  color: 'var(--text-primary)',
                   outline: 'none',
                   width: '320px',
                   transition: 'border-color 0.2s ease',
@@ -782,26 +774,28 @@ export const AttendanceDesk: React.FC = () => {
               />
             </div>
 
-            {/* Check-Out / Check-In Action Card (Coral / Red pill card) */}
+            {/* Check-Out / Check-In Action Card */}
             <div
               onClick={() => handlePunchAction(isCheckedIn ? 'punch_out' : 'punch_in')}
               style={{
-                background: isCheckedIn ? '#ef4444' : '#10b981',
+                background: isCheckedIn ? 'var(--surface-3)' : 'var(--text-primary)',
+                color: isCheckedIn ? 'var(--text-primary)' : 'var(--surface-0)',
+                border: '1px solid var(--border-subtle)',
                 borderRadius: '8px',
                 padding: '8px 18px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '14px',
                 cursor: 'pointer',
-                boxShadow: isCheckedIn ? '0 4px 14px rgba(239, 68, 68, 0.3)' : '0 4px 14px rgba(16, 185, 129, 0.3)',
+                boxShadow: 'var(--shadow-sm)',
                 transition: 'transform 0.1s ease',
               }}
             >
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', opacity: 0.9 }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, opacity: 0.85 }}>
                   {isCheckedIn ? 'Check-out' : 'Check-in'}
                 </div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace', letterSpacing: '0.02em' }}>
+                <div style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.02em' }}>
                   {isCheckedIn ? `${elapsedWorkTime} Hrs` : '00:00:00 Hrs'}
                 </div>
               </div>
@@ -811,11 +805,11 @@ export const AttendanceDesk: React.FC = () => {
                   width: '32px',
                   height: '32px',
                   borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.2)',
+                  background: isCheckedIn ? 'var(--surface-hover)' : 'var(--surface-3)',
+                  color: isCheckedIn ? 'var(--text-primary)' : 'var(--surface-0)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: 'var(--text-primary)',
                 }}
               >
                 {isCheckedIn ? <LogOut size={16} /> : <LogIn size={16} />}
@@ -827,29 +821,30 @@ export const AttendanceDesk: React.FC = () => {
               id="btn-face-punch"
               onClick={() => openFaceModal(isCheckedIn ? 'out' : 'in')}
               style={{
-                background: 'linear-gradient(135deg, #1e1b4b 0%, #2e1065 50%, #4338ca 100%)',
-                border: '1px solid rgba(165, 180, 252, 0.4)',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border-subtle)',
                 borderRadius: '8px',
                 padding: '8px 16px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(99, 102, 241, 0.35)',
+                boxShadow: 'var(--shadow-xs)',
                 transition: 'all 0.2s ease',
+                color: 'var(--text-primary)',
               }}
               title="Biometric Face Authentication (MobileFaceNet 128-D)"
             >
               <div style={{ textAlign: 'left' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#e0e7ff', letterSpacing: '0.02em' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
                     {isCheckedIn ? 'Face Check-out' : 'Face Check-in'}
                   </span>
                   <span
                     style={{
-                      background: 'rgba(56, 189, 248, 0.25)',
-                      border: '1px solid rgba(56, 189, 248, 0.5)',
-                      color: '#38bdf8',
+                      background: 'var(--surface-3)',
+                      border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-secondary)',
                       fontSize: '9px',
                       padding: '1px 5px',
                       borderRadius: '4px',
@@ -859,7 +854,7 @@ export const AttendanceDesk: React.FC = () => {
                     AI 128-D
                   </span>
                 </div>
-                <div style={{ fontSize: '10px', color: '#a5b4fc', marginTop: '2px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
                   Biometric Verified
                 </div>
               </div>
@@ -869,8 +864,8 @@ export const AttendanceDesk: React.FC = () => {
                   width: '32px',
                   height: '32px',
                   borderRadius: '50%',
-                  background: 'rgba(99, 102, 241, 0.3)',
-                  border: '1px solid rgba(199, 210, 254, 0.3)',
+                  background: 'var(--surface-3)',
+                  border: '1px solid var(--border-subtle)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -896,23 +891,23 @@ export const AttendanceDesk: React.FC = () => {
                       display: 'flex',
                       alignItems: 'center',
                       padding: '0 24px',
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                      borderBottom: '1px solid var(--border-hairline)',
                       position: 'relative',
-                      background: day.isToday ? 'rgba(59, 130, 246, 0.03)' : 'transparent',
+                      background: day.isToday ? 'var(--surface-hover)' : 'transparent',
                     }}
                   >
                     {/* Left Column: Date & Status Badge */}
                     <div style={{ width: '160px', display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
                       <div style={{ textAlign: 'center', minWidth: '32px' }}>
-                        <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                           {day.dayName}
                         </div>
                         <div
                           style={{
                             fontSize: '13px',
                             fontWeight: 700,
-                            color: day.isToday ? '#ffffff' : '#e2e8f0',
-                            background: day.isToday ? '#0284c7' : 'transparent',
+                            color: day.isToday ? 'var(--surface-0)' : 'var(--text-primary)',
+                            background: day.isToday ? 'var(--text-primary)' : 'transparent',
                             width: day.isToday ? '24px' : 'auto',
                             height: day.isToday ? '24px' : 'auto',
                             borderRadius: '50%',
@@ -929,8 +924,8 @@ export const AttendanceDesk: React.FC = () => {
                       {/* In badge if checked in */}
                       {(day.status === 'present' || day.status === 'today') && (
                         <div>
-                          <div style={{ fontSize: '10px', color: '#34d399', fontWeight: 600 }}>Office In</div>
-                          <div style={{ fontSize: '11px', color: '#e2e8f0', fontFamily: 'monospace' }}>
+                          <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600 }}>Office In</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-primary)', fontFamily: 'monospace' }}>
                             {day.inTime}
                           </div>
                         </div>
@@ -944,7 +939,7 @@ export const AttendanceDesk: React.FC = () => {
                         style={{
                           width: '100%',
                           height: '2px',
-                          background: 'rgba(255, 255, 255, 0.1)',
+                          background: 'var(--border-subtle)',
                           position: 'relative',
                         }}
                       >
@@ -958,7 +953,7 @@ export const AttendanceDesk: React.FC = () => {
                             width: '4px',
                             height: '4px',
                             borderRadius: '50%',
-                            background: 'rgba(255, 255, 255, 0.25)',
+                            background: 'var(--text-secondary)',
                           }}
                         />
 
@@ -972,7 +967,7 @@ export const AttendanceDesk: React.FC = () => {
                             width: '4px',
                             height: '4px',
                             borderRadius: '50%',
-                            background: 'rgba(255, 255, 255, 0.25)',
+                            background: 'var(--text-secondary)',
                           }}
                         />
 
@@ -984,9 +979,9 @@ export const AttendanceDesk: React.FC = () => {
                               left: '50%',
                               top: '50%',
                               transform: 'translate(-50%, -50%)',
-                              background: '#222014',
-                              border: '1px solid #78581e',
-                              color: '#fbbf24',
+                              background: 'var(--surface-3)',
+                              border: '1px solid var(--border-subtle)',
+                              color: 'var(--text-secondary)',
                               fontSize: '10px',
                               fontWeight: 600,
                               padding: '2px 10px',
@@ -1006,9 +1001,9 @@ export const AttendanceDesk: React.FC = () => {
                               left: '50%',
                               top: '50%',
                               transform: 'translate(-50%, -50%)',
-                              background: '#2a1719',
-                              border: '1px solid #7f232b',
-                              color: '#f87171',
+                              background: 'var(--surface-3)',
+                              border: '1px solid var(--border-subtle)',
+                              color: 'var(--text-secondary)',
                               fontSize: '10px',
                               fontWeight: 600,
                               padding: '2px 10px',
@@ -1029,7 +1024,7 @@ export const AttendanceDesk: React.FC = () => {
                                 left: '0%',
                                 right: '0%',
                                 height: '2px',
-                                background: '#34d399',
+                                background: 'var(--text-primary)',
                               }}
                             />
                             {/* In dot */}
@@ -1042,7 +1037,7 @@ export const AttendanceDesk: React.FC = () => {
                                 width: '6px',
                                 height: '6px',
                                 borderRadius: '50%',
-                                background: '#34d399',
+                                background: 'var(--text-primary)',
                               }}
                             />
                             {/* Break dots in middle */}
@@ -1055,7 +1050,7 @@ export const AttendanceDesk: React.FC = () => {
                                 width: '4px',
                                 height: '4px',
                                 borderRadius: '50%',
-                                background: '#f59e0b',
+                                background: 'var(--text-muted)',
                               }}
                             />
                             <div
@@ -1067,7 +1062,7 @@ export const AttendanceDesk: React.FC = () => {
                                 width: '4px',
                                 height: '4px',
                                 borderRadius: '50%',
-                                background: '#f59e0b',
+                                background: 'var(--text-muted)',
                               }}
                             />
                             {/* Out dot */}
@@ -1080,7 +1075,7 @@ export const AttendanceDesk: React.FC = () => {
                                 width: '6px',
                                 height: '6px',
                                 borderRadius: '50%',
-                                background: '#f87171',
+                                background: 'var(--text-primary)',
                               }}
                             />
                           </>
@@ -1095,7 +1090,7 @@ export const AttendanceDesk: React.FC = () => {
                                 left: '0%',
                                 width: `${currentTimePercent}%`,
                                 height: '2px',
-                                background: '#34d399',
+                                background: 'var(--text-primary)',
                               }}
                             />
                             {/* In dot */}
@@ -1108,7 +1103,7 @@ export const AttendanceDesk: React.FC = () => {
                                 width: '6px',
                                 height: '6px',
                                 borderRadius: '50%',
-                                background: '#34d399',
+                                background: 'var(--text-primary)',
                               }}
                             />
                           </>
@@ -1119,14 +1114,14 @@ export const AttendanceDesk: React.FC = () => {
                     {/* Right Column: Hours Worked & Punch Out time */}
                     <div style={{ width: '130px', textAlign: 'right', flexShrink: 0 }}>
                       {day.status === 'present' && (
-                        <div style={{ fontSize: '11px', color: '#94a3b8', fontFamily: 'monospace', marginBottom: '2px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '2px' }}>
                           07:00 PM
                         </div>
                       )}
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'monospace' }}>
                         {day.hoursWorked}
                       </div>
-                      <div style={{ fontSize: '10px', color: '#64748b' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                         {day.status === 'today' ? 'Hrs' : 'Hrs worked'}
                       </div>
                     </div>
@@ -1135,7 +1130,7 @@ export const AttendanceDesk: React.FC = () => {
               })}
             </div>
 
-            {/* Vertical Dashed Blue Line across all rows marking Current Time (e.g. 04PM in screenshot) */}
+            {/* Vertical Dashed Line across all rows marking Current Time */}
             <div
               style={{
                 position: 'absolute',
@@ -1143,7 +1138,7 @@ export const AttendanceDesk: React.FC = () => {
                 bottom: '36px',
                 left: `calc(184px + (100% - 338px) * ${currentTimePercent / 100})`,
                 width: '1px',
-                borderLeft: '1px dashed #38bdf8',
+                borderLeft: '1px dashed var(--border-strong)',
                 pointerEvents: 'none',
                 zIndex: 10,
               }}
@@ -1153,8 +1148,8 @@ export const AttendanceDesk: React.FC = () => {
             <div
               style={{
                 height: '36px',
-                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                background: '#151515',
+                borderTop: '1px solid var(--border-hairline)',
+                background: 'var(--surface-1)',
                 display: 'flex',
                 alignItems: 'center',
                 padding: '0 24px',
@@ -1167,7 +1162,7 @@ export const AttendanceDesk: React.FC = () => {
                     key={lbl}
                     style={{
                       fontSize: '11px',
-                      color: '#64748b',
+                      color: 'var(--text-muted)',
                       fontFamily: 'monospace',
                     }}
                   >
@@ -1179,12 +1174,12 @@ export const AttendanceDesk: React.FC = () => {
             </div>
           </div>
 
-          {/* 4. Bottom Summary Bar (Matches Screenshot exactly) */}
+          {/* 4. Bottom Summary Bar */}
           <div
             style={{
               height: '48px',
-              background: '#181818',
-              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'var(--surface-1)',
+              borderTop: '1px solid var(--border-hairline)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -1198,17 +1193,17 @@ export const AttendanceDesk: React.FC = () => {
               <div
                 style={{
                   display: 'flex',
-                  background: '#242424',
+                  background: 'var(--surface-2)',
                   borderRadius: '4px',
                   padding: '2px',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  border: '1px solid var(--border-hairline)',
                 }}
               >
                 <button
                   onClick={() => setUnitMode('days')}
                   style={{
-                    background: unitMode === 'days' ? '#3b82f6' : 'transparent',
-                    color: unitMode === 'days' ? 'var(--text-primary)' : 'var(--text-muted)',
+                    background: unitMode === 'days' ? 'var(--text-primary)' : 'transparent',
+                    color: unitMode === 'days' ? 'var(--surface-0)' : 'var(--text-muted)',
                     border: 'none',
                     borderRadius: '3px',
                     padding: '3px 10px',
@@ -1222,8 +1217,8 @@ export const AttendanceDesk: React.FC = () => {
                 <button
                   onClick={() => setUnitMode('hours')}
                   style={{
-                    background: unitMode === 'hours' ? '#3b82f6' : 'transparent',
-                    color: unitMode === 'hours' ? 'var(--text-primary)' : 'var(--text-muted)',
+                    background: unitMode === 'hours' ? 'var(--text-primary)' : 'transparent',
+                    color: unitMode === 'hours' ? 'var(--surface-0)' : 'var(--text-muted)',
                     border: 'none',
                     borderRadius: '3px',
                     padding: '3px 10px',
@@ -1236,41 +1231,41 @@ export const AttendanceDesk: React.FC = () => {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#94a3b8' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: 'var(--text-muted)' }}>
                 <div>
-                  <span style={{ color: '#64748b' }}>Payable Days: </span>
+                  <span style={{ color: 'var(--text-muted)' }}>Payable Days: </span>
                   <strong style={{ color: 'var(--text-primary)' }}>3 Days</strong>
                 </div>
 
-                <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.1)', paddingLeft: '16px' }}>
-                  <span style={{ color: '#64748b' }}>Present: </span>
-                  <strong style={{ color: '#34d399' }}>1 Day</strong>
+                <div style={{ borderLeft: '1px solid var(--border-hairline)', paddingLeft: '16px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Present: </span>
+                  <strong style={{ color: 'var(--text-primary)' }}>1 Day</strong>
                 </div>
 
-                <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.1)', paddingLeft: '16px' }}>
-                  <span style={{ color: '#64748b' }}>On Duty: </span>
-                  <strong style={{ color: '#818cf8' }}>0 Day</strong>
+                <div style={{ borderLeft: '1px solid var(--border-hairline)', paddingLeft: '16px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>On Duty: </span>
+                  <strong style={{ color: 'var(--text-primary)' }}>0 Day</strong>
                 </div>
 
-                <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.1)', paddingLeft: '16px' }}>
-                  <span style={{ color: '#64748b' }}>Paid leave: </span>
-                  <strong style={{ color: '#38bdf8' }}>0 Day</strong>
+                <div style={{ borderLeft: '1px solid var(--border-hairline)', paddingLeft: '16px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Paid leave: </span>
+                  <strong style={{ color: 'var(--text-primary)' }}>0 Day</strong>
                 </div>
 
-                <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.1)', paddingLeft: '16px' }}>
-                  <span style={{ color: '#64748b' }}>Holidays: </span>
-                  <strong style={{ color: '#c084fc' }}>0 Day</strong>
+                <div style={{ borderLeft: '1px solid var(--border-hairline)', paddingLeft: '16px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Holidays: </span>
+                  <strong style={{ color: 'var(--text-primary)' }}>0 Day</strong>
                 </div>
 
-                <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.1)', paddingLeft: '16px' }}>
-                  <span style={{ color: '#64748b' }}>Weekend: </span>
-                  <strong style={{ color: '#fbbf24' }}>2 Days</strong>
+                <div style={{ borderLeft: '1px solid var(--border-hairline)', paddingLeft: '16px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Weekend: </span>
+                  <strong style={{ color: 'var(--text-primary)' }}>2 Days</strong>
                 </div>
               </div>
             </div>
 
             {/* Right: Assigned Shift */}
-            <div style={{ color: '#94a3b8', fontSize: '11px' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
               General [ 10:00 AM - 7:00 PM ]
             </div>
           </div>
@@ -1283,10 +1278,10 @@ export const AttendanceDesk: React.FC = () => {
           <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: '#f1f5f9' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                   Attendance Regularizations
                 </h2>
-                <p style={{ fontSize: '12px', color: '#94a3b8', margin: '3px 0 0' }}>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '3px 0 0' }}>
                   Submit missed clock-ins or clock-outs for manager reconciliation.
                 </p>
               </div>
@@ -1297,8 +1292,8 @@ export const AttendanceDesk: React.FC = () => {
                   setIsRegularizeModalOpen(true);
                 }}
                 style={{
-                  background: '#3b82f6',
-                  color: '#ffffff',
+                  background: 'var(--text-primary)',
+                  color: 'var(--surface-0)',
                   border: 'none',
                   borderRadius: '6px',
                   padding: '8px 16px',
@@ -1315,10 +1310,10 @@ export const AttendanceDesk: React.FC = () => {
               </button>
             </div>
 
-            <div style={{ background: '#1c1c1c', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-hairline)', borderRadius: '10px', overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ background: '#242424', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: '#94a3b8' }}>
+                  <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border-hairline)', color: 'var(--text-muted)' }}>
                     <th style={{ padding: '12px 16px', fontWeight: 600 }}>Date</th>
                     <th style={{ padding: '12px 16px', fontWeight: 600 }}>Category</th>
                     <th style={{ padding: '12px 16px', fontWeight: 600 }}>Requested In/Out</th>
@@ -1330,24 +1325,24 @@ export const AttendanceDesk: React.FC = () => {
                 <tbody>
                   {myRegularizations.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
+                      <td colSpan={6} style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
                         No regularization requests found.
                       </td>
                     </tr>
                   ) : (
                     myRegularizations.map((r) => (
-                      <tr key={r.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                      <tr key={r.id} style={{ borderBottom: '1px solid var(--border-hairline)' }}>
                         <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>
                           {new Date(r.request_date).toLocaleDateString()}
                         </td>
-                        <td style={{ padding: '12px 16px', textTransform: 'uppercase', fontSize: '11px', color: '#818cf8', fontWeight: 600 }}>
+                        <td style={{ padding: '12px 16px', textTransform: 'uppercase', fontSize: '11px', color: 'var(--text-primary)', fontWeight: 600 }}>
                           {r.request_type.replace('_', ' ')}
                         </td>
-                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#94a3b8' }}>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
                           {r.requested_punch_in ? new Date(r.requested_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00'} -{' '}
                           {r.requested_punch_out ? new Date(r.requested_punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '18:00'}
                         </td>
-                        <td style={{ padding: '12px 16px', color: '#cbd5e1', maxWidth: '300px' }}>
+                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', maxWidth: '300px' }}>
                           {r.reason}
                         </td>
                         <td style={{ padding: '12px 16px' }}>
@@ -1359,24 +1354,15 @@ export const AttendanceDesk: React.FC = () => {
                               fontSize: '10px',
                               fontWeight: 700,
                               textTransform: 'uppercase',
-                              background:
-                                r.status === 'approved'
-                                  ? 'rgba(16, 185, 129, 0.15)'
-                                  : r.status === 'rejected'
-                                  ? 'rgba(239, 68, 68, 0.15)'
-                                  : 'rgba(245, 158, 11, 0.15)',
-                              color:
-                                r.status === 'approved'
-                                  ? '#34d399'
-                                  : r.status === 'rejected'
-                                  ? '#f87171'
-                                  : '#fbbf24',
+                              background: 'var(--surface-3)',
+                              border: '1px solid var(--border-subtle)',
+                              color: 'var(--text-secondary)',
                             }}
                           >
                             {r.status}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 16px', color: '#64748b' }}>
+                        <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>
                           {r.approver_name || 'Pending Review'}
                         </td>
                       </tr>
@@ -1395,10 +1381,10 @@ export const AttendanceDesk: React.FC = () => {
           <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: '#f1f5f9' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                   On Duty Work Applications
                 </h2>
-                <p style={{ fontSize: '12px', color: '#94a3b8', margin: '3px 0 0' }}>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '3px 0 0' }}>
                   Client visits, conferences, training sessions, and external field work.
                 </p>
               </div>
@@ -1409,8 +1395,8 @@ export const AttendanceDesk: React.FC = () => {
                   setIsRegularizeModalOpen(true);
                 }}
                 style={{
-                  background: '#3b82f6',
-                  color: '#ffffff',
+                  background: 'var(--text-primary)',
+                  color: 'var(--surface-0)',
                   border: 'none',
                   borderRadius: '6px',
                   padding: '8px 16px',
@@ -1427,10 +1413,10 @@ export const AttendanceDesk: React.FC = () => {
               </button>
             </div>
 
-            <div style={{ background: '#1c1c1c', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '10px', padding: '36px', textAlign: 'center', color: '#64748b' }}>
+            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-hairline)', borderRadius: '10px', padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
               <Briefcase size={36} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#e2e8f0' }}>No On Duty applications recorded</div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>No On Duty applications recorded</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 When you are traveling for client meetings or work outside office, apply for On Duty credit.
               </div>
             </div>
@@ -1456,21 +1442,21 @@ export const AttendanceDesk: React.FC = () => {
         >
           <div
             style={{
-              background: '#1e1e1e',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-subtle)',
               borderRadius: '12px',
               width: '460px',
               padding: '24px',
               display: 'flex',
               flexDirection: 'column',
               gap: '18px',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)',
+              boxShadow: 'var(--shadow-popover)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileCheck2 size={18} color="#38bdf8" />
+                <FileCheck2 size={18} color="var(--text-primary)" />
                 <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                   {regularizeType === 'missed_punch'
                     ? 'Request Regularization (Missed Punch)'
@@ -1481,7 +1467,7 @@ export const AttendanceDesk: React.FC = () => {
               </div>
               <button
                 onClick={() => setIsRegularizeModalOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               >
                 <X size={16} />
               </button>
@@ -1514,7 +1500,7 @@ export const AttendanceDesk: React.FC = () => {
               style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
             >
               <div>
-                <label style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
                   Target Date
                 </label>
                 <input
@@ -1524,8 +1510,8 @@ export const AttendanceDesk: React.FC = () => {
                   required
                   style={{
                     width: '100%',
-                    background: '#282828',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    background: 'var(--surface-3)',
+                    border: '1px solid var(--border-subtle)',
                     borderRadius: '6px',
                     padding: '8px 12px',
                     color: 'var(--text-primary)',
@@ -1536,7 +1522,7 @@ export const AttendanceDesk: React.FC = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
                     Requested In Time
                   </label>
                   <input
@@ -1545,8 +1531,8 @@ export const AttendanceDesk: React.FC = () => {
                     defaultValue="10:00"
                     style={{
                       width: '100%',
-                      background: '#282828',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      background: 'var(--surface-3)',
+                      border: '1px solid var(--border-subtle)',
                       borderRadius: '6px',
                       padding: '8px 12px',
                       color: 'var(--text-primary)',
@@ -1555,7 +1541,7 @@ export const AttendanceDesk: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
                     Requested Out Time
                   </label>
                   <input
@@ -1564,8 +1550,8 @@ export const AttendanceDesk: React.FC = () => {
                     defaultValue="19:00"
                     style={{
                       width: '100%',
-                      background: '#282828',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      background: 'var(--surface-3)',
+                      border: '1px solid var(--border-subtle)',
                       borderRadius: '6px',
                       padding: '8px 12px',
                       color: 'var(--text-primary)',
@@ -1576,7 +1562,7 @@ export const AttendanceDesk: React.FC = () => {
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
                   Reason / Justification
                 </label>
                 <textarea
@@ -1586,8 +1572,8 @@ export const AttendanceDesk: React.FC = () => {
                   required
                   style={{
                     width: '100%',
-                    background: '#282828',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    background: 'var(--surface-3)',
+                    border: '1px solid var(--border-subtle)',
                     borderRadius: '6px',
                     padding: '8px 12px',
                     color: 'var(--text-primary)',
@@ -1603,10 +1589,10 @@ export const AttendanceDesk: React.FC = () => {
                   onClick={() => setIsRegularizeModalOpen(false)}
                   style={{
                     background: 'transparent',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    border: '1px solid var(--border-subtle)',
                     borderRadius: '6px',
                     padding: '8px 16px',
-                    color: '#94a3b8',
+                    color: 'var(--text-muted)',
                     fontSize: '12px',
                     cursor: 'pointer',
                   }}
@@ -1616,11 +1602,11 @@ export const AttendanceDesk: React.FC = () => {
                 <button
                   type="submit"
                   style={{
-                    background: '#3b82f6',
+                    background: 'var(--text-primary)',
                     border: 'none',
                     borderRadius: '6px',
                     padding: '8px 18px',
-                    color: 'var(--text-primary)',
+                    color: 'var(--surface-0)',
                     fontSize: '12px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -1654,11 +1640,6 @@ export const AttendanceDesk: React.FC = () => {
               50% { top: 85%; opacity: 1; }
               100% { top: 10%; opacity: 0.6; }
             }
-            @keyframes pulseGlow {
-              0% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.25); }
-              50% { box-shadow: 0 0 35px rgba(56, 189, 248, 0.55); }
-              100% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.25); }
-            }
             .spin-animate {
               animation: spin 1s linear infinite;
             }
@@ -1669,13 +1650,13 @@ export const AttendanceDesk: React.FC = () => {
           `}</style>
           <div
             style={{
-              background: '#18181b',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-subtle)',
               borderRadius: '16px',
               width: '460px',
               maxWidth: '92vw',
               overflow: 'hidden',
-              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px rgba(99, 102, 241, 0.15)',
+              boxShadow: 'var(--shadow-popover)',
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -1687,8 +1668,8 @@ export const AttendanceDesk: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '16px 20px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-                background: 'rgba(24, 24, 27, 0.9)',
+                borderBottom: '1px solid var(--border-hairline)',
+                background: 'var(--surface-2)',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1697,24 +1678,24 @@ export const AttendanceDesk: React.FC = () => {
                     width: '32px',
                     height: '32px',
                     borderRadius: '8px',
-                    background: 'rgba(99, 102, 241, 0.2)',
-                    border: '1px solid rgba(129, 140, 248, 0.3)',
+                    background: 'var(--surface-3)',
+                    border: '1px solid var(--border-subtle)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#818cf8',
+                    color: 'var(--text-primary)',
                   }}
                 >
                   <Scan size={18} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', margin: 0 }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                     Face Biometric Check-{faceModalType === 'in' ? 'In' : 'Out'}
                   </h3>
-                  <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span>MobileFaceNet 128-D</span>
                     <span>&bull;</span>
-                    <span style={{ color: '#38bdf8' }}>Native Go Engine</span>
+                    <span>Native Go Engine</span>
                   </div>
                 </div>
               </div>
@@ -1724,7 +1705,7 @@ export const AttendanceDesk: React.FC = () => {
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#94a3b8',
+                  color: 'var(--text-muted)',
                   cursor: 'pointer',
                   padding: '4px',
                   borderRadius: '6px',
@@ -1744,15 +1725,15 @@ export const AttendanceDesk: React.FC = () => {
                   gap: '6px',
                   padding: '4px 12px',
                   borderRadius: '20px',
-                  background: 'rgba(99, 102, 241, 0.12)',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  background: 'var(--surface-3)',
+                  border: '1px solid var(--border-subtle)',
                   fontSize: '11px',
-                  color: '#a5b4fc',
+                  color: 'var(--text-secondary)',
                   fontWeight: 600,
                   letterSpacing: '0.02em',
                 }}
               >
-                <ShieldCheck size={13} color="#818cf8" />
+                <ShieldCheck size={13} color="var(--text-primary)" />
                 <span>AI Anti-Spoofing Active &bull; Screen & Print Guard</span>
               </div>
 
@@ -1763,8 +1744,8 @@ export const AttendanceDesk: React.FC = () => {
                   height: '320px',
                   borderRadius: '16px',
                   overflow: 'hidden',
-                  background: '#09090b',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  background: 'var(--surface-0)',
+                  border: '1px solid var(--border-hairline)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1795,10 +1776,8 @@ export const AttendanceDesk: React.FC = () => {
                         width: '180px',
                         height: '240px',
                         borderRadius: '50%',
-                        border: '2px dashed rgba(56, 189, 248, 0.7)',
-                        boxShadow: '0 0 25px rgba(56, 189, 248, 0.2)',
+                        border: '2px dashed var(--border-strong)',
                         pointerEvents: 'none',
-                        animation: 'pulseGlow 2.5s infinite',
                       }}
                     >
                       <div
@@ -1806,25 +1785,24 @@ export const AttendanceDesk: React.FC = () => {
                           position: 'absolute',
                           width: '100%',
                           height: '2px',
-                          background: 'linear-gradient(90deg, transparent, #38bdf8, transparent)',
-                          boxShadow: '0 0 8px #38bdf8',
+                          background: 'linear-gradient(90deg, transparent, var(--text-primary), transparent)',
                           animation: 'scanSweep 2s infinite ease-in-out',
                         }}
                       />
                     </div>
 
                     {/* Corner Reticle Accents */}
-                    <div style={{ position: 'absolute', top: 12, left: 12, width: 14, height: 14, borderTop: '2px solid #818cf8', borderLeft: '2px solid #818cf8' }} />
-                    <div style={{ position: 'absolute', top: 12, right: 12, width: 14, height: 14, borderTop: '2px solid #818cf8', borderRight: '2px solid #818cf8' }} />
-                    <div style={{ position: 'absolute', bottom: 12, left: 12, width: 14, height: 14, borderBottom: '2px solid #818cf8', borderLeft: '2px solid #818cf8' }} />
-                    <div style={{ position: 'absolute', bottom: 12, right: 12, width: 14, height: 14, borderBottom: '2px solid #818cf8', borderRight: '2px solid #818cf8' }} />
+                    <div style={{ position: 'absolute', top: 12, left: 12, width: 14, height: 14, borderTop: '2px solid var(--text-primary)', borderLeft: '2px solid var(--text-primary)' }} />
+                    <div style={{ position: 'absolute', top: 12, right: 12, width: 14, height: 14, borderTop: '2px solid var(--text-primary)', borderRight: '2px solid var(--text-primary)' }} />
+                    <div style={{ position: 'absolute', bottom: 12, left: 12, width: 14, height: 14, borderBottom: '2px solid var(--text-primary)', borderLeft: '2px solid var(--text-primary)' }} />
+                    <div style={{ position: 'absolute', bottom: 12, right: 12, width: 14, height: 14, borderBottom: '2px solid var(--text-primary)', borderRight: '2px solid var(--text-primary)' }} />
 
                     {cameraError && (
                       <div
                         style={{
                           position: 'absolute',
                           inset: 0,
-                          background: 'rgba(9, 9, 11, 0.9)',
+                          background: 'var(--surface-0)',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
@@ -1834,8 +1812,8 @@ export const AttendanceDesk: React.FC = () => {
                           gap: '10px',
                         }}
                       >
-                        <ShieldAlert size={32} color="#f87171" />
-                        <span style={{ fontSize: '12px', color: '#fca5a5' }}>{cameraError}</span>
+                        <ShieldAlert size={32} color="var(--text-primary)" />
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{cameraError}</span>
                       </div>
                     )}
                   </>
@@ -1857,18 +1835,7 @@ export const AttendanceDesk: React.FC = () => {
                         width: '180px',
                         height: '240px',
                         borderRadius: '50%',
-                        border:
-                          verificationFeedback.status === 'success'
-                            ? '3px solid #10b981'
-                            : verificationFeedback.status === 'failed'
-                            ? '3px solid #ef4444'
-                            : '2px solid rgba(255, 255, 255, 0.3)',
-                        boxShadow:
-                          verificationFeedback.status === 'success'
-                            ? '0 0 35px rgba(16, 185, 129, 0.6)'
-                            : verificationFeedback.status === 'failed'
-                            ? '0 0 35px rgba(239, 68, 68, 0.6)'
-                            : 'none',
+                        border: '2px solid var(--border-strong)',
                         pointerEvents: 'none',
                         display: 'flex',
                         alignItems: 'center',
@@ -1878,7 +1845,8 @@ export const AttendanceDesk: React.FC = () => {
                       {verificationFeedback.status === 'success' && (
                         <div
                           style={{
-                            background: 'rgba(16, 185, 129, 0.9)',
+                            background: 'var(--surface-3)',
+                            border: '1px solid var(--border-subtle)',
                             color: 'var(--text-primary)',
                             padding: '6px 14px',
                             borderRadius: '20px',
@@ -1887,7 +1855,7 @@ export const AttendanceDesk: React.FC = () => {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+                            boxShadow: 'var(--shadow-sm)',
                           }}
                         >
                           <Check size={14} /> MATCH CONFIRMED
@@ -1896,7 +1864,8 @@ export const AttendanceDesk: React.FC = () => {
                       {verificationFeedback.status === 'failed' && (
                         <div
                           style={{
-                            background: 'rgba(239, 68, 68, 0.95)',
+                            background: 'var(--surface-3)',
+                            border: '1px solid var(--border-strong)',
                             color: 'var(--text-primary)',
                             padding: '6px 14px',
                             borderRadius: '20px',
@@ -1906,7 +1875,7 @@ export const AttendanceDesk: React.FC = () => {
                             alignItems: 'center',
                             gap: '6px',
                             textAlign: 'center',
-                            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)',
+                            boxShadow: 'var(--shadow-sm)',
                           }}
                         >
                           <ShieldAlert size={14} /> PROXY BLOCKED
@@ -1920,7 +1889,7 @@ export const AttendanceDesk: React.FC = () => {
               {/* Status Message / Prompt */}
               <div style={{ textAlign: 'center', maxWidth: '340px' }}>
                 {verificationFeedback.status === 'idle' && (
-                  <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
                     {!capturedSelfie
                       ? 'Align your face inside the oval guide and look directly at the camera.'
                       : 'Snapshot captured. Ready to run biometric verification against enrolled profile.'}
@@ -1929,16 +1898,16 @@ export const AttendanceDesk: React.FC = () => {
                 {verificationFeedback.status === 'success' && (
                   <div
                     style={{
-                      background: 'rgba(16, 185, 129, 0.12)',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      background: 'var(--surface-3)',
+                      border: '1px solid var(--border-subtle)',
                       borderRadius: '8px',
                       padding: '8px 14px',
                     }}
                   >
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#34d399' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {verificationFeedback.message}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#6ee7b7', marginTop: '3px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
                       Match Confidence: {verificationFeedback.confidence?.toFixed(1)}% &bull; Distance: {verificationFeedback.distance?.toFixed(3)}
                     </div>
                   </div>
@@ -1946,17 +1915,17 @@ export const AttendanceDesk: React.FC = () => {
                 {verificationFeedback.status === 'failed' && (
                   <div
                     style={{
-                      background: 'rgba(239, 68, 68, 0.12)',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      background: 'var(--surface-3)',
+                      border: '1px solid var(--border-subtle)',
                       borderRadius: '8px',
                       padding: '8px 14px',
                     }}
                   >
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      <ShieldAlert size={15} color="#ef4444" />
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      <ShieldAlert size={15} color="var(--text-primary)" />
                       <span>{verificationFeedback.message?.includes('Presentation attack') ? 'Presentation Attack Blocked' : 'Authentication Rejected'}</span>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#fca5a5', marginTop: '4px', lineHeight: 1.4 }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.4 }}>
                       {verificationFeedback.message}
                     </div>
                   </div>
@@ -1972,8 +1941,8 @@ export const AttendanceDesk: React.FC = () => {
                       type="button"
                       onClick={takeSelfieSnapshot}
                       style={{
-                        background: '#3b82f6',
-                        color: '#ffffff',
+                        background: 'var(--text-primary)',
+                        color: 'var(--surface-0)',
                         border: 'none',
                         borderRadius: '8px',
                         padding: '10px 20px',
@@ -1983,7 +1952,7 @@ export const AttendanceDesk: React.FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                        boxShadow: 'var(--shadow-sm)',
                       }}
                     >
                       <Camera size={16} /> Snap Selfie
@@ -1991,9 +1960,9 @@ export const AttendanceDesk: React.FC = () => {
 
                     <label
                       style={{
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        color: '#e2e8f0',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        background: 'var(--surface-3)',
+                        color: 'var(--text-primary)',
+                        border: '1px solid var(--border-subtle)',
                         borderRadius: '8px',
                         padding: '10px 16px',
                         fontSize: '13px',
@@ -2031,10 +2000,10 @@ export const AttendanceDesk: React.FC = () => {
                       disabled={isVerifyingFace}
                       style={{
                         background: 'transparent',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        border: '1px solid var(--border-subtle)',
                         borderRadius: '8px',
                         padding: '10px 18px',
-                        color: '#94a3b8',
+                        color: 'var(--text-muted)',
                         fontSize: '13px',
                         cursor: isVerifyingFace ? 'not-allowed' : 'pointer',
                         display: 'flex',
@@ -2051,8 +2020,8 @@ export const AttendanceDesk: React.FC = () => {
                       onClick={submitFacePunchVerification}
                       disabled={isVerifyingFace || verificationFeedback.status === 'success'}
                       style={{
-                        background: verificationFeedback.status === 'success' ? '#10b981' : '#6366f1',
-                        color: 'var(--text-primary)',
+                        background: 'var(--text-primary)',
+                        color: 'var(--surface-0)',
                         border: 'none',
                         borderRadius: '8px',
                         padding: '10px 22px',
@@ -2062,7 +2031,7 @@ export const AttendanceDesk: React.FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
+                        boxShadow: 'var(--shadow-sm)',
                       }}
                     >
                       {isVerifyingFace ? (
