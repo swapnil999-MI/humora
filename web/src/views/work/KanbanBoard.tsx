@@ -359,11 +359,11 @@ const KanbanColumnComponent: React.FC<ColumnProps> = ({ column, isOnline, projec
         ) : (
           <button
             type="button"
-            className="btn-ghost"
+            className="btn btn-ghost btn-sm"
             style={{
               width: '100%',
               justifyContent: 'flex-start',
-              padding: '6px 8px',
+              padding: '6px 10px',
               fontSize: '11.5px',
               color: 'var(--text-muted)',
               borderRadius: 'var(--radius-sm)',

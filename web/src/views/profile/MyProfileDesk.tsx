@@ -34,29 +34,29 @@ import {
 
 const BANNER_PRESETS = [
   {
-    name: 'Obsidian Indigo',
-    value: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 35%, #312e81 70%, #4338ca 100%)',
-    preview: '#312e81',
+    name: 'Champagne Gold Matrix',
+    value: 'linear-gradient(135deg, #181715 0%, #29241b 40%, #543f17 75%, #b45309 100%)',
+    preview: '#b45309',
   },
   {
-    name: 'Aurora Borealis',
-    value: 'linear-gradient(135deg, #022c22 0%, #064e3b 40%, #047857 70%, #0d9488 100%)',
-    preview: '#047857',
+    name: 'Smoky Obsidian Velvet',
+    value: 'linear-gradient(135deg, #121110 0%, #1f1d1a 50%, #2f2c27 100%)',
+    preview: '#1f1d1a',
   },
   {
-    name: 'Cyber Sunset',
-    value: 'linear-gradient(135deg, #3b0764 0%, #701a75 35%, #9d174d 70%, #be123c 100%)',
-    preview: '#9d174d',
+    name: 'Warm Cashmere Slate',
+    value: 'linear-gradient(135deg, #26231f 0%, #3d3730 50%, #574e44 100%)',
+    preview: '#574e44',
   },
   {
-    name: 'Deep Emerald Matrix',
-    value: 'linear-gradient(135deg, #06101e 0%, #0d2818 50%, #04471c 100%)',
-    preview: '#04471c',
+    name: 'Molten Bronze Elegance',
+    value: 'linear-gradient(135deg, #1a1510 0%, #382513 50%, #78350f 100%)',
+    preview: '#78350f',
   },
   {
-    name: 'Hyper Sky',
-    value: 'linear-gradient(135deg, #082f49 0%, #075985 45%, #0284c7 80%, #0ea5e9 100%)',
-    preview: '#0284c7',
+    name: 'Cognac Amber Glow',
+    value: 'linear-gradient(135deg, #1c1510 0%, #451a03 50%, #92400e 100%)',
+    preview: '#92400e',
   },
   {
     name: 'Midnight Monolith',
@@ -335,26 +335,28 @@ export const MyProfileDesk: React.FC = () => {
             <button
               onClick={() => setIsBannerPickerOpen(true)}
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '6px 14px',
-                background: 'rgba(15, 23, 42, 0.75)',
-                backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                borderRadius: 'var(--radius-sm)',
-                color: 'var(--text-primary)',
+                padding: '7px 16px',
+                background: 'rgba(18, 17, 16, 0.88)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                border: '1px solid rgba(245, 158, 11, 0.45)',
+                borderRadius: 'var(--radius-full)',
+                color: '#faf8f5',
                 fontSize: '12px',
-                fontWeight: 500,
+                fontWeight: 600,
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 245, 230, 0.15)',
                 transition: 'all var(--transition-fast)',
               }}
-              className="btn-ghost"
               title="Change Cover Banner"
             >
-              <Palette size={13} />
-              <span>Change Cover</span>
+              <Palette size={14} color="var(--accent-primary)" />
+              <span style={{ color: '#faf8f5', fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.6)' }}>
+                Change Cover
+              </span>
             </button>
           </div>
         </div>

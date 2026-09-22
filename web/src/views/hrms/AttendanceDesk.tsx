@@ -434,8 +434,8 @@ export const AttendanceDesk: React.FC = () => {
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: activeTab === 'summary' ? '2px solid var(--text-primary)' : '2px solid transparent',
-              color: activeTab === 'summary' ? 'var(--text-primary)' : 'var(--text-muted)',
+              borderBottom: activeTab === 'summary' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              color: activeTab === 'summary' ? 'var(--accent-primary)' : 'var(--text-muted)',
               fontSize: '13px',
               fontWeight: 600,
               cursor: 'pointer',
@@ -453,8 +453,8 @@ export const AttendanceDesk: React.FC = () => {
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: activeTab === 'regularization' ? '2px solid var(--text-primary)' : '2px solid transparent',
-              color: activeTab === 'regularization' ? 'var(--text-primary)' : 'var(--text-muted)',
+              borderBottom: activeTab === 'regularization' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              color: activeTab === 'regularization' ? 'var(--accent-primary)' : 'var(--text-muted)',
               fontSize: '13px',
               fontWeight: 500,
               cursor: 'pointer',
@@ -478,8 +478,8 @@ export const AttendanceDesk: React.FC = () => {
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: activeTab === 'onduty' ? '2px solid var(--text-primary)' : '2px solid transparent',
-              color: activeTab === 'onduty' ? 'var(--text-primary)' : 'var(--text-muted)',
+              borderBottom: activeTab === 'onduty' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              color: activeTab === 'onduty' ? 'var(--accent-primary)' : 'var(--text-muted)',
               fontSize: '13px',
               fontWeight: 500,
               cursor: 'pointer',
@@ -547,14 +547,15 @@ export const AttendanceDesk: React.FC = () => {
             <button
               onClick={() => setViewMode('list')}
               style={{
-                background: viewMode === 'list' ? 'var(--text-primary)' : 'transparent',
-                color: viewMode === 'list' ? 'var(--surface-0)' : 'var(--text-muted)',
-                border: 'none',
+                background: viewMode === 'list' ? 'var(--accent-subtle)' : 'transparent',
+                color: viewMode === 'list' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                border: viewMode === 'list' ? '1px solid var(--accent-ring)' : '1px solid transparent',
                 borderRadius: '4px',
                 padding: '4px 8px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
+                transition: 'all var(--transition-fast)',
               }}
               title="Timeline List View"
             >
@@ -564,14 +565,15 @@ export const AttendanceDesk: React.FC = () => {
             <button
               onClick={() => setViewMode('matrix')}
               style={{
-                background: viewMode === 'matrix' ? 'var(--text-primary)' : 'transparent',
-                color: viewMode === 'matrix' ? 'var(--surface-0)' : 'var(--text-muted)',
-                border: 'none',
+                background: viewMode === 'matrix' ? 'var(--accent-subtle)' : 'transparent',
+                color: viewMode === 'matrix' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                border: viewMode === 'matrix' ? '1px solid var(--accent-ring)' : '1px solid transparent',
                 borderRadius: '4px',
                 padding: '4px 8px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
+                transition: 'all var(--transition-fast)',
               }}
               title="Table View"
             >
@@ -581,14 +583,15 @@ export const AttendanceDesk: React.FC = () => {
             <button
               onClick={() => setViewMode('calendar')}
               style={{
-                background: viewMode === 'calendar' ? 'var(--text-primary)' : 'transparent',
-                color: viewMode === 'calendar' ? 'var(--surface-0)' : 'var(--text-muted)',
-                border: 'none',
+                background: viewMode === 'calendar' ? 'var(--accent-subtle)' : 'transparent',
+                color: viewMode === 'calendar' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                border: viewMode === 'calendar' ? '1px solid var(--accent-ring)' : '1px solid transparent',
                 borderRadius: '4px',
                 padding: '4px 8px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
+                transition: 'all var(--transition-fast)',
               }}
               title="Month Calendar View"
             >
@@ -599,20 +602,9 @@ export const AttendanceDesk: React.FC = () => {
           {/* Request Dropdown Button */}
           <div style={{ position: 'relative' }}>
             <button
+              type="button"
+              className="btn btn-primary btn-sm"
               onClick={() => setIsRequestMenuOpen((prev) => !prev)}
-              style={{
-                background: 'var(--text-primary)',
-                color: 'var(--surface-0)',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '6px 14px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
             >
               <span>Request</span>
               <ChevronDown size={13} />
