@@ -2,18 +2,18 @@
 
 :root {
   /* ==========================================================================
-     HUMORA TWO-COLOR TONAL SYSTEM: TITANIUM OBSIDIAN (BASE) + RADIANT EMERALD (ACCENT)
-     Graduated Tones from Lighter to Darker · Zero Blue/Navy · Zero Harsh B&W · Zero Circus
+     HUMORA TWO-COLOR TONAL SYSTEM: SMOKY OBSIDIAN (BASE) + CHAMPAGNE AMBER GOLD (ACCENT)
+     CRED-Card Luxury Tiers · Graduated Tones Lighter to Darker · Zero Blue/Navy/Green
      ========================================================================== */
 
-  /* Dark Theme Surfaces (Deep Structural Titanium Obsidian Ladder) */
-  --surface-0: #0d1110; /* Base Canvas: Deep Mineral Titanium Obsidian */
-  --surface-1: #131716; /* App Rail, Header Base */
-  --surface-2: #1a201e; /* SubNav Pane, Side Drawers */
-  --surface-3: #222927; /* Clean Monolithic Cards */
-  --surface-4: #2b3431; /* Elevated Menus, Popovers, Active Wells */
-  --surface-hover: rgba(16, 185, 129, 0.08);
-  --surface-active: rgba(16, 185, 129, 0.16);
+  /* Dark Theme Surfaces (Deep Structural Smoky Velvet Obsidian Ladder) */
+  --surface-0: #121110; /* Base Canvas: Deep Smoky Obsidian */
+  --surface-1: #181715; /* App Rail, Header Base */
+  --surface-2: #201e1b; /* SubNav Pane, Side Drawers */
+  --surface-3: #292723; /* Clean Monolithic Cards */
+  --surface-4: #35322d; /* Elevated Menus, Popovers, Active Wells */
+  --surface-hover: rgba(245, 158, 11, 0.08);
+  --surface-active: rgba(245, 158, 11, 0.16);
 
   /* Compatibility Aliases */
   --bg-app: var(--surface-0);
@@ -23,58 +23,58 @@
   --bg-surface-hover: var(--surface-hover);
   --bg-surface-active: var(--surface-active);
 
-  /* Tonal Hairlines & Borders (Neutral Transparencies) */
-  --border-hairline: rgba(255, 255, 255, 0.07);
-  --border-subtle: rgba(255, 255, 255, 0.13);
-  --border-strong: rgba(255, 255, 255, 0.24);
-  --border-accent: #10b981;
+  /* Tonal Hairlines & Borders (Warm Metallic Transparencies) */
+  --border-hairline: rgba(255, 245, 230, 0.07);
+  --border-subtle: rgba(255, 245, 230, 0.13);
+  --border-strong: rgba(255, 245, 230, 0.24);
+  --border-accent: #f59e0b;
 
-  /* Tonal Typography Ladder (Dark Mode: Light Alabaster to Mineral Charcoal) */
-  --text-primary: #f2f5f3;   /* Soft Silk Alabaster (Ultra Readability, Zero Glare) */
-  --text-secondary: #9da9a3; /* Warm Mineral Sage-Slate */
-  --text-muted: #6b7771;     /* Deep Mineral Slate */
-  --text-dim: #46524c;       /* Subtle Hint */
+  /* Tonal Typography Ladder (Dark Mode: Warm Silk Alabaster to Deep Mineral) */
+  --text-primary: #faf8f5;   /* Soft Warm Silk Alabaster (Ultra Readability, Zero Glare) */
+  --text-secondary: #ab9f91; /* Warm Cashmere Mineral */
+  --text-muted: #786e62;     /* Deep Warm Earth Slate */
+  --text-dim: #524a40;       /* Subtle Hint */
 
-  /* Color 2: Radiant Jewel Emerald (Accents, Buttons, Live Highlights) */
-  --accent-primary: #10b981;
-  --accent-primary-hover: #059669;
-  --accent-gradient: linear-gradient(135deg, #10b981 0%, #047857 100%);
-  --accent-subtle: rgba(16, 185, 129, 0.13);
-  --accent-ring: rgba(16, 185, 129, 0.32);
+  /* Color 2: Lustrous Champagne Amber Gold (Accents, Buttons, Live Highlights) */
+  --accent-primary: #f59e0b;
+  --accent-primary-hover: #d97706;
+  --accent-gradient: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+  --accent-subtle: rgba(245, 158, 11, 0.13);
+  --accent-ring: rgba(245, 158, 11, 0.35);
 
-  /* Restrained Tonal Status Indicators (Unified with Emerald & Obsidian) */
-  --status-backlog: #6b7771;
-  --status-todo: #9da9a3;
-  --status-in-progress: #34d399;
-  --status-in-review: #6ee7b7;
-  --status-done: #10b981;
-  --status-cancelled: #46524c;
+  /* Restrained Tonal Status Indicators (Unified with Amber Gold & Obsidian) */
+  --status-backlog: #786e62;
+  --status-todo: #ab9f91;
+  --status-in-progress: #fbbf24;
+  --status-in-review: #fcd34d;
+  --status-done: #f59e0b;
+  --status-cancelled: #524a40;
 
   --priority-urgent: #f43f5e;
-  --priority-high: #34d399;
-  --priority-medium: #9da9a3;
-  --priority-low: #6b7771;
+  --priority-high: #fbbf24;
+  --priority-medium: #ab9f91;
+  --priority-low: #786e62;
 
-  --hrms-present: #10b981;
-  --hrms-present-subtle: rgba(16, 185, 129, 0.14);
-  --hrms-on-leave: #9da9a3;
-  --hrms-on-leave-subtle: rgba(157, 169, 163, 0.10);
-  --hrms-sandwich-flag: #34d399;
-  --hrms-quota-bar: #10b981;
+  --hrms-present: #f59e0b;
+  --hrms-present-subtle: rgba(245, 158, 11, 0.14);
+  --hrms-on-leave: #ab9f91;
+  --hrms-on-leave-subtle: rgba(171, 159, 145, 0.10);
+  --hrms-sandwich-flag: #fbbf24;
+  --hrms-quota-bar: #f59e0b;
 
-  --accent-emerald: #10b981;
-  --accent-emerald-subtle: rgba(16, 185, 129, 0.14);
-  --accent-amber: #34d399;
-  --accent-amber-subtle: rgba(52, 211, 153, 0.14);
+  --accent-emerald: #f59e0b;
+  --accent-emerald-subtle: rgba(245, 158, 11, 0.14);
+  --accent-amber: #fbbf24;
+  --accent-amber-subtle: rgba(251, 191, 36, 0.14);
   --accent-rose: #f43f5e;
   --accent-rose-subtle: rgba(244, 63, 94, 0.12);
 
   /* Soft Multi-Layered Shadows (Dark Mode) */
-  --shadow-xs: 0 1px 2px rgba(13, 17, 16, 0.4);
-  --shadow-sm: 0 2px 5px rgba(13, 17, 16, 0.45);
-  --shadow-md: 0 6px 20px -2px rgba(13, 17, 16, 0.55);
-  --shadow-lg: 0 12px 36px -4px rgba(13, 17, 16, 0.70);
-  --shadow-popover: 0 20px 48px rgba(13, 17, 16, 0.85), 0 0 0 1px var(--border-subtle);
+  --shadow-xs: 0 1px 2px rgba(18, 17, 16, 0.4);
+  --shadow-sm: 0 2px 5px rgba(18, 17, 16, 0.45);
+  --shadow-md: 0 6px 20px -2px rgba(18, 17, 16, 0.55);
+  --shadow-lg: 0 12px 36px -4px rgba(18, 17, 16, 0.70);
+  --shadow-popover: 0 20px 48px rgba(18, 17, 16, 0.85), 0 0 0 1px var(--border-subtle);
 
   /* Soft Geometry */
   --radius-xs: 6px;
@@ -95,117 +95,117 @@
 
   /* App Rail Tokens (Dark Mode) */
   --rail-bg: var(--surface-1);
-  --rail-btn-idle-color: #6b7771;
-  --rail-btn-hover-bg: rgba(16, 185, 129, 0.08);
-  --rail-btn-hover-color: #f2f5f3;
-  --rail-btn-active-bg: rgba(16, 185, 129, 0.16);
-  --rail-btn-active-color: #10b981;
-  --rail-btn-active-border: #10b981;
+  --rail-btn-idle-color: #786e62;
+  --rail-btn-hover-bg: rgba(245, 158, 11, 0.08);
+  --rail-btn-hover-color: #faf8f5;
+  --rail-btn-active-bg: rgba(245, 158, 11, 0.16);
+  --rail-btn-active-color: #f59e0b;
+  --rail-btn-active-border: #f59e0b;
 
   /* SubNav Tokens (Dark Mode) */
   --subnav-bg: var(--surface-2);
-  --subnav-item-idle-color: #9da9a3;
-  --subnav-item-hover-bg: rgba(16, 185, 129, 0.08);
-  --subnav-item-hover-color: #f2f5f3;
-  --subnav-item-active-bg: rgba(16, 185, 129, 0.16);
-  --subnav-item-active-color: #f2f5f3;
-  --subnav-item-active-border: #10b981;
+  --subnav-item-idle-color: #ab9f91;
+  --subnav-item-hover-bg: rgba(245, 158, 11, 0.08);
+  --subnav-item-hover-color: #faf8f5;
+  --subnav-item-active-bg: rgba(245, 158, 11, 0.16);
+  --subnav-item-active-color: #faf8f5;
+  --subnav-item-active-border: #f59e0b;
 
   /* Card Tokens (Dark Mode) */
   --card-bg: var(--surface-3);
   --card-border: var(--border-hairline);
-  --card-highlight: linear-gradient(90deg, transparent 0%, rgba(16, 185, 129, 0.12) 50%, transparent 100%);
-  --card-shadow: 0 4px 20px -2px rgba(13, 17, 16, 0.4), inset 0 1px 0 rgba(16, 185, 129, 0.08);
+  --card-highlight: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.12) 50%, transparent 100%);
+  --card-shadow: 0 4px 20px -2px rgba(18, 17, 16, 0.4), inset 0 1px 0 rgba(245, 158, 11, 0.08);
 }
 
 /* ==========================================================================
-   LIGHT THEME: WARM ARCHITECTURAL LINEN + EXECUTIVE JADE EMERALD
-   Zero Harsh Blinding White · Zero Blue · Pure Ergonomic Tone
+   LIGHT THEME: WARM CASHMERE ALABASTER + BURNISHED COGNAC GOLD
+   Zero Harsh Blinding White · Zero Blue · Pure Luxury Ergonomics
    ========================================================================== */
 [data-theme="light"],
 .light {
-  --surface-0: #f2f5f3; /* Ergonomic Warm Linen Stone Canvas */
-  --surface-1: #fafcfa; /* Elevated Soft Surface */
-  --surface-2: #e5ebe6; /* SubNav Pane, Structural Containers */
+  --surface-0: #f7f5f0; /* Ergonomic Warm Cashmere Alabaster Canvas */
+  --surface-1: #fdfcf9; /* Elevated Soft Surface */
+  --surface-2: #ece8e1; /* SubNav Pane, Structural Containers */
   --surface-3: #ffffff; /* Monolithic Crisp Surface */
-  --surface-4: #d8e0da; /* Elevated Floating Popovers */
-  --surface-hover: rgba(5, 150, 105, 0.07);
-  --surface-active: rgba(5, 150, 105, 0.14);
+  --surface-4: #ded8cd; /* Elevated Floating Popovers */
+  --surface-hover: rgba(217, 119, 6, 0.07);
+  --surface-active: rgba(217, 119, 6, 0.14);
 
-  --border-hairline: #e1e7e2;
-  --border-subtle: #cbd5ce;
-  --border-strong: #94a39b;
-  --border-accent: #059669;
+  --border-hairline: #e6e0d6;
+  --border-subtle: #d2c9bc;
+  --border-strong: #9e9180;
+  --border-accent: #d97706;
 
-  --text-primary: #111a15;   /* Deep Forest Mineral Charcoal */
-  --text-secondary: #334239; /* Mid Mineral Charcoal */
-  --text-muted: #5e6f65;     /* Soft Mineral */
-  --text-dim: #8f9f95;       /* Subtle Mineral */
+  --text-primary: #1f1a14;   /* Deep Antique Bronze Obsidian */
+  --text-secondary: #4d4235; /* Warm Cognac Charcoal */
+  --text-muted: #786b5b;     /* Soft Earth Mineral */
+  --text-dim: #9e9282;       /* Subtle Mineral */
 
-  /* Color 2: Executive Jade Emerald (Light Mode) */
-  --accent-primary: #059669;
-  --accent-primary-hover: #047857;
-  --accent-gradient: linear-gradient(135deg, #059669 0%, #064e3b 100%);
-  --accent-subtle: rgba(5, 150, 105, 0.09);
-  --accent-ring: rgba(5, 150, 105, 0.25);
+  /* Color 2: Burnished Cognac Gold (Light Mode) */
+  --accent-primary: #d97706;
+  --accent-primary-hover: #b45309;
+  --accent-gradient: linear-gradient(135deg, #d97706 0%, #92400e 100%);
+  --accent-subtle: rgba(217, 119, 6, 0.09);
+  --accent-ring: rgba(217, 119, 6, 0.25);
 
   /* Status Indicators (Light Mode) */
-  --status-backlog: #5e6f65;
-  --status-todo: #334239;
-  --status-in-progress: #059669;
-  --status-in-review: #10b981;
-  --status-done: #047857;
-  --status-cancelled: #8f9f95;
+  --status-backlog: #786b5b;
+  --status-todo: #4d4235;
+  --status-in-progress: #d97706;
+  --status-in-review: #f59e0b;
+  --status-done: #b45309;
+  --status-cancelled: #9e9282;
 
   --priority-urgent: #e11d48;
-  --priority-high: #059669;
-  --priority-medium: #334239;
-  --priority-low: #5e6f65;
+  --priority-high: #d97706;
+  --priority-medium: #4d4235;
+  --priority-low: #786b5b;
 
-  --hrms-present: #059669;
-  --hrms-present-subtle: rgba(5, 150, 105, 0.08);
-  --hrms-on-leave: #334239;
-  --hrms-on-leave-subtle: rgba(51, 66, 57, 0.06);
-  --hrms-sandwich-flag: #059669;
-  --hrms-quota-bar: #059669;
+  --hrms-present: #d97706;
+  --hrms-present-subtle: rgba(217, 119, 6, 0.08);
+  --hrms-on-leave: #4d4235;
+  --hrms-on-leave-subtle: rgba(77, 66, 53, 0.06);
+  --hrms-sandwich-flag: #d97706;
+  --hrms-quota-bar: #d97706;
 
-  --accent-emerald: #059669;
-  --accent-emerald-subtle: rgba(5, 150, 105, 0.08);
-  --accent-amber: #047857;
-  --accent-amber-subtle: rgba(4, 120, 87, 0.08);
+  --accent-emerald: #d97706;
+  --accent-emerald-subtle: rgba(217, 119, 6, 0.08);
+  --accent-amber: #b45309;
+  --accent-amber-subtle: rgba(180, 83, 9, 0.08);
   --accent-rose: #e11d48;
   --accent-rose-subtle: rgba(225, 29, 72, 0.08);
 
   /* Soft Light Mode Shadows */
-  --shadow-xs: 0 1px 2px rgba(17, 26, 21, 0.04);
-  --shadow-sm: 0 1px 3px rgba(17, 26, 21, 0.06), 0 1px 2px rgba(17, 26, 21, 0.03);
-  --shadow-md: 0 4px 14px -2px rgba(17, 26, 21, 0.08);
-  --shadow-lg: 0 10px 24px -4px rgba(17, 26, 21, 0.10);
-  --shadow-popover: 0 16px 36px -4px rgba(17, 26, 21, 0.15), 0 0 0 1px #cbd5ce;
+  --shadow-xs: 0 1px 2px rgba(31, 26, 20, 0.04);
+  --shadow-sm: 0 1px 3px rgba(31, 26, 20, 0.06), 0 1px 2px rgba(31, 26, 20, 0.03);
+  --shadow-md: 0 4px 14px -2px rgba(31, 26, 20, 0.08);
+  --shadow-lg: 0 10px 24px -4px rgba(31, 26, 20, 0.10);
+  --shadow-popover: 0 16px 36px -4px rgba(31, 26, 20, 0.15), 0 0 0 1px #d2c9bc;
 
   /* App Rail Tokens (Light Mode) */
-  --rail-bg: #fafcfa;
-  --rail-btn-idle-color: #5e6f65;
-  --rail-btn-hover-bg: #e5ebe6;
-  --rail-btn-hover-color: #111a15;
-  --rail-btn-active-bg: rgba(5, 150, 105, 0.12);
-  --rail-btn-active-color: #059669;
-  --rail-btn-active-border: #059669;
+  --rail-bg: #fdfcf9;
+  --rail-btn-idle-color: #786b5b;
+  --rail-btn-hover-bg: #ece8e1;
+  --rail-btn-hover-color: #1f1a14;
+  --rail-btn-active-bg: rgba(217, 119, 6, 0.12);
+  --rail-btn-active-color: #d97706;
+  --rail-btn-active-border: #d97706;
 
   /* SubNav Tokens (Light Mode) */
-  --subnav-bg: #e5ebe6;
-  --subnav-item-idle-color: #334239;
-  --subnav-item-hover-bg: rgba(5, 150, 105, 0.06);
-  --subnav-item-hover-color: #111a15;
-  --subnav-item-active-bg: rgba(5, 150, 105, 0.12);
-  --subnav-item-active-color: #059669;
-  --subnav-item-active-border: #059669;
+  --subnav-bg: #ece8e1;
+  --subnav-item-idle-color: #4d4235;
+  --subnav-item-hover-bg: rgba(217, 119, 6, 0.06);
+  --subnav-item-hover-color: #1f1a14;
+  --subnav-item-active-bg: rgba(217, 119, 6, 0.12);
+  --subnav-item-active-color: #d97706;
+  --subnav-item-active-border: #d97706;
 
   /* Card Tokens (Light Mode) */
   --card-bg: #ffffff;
-  --card-border: #e1e7e2;
-  --card-highlight: linear-gradient(90deg, transparent 0%, rgba(5, 150, 105, 0.06) 50%, transparent 100%);
-  --card-shadow: 0 2px 8px rgba(17, 26, 21, 0.05), 0 1px 2px rgba(17, 26, 21, 0.03);
+  --card-border: #e6e0d6;
+  --card-highlight: linear-gradient(90deg, transparent 0%, rgba(217, 119, 6, 0.06) 50%, transparent 100%);
+  --card-shadow: 0 2px 8px rgba(31, 26, 20, 0.05), 0 1px 2px rgba(31, 26, 20, 0.03);
 }
 
 /* ==========================================================================
@@ -496,16 +496,16 @@ p, span, div {
   transform: translateY(1px);
 }
 
-/* Primary Button: Radiant Jewel Emerald (Rich Two-Color System) */
+/* Primary Button: Lustrous Champagne Amber Gold (CRED Luxury Tonal System) */
 .btn-primary {
   background: var(--accent-gradient);
   color: #ffffff !important;
   border: 1px solid var(--accent-primary);
-  box-shadow: 0 2px 8px var(--accent-ring);
+  box-shadow: 0 2px 10px var(--accent-ring);
 }
 .btn-primary:hover {
   background: var(--accent-primary-hover);
-  box-shadow: 0 4px 14px var(--accent-ring);
+  box-shadow: 0 4px 16px var(--accent-ring);
   transform: translateY(-1px);
 }
 
@@ -602,11 +602,11 @@ p, span, div {
   border-color: var(--accent-primary);
   border-radius: 18px 18px 0 0;
   border-bottom: 1px solid var(--border-hairline);
-  box-shadow: 0 8px 24px -4px rgba(13, 17, 16, 0.45);
+  box-shadow: 0 8px 24px -4px rgba(18, 17, 16, 0.45);
 }
 
 [data-theme="light"] .google-search-bar.expanded {
-  box-shadow: 0 8px 24px -4px rgba(17, 26, 21, 0.12);
+  box-shadow: 0 8px 24px -4px rgba(31, 26, 20, 0.12);
 }
 
 .google-search-input {
@@ -677,14 +677,14 @@ p, span, div {
   border: 1px solid var(--accent-primary);
   border-top: none;
   border-radius: 0 0 18px 18px;
-  box-shadow: 0 18px 36px -4px rgba(13, 17, 16, 0.6);
+  box-shadow: 0 18px 36px -4px rgba(18, 17, 16, 0.6);
   overflow: hidden;
   z-index: 100;
   animation: googleDropdownSlide 130ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="light"] .google-dropdown-menu {
-  box-shadow: 0 18px 36px -4px rgba(17, 26, 21, 0.14);
+  box-shadow: 0 18px 36px -4px rgba(31, 26, 20, 0.14);
 }
 
 @keyframes googleDropdownSlide {

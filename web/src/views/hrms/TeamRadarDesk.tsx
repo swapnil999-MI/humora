@@ -244,9 +244,9 @@ export const TeamRadarDesk: React.FC = () => {
                       border: '2px solid var(--surface-1)',
                       background:
                         member.presence_status === 'working'
-                          ? '#10b981'
+                          ? 'var(--accent-primary)'
                           : member.presence_status === 'on_break'
-                          ? '#f59e0b'
+                          ? 'var(--accent-amber)'
                           : member.presence_status === 'on_leave'
                           ? 'var(--text-muted)'
                           : '#ef4444',

@@ -728,7 +728,7 @@ export const TeamCapacityDesk: React.FC = () => {
                       </div>
                       <div>
                         <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block' }}>Sync Fidelity</span>
-                        <strong style={{ color: ts.sync_percentage >= 80 ? '#10b981' : '#f59e0b' }}>
+                        <strong style={{ color: ts.sync_percentage >= 80 ? 'var(--accent-primary)' : 'var(--accent-amber)' }}>
                           {ts.sync_percentage}%
                         </strong>
                       </div>
@@ -778,7 +778,7 @@ export const TeamCapacityDesk: React.FC = () => {
                               </button>
                               <button
                                 className="btn btn-primary btn-sm"
-                                style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#10b981' }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                                 disabled={isReviewingTimesheet}
                                 onClick={() => handleReviewTimesheet(ts.submission_id!, 'approved')}
                               >
@@ -1013,7 +1013,7 @@ export const TeamCapacityDesk: React.FC = () => {
                   Team Fatigue Sentinel Index
                 </span>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginTop: '6px' }}>
-                  <span style={{ fontSize: '44px', fontWeight: 800, color: burnoutSentinel.overall_tier === 'high_risk' ? '#ef4444' : '#10b981' }}>
+                  <span style={{ fontSize: '44px', fontWeight: 800, color: burnoutSentinel.overall_tier === 'high_risk' ? '#ef4444' : 'var(--accent-primary)' }}>
                     {burnoutSentinel.team_burnout_index}
                   </span>
                   <span style={{ fontSize: '16px', color: 'var(--text-muted)' }}>/ 100</span>

@@ -52,7 +52,7 @@ export const ShiftManagementDesk: React.FC = () => {
   const [graceMinutes, setGraceMinutes] = useState(15);
   const [halfDayThresholdHours, setHalfDayThresholdHours] = useState(4.0);
   const [isNightShift, setIsNightShift] = useState(false);
-  const [shiftColor, setShiftColor] = useState('#10b981');
+  const [shiftColor, setShiftColor] = useState('#f59e0b');
 
   // Form states for Roster Assign Modal
   const [selectedShiftId, setSelectedShiftId] = useState('');
