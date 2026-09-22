@@ -14,6 +14,7 @@ import {
   Clock,
   User,
   Users,
+  UserPlus,
   X,
   ExternalLink,
   ChevronRight,
@@ -39,12 +40,13 @@ import {
   Copy,
   Check,
   Zap,
-  Bold,
-  Italic,
-  Code,
-  Calendar,
-  Gift,
-  SmilePlus,
+  Phone,
+  PhoneCall,
+  PhoneOff,
+  Video,
+  VideoOff,
+  ShieldCheck,
+  MoreVertical,
 } from 'lucide-react';
 import {
   usePulseStore,
@@ -55,6 +57,18 @@ import {
 } from '../../store/pulseStore';
 import { useWorkStore } from '../../store/workStore';
 import { useUiStore } from '../../store/uiStore';
+
+interface GroupMember {
+  id: string;
+  userId: string;
+  name: string;
+  role: string;
+  department: string;
+  status: 'online' | 'away' | 'busy' | 'offline';
+  customStatus?: string;
+  isAdmin?: boolean;
+  dmId?: string;
+}
 
 export const PulseDesk: React.FC = () => {
   const {
@@ -92,6 +106,17 @@ export const PulseDesk: React.FC = () => {
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+
+  // WhatsApp-like Group Members Drawer state
+  const [isGroupInfoDrawerOpen, setIsGroupInfoDrawerOpen] = useState(false);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [activeCallPartner, setActiveCallPartner] = useState<{
+    name: string;
+    role: string;
+    type: 'voice' | 'video';
+  } | null>(null);
+  const [callDuration, setCallDuration] = useState(0);
+  const [isCallMuted, setIsCallMuted] = useState(false);
 
   // Spicy tadka states
   const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
@@ -161,6 +186,19 @@ export const PulseDesk: React.FC = () => {
     return () => clearInterval(timer);
   }, [playingVoiceId]);
 
+  // Active call duration timer
+  useEffect(() => {
+    let callTimer: any;
+    if (activeCallPartner) {
+      callTimer = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setCallDuration(0);
+    }
+    return () => clearInterval(callTimer);
+  }, [activeCallPartner]);
+
   // Monitor slash command triggers in input
   useEffect(() => {
     if (inputText.startsWith('/')) {
@@ -185,6 +223,214 @@ export const PulseDesk: React.FC = () => {
       dm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       dm.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
       dm.department.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Rich WhatsApp-style member roster for each squad/group
+  const allSquadMembers: Record<string, GroupMember[]> = {
+    'chan-engineering': [
+      {
+        id: 'mem-1',
+        userId: 'user-sarah',
+        name: 'Sarah Jenkins',
+        role: 'VP of Engineering',
+        department: 'Engineering Leadership',
+        status: 'online',
+        customStatus: 'Reviewing Q3 sprint deliverables',
+        isAdmin: true,
+        dmId: 'dm-sarah',
+      },
+      {
+        id: 'mem-2',
+        userId: 'user-alex',
+        name: 'Alex Rivera',
+        role: 'Staff Lead Architect',
+        department: 'Core Infrastructure',
+        status: 'online',
+        customStatus: 'Testing NGINX blue-green switches',
+        isAdmin: true,
+        dmId: 'dm-alex',
+      },
+      {
+        id: 'mem-3',
+        userId: 'user-priya',
+        name: 'Priya Sharma',
+        role: 'Principal Product Designer',
+        department: 'Product Design',
+        status: 'online',
+        customStatus: 'Polishing dark mode design tokens',
+        dmId: 'dm-priya',
+      },
+      {
+        id: 'mem-4',
+        userId: 'user-rohan',
+        name: 'Rohan Deshmukh',
+        role: 'Senior Fullstack Engineer',
+        department: 'Frontend Engineering',
+        status: 'away',
+        customStatus: 'Reconciling weekly timesheets',
+        dmId: 'dm-rohan',
+      },
+      {
+        id: 'mem-5',
+        userId: 'user-current',
+        name: 'You',
+        role: 'Senior Systems Engineer',
+        department: 'Platform Architecture',
+        status: 'online',
+        customStatus: 'In Deep Flow 🎧',
+      },
+      {
+        id: 'mem-6',
+        userId: 'user-vikram',
+        name: 'Vikram Patel',
+        role: 'DevOps & Cloud Lead',
+        department: 'Infrastructure',
+        status: 'online',
+        customStatus: 'Terraform pipelines green 🚀',
+      },
+      {
+        id: 'mem-7',
+        userId: 'user-ananya',
+        name: 'Ananya Iyer',
+        role: 'Lead QA Automation',
+        department: 'Quality Engineering',
+        status: 'online',
+        customStatus: 'Running E2E regression suite',
+      },
+    ],
+    'chan-general': [
+      {
+        id: 'mem-1',
+        userId: 'user-sarah',
+        name: 'Sarah Jenkins',
+        role: 'VP of Engineering',
+        department: 'Leadership',
+        status: 'online',
+        isAdmin: true,
+        dmId: 'dm-sarah',
+      },
+      {
+        id: 'mem-2',
+        userId: 'user-alex',
+        name: 'Alex Rivera',
+        role: 'Staff Lead',
+        department: 'Engineering',
+        status: 'online',
+        dmId: 'dm-alex',
+      },
+      {
+        id: 'mem-3',
+        userId: 'user-priya',
+        name: 'Priya Sharma',
+        role: 'Product Designer',
+        department: 'Design',
+        status: 'online',
+        dmId: 'dm-priya',
+      },
+      {
+        id: 'mem-4',
+        userId: 'user-rohan',
+        name: 'Rohan Deshmukh',
+        role: 'Senior Engineer',
+        department: 'Engineering',
+        status: 'away',
+        dmId: 'dm-rohan',
+      },
+      {
+        id: 'mem-5',
+        userId: 'user-current',
+        name: 'You',
+        role: 'Senior Systems Engineer',
+        department: 'Platform',
+        status: 'online',
+      },
+    ],
+    'chan-sprint-room': [
+      {
+        id: 'mem-1',
+        userId: 'user-sarah',
+        name: 'Sarah Jenkins',
+        role: 'VP of Engineering',
+        department: 'Leadership',
+        status: 'online',
+        isAdmin: true,
+        dmId: 'dm-sarah',
+      },
+      {
+        id: 'mem-2',
+        userId: 'user-alex',
+        name: 'Alex Rivera',
+        role: 'Staff Lead',
+        department: 'Engineering',
+        status: 'online',
+        dmId: 'dm-alex',
+      },
+      {
+        id: 'mem-4',
+        userId: 'user-rohan',
+        name: 'Rohan Deshmukh',
+        role: 'Senior Engineer',
+        department: 'Engineering',
+        status: 'away',
+        dmId: 'dm-rohan',
+      },
+      {
+        id: 'mem-5',
+        userId: 'user-current',
+        name: 'You',
+        role: 'Senior Systems Engineer',
+        department: 'Platform',
+        status: 'online',
+      },
+    ],
+    'chan-product-design': [
+      {
+        id: 'mem-3',
+        userId: 'user-priya',
+        name: 'Priya Sharma',
+        role: 'Principal Product Designer',
+        department: 'Design',
+        status: 'online',
+        isAdmin: true,
+        dmId: 'dm-priya',
+      },
+      {
+        id: 'mem-1',
+        userId: 'user-sarah',
+        name: 'Sarah Jenkins',
+        role: 'VP of Engineering',
+        department: 'Leadership',
+        status: 'online',
+        dmId: 'dm-sarah',
+      },
+      {
+        id: 'mem-4',
+        userId: 'user-rohan',
+        name: 'Rohan Deshmukh',
+        role: 'Senior Engineer',
+        department: 'Engineering',
+        status: 'away',
+        dmId: 'dm-rohan',
+      },
+      {
+        id: 'mem-5',
+        userId: 'user-current',
+        name: 'You',
+        role: 'Senior Systems Engineer',
+        department: 'Platform',
+        status: 'online',
+      },
+    ],
+  };
+
+  const currentGroupMembers: GroupMember[] =
+    allSquadMembers[activeId] || allSquadMembers['chan-engineering'];
+
+  const filteredGroupMembers = currentGroupMembers.filter(
+    (m) =>
+      m.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+      m.role.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+      m.department.toLowerCase().includes(memberSearchQuery.toLowerCase())
   );
 
   // Available manager-assigned sprint tasks for tagging
@@ -329,6 +575,41 @@ export const PulseDesk: React.FC = () => {
     addToast({ type: 'success', message: '🎙️ Voice note published with waveform visualizer.' });
   };
 
+  // WhatsApp UX: Direct Message a Member
+  const handleDirectMessageMember = (member: GroupMember) => {
+    setIsGroupInfoDrawerOpen(false);
+    if (member.dmId) {
+      setActiveConversation(member.dmId, 'dm');
+      addToast({ type: 'success', message: `Opened 1:1 Direct Message with ${member.name}.` });
+    } else {
+      addToast({
+        type: 'info',
+        message: `Direct message thread initialized for ${member.name}.`,
+      });
+    }
+  };
+
+  // WhatsApp UX: Start Call with Member
+  const handleStartCallMember = (member: GroupMember, type: 'voice' | 'video') => {
+    setActiveCallPartner({ name: member.name, role: member.role, type });
+    addToast({
+      type: 'info',
+      message: `📞 Calling ${member.name} (${type === 'voice' ? 'Voice Call' : 'Video Call'})...`,
+    });
+  };
+
+  // End Call Handler
+  const handleEndCall = () => {
+    if (activeCallPartner) {
+      addToast({
+        type: 'info',
+        message: `Call ended with ${activeCallPartner.name}. Duration: ${Math.floor(callDuration / 60)}m ${callDuration % 60}s.`,
+      });
+      setActiveCallPartner(null);
+      setCallDuration(0);
+    }
+  };
+
   // Create Channel/Group submission
   const handleCreateChannelSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -452,6 +733,131 @@ export const PulseDesk: React.FC = () => {
           background: 'radial-gradient(circle, rgba(217, 119, 6, 0.04) 0%, transparent 70%)',
         }}
       />
+
+      {/* ========================================================================= */}
+      {/* ACTIVE CALL FLOATING OVERLAY / BANNER (WHATSAPP UX)                       */}
+      {/* ========================================================================= */}
+      {activeCallPartner && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '24px',
+            zIndex: 100,
+            background: 'linear-gradient(135deg, rgba(32, 30, 27, 0.96) 0%, rgba(18, 17, 16, 0.98) 100%)',
+            border: '1px solid var(--accent-primary)',
+            borderRadius: '14px',
+            padding: '12px 18px',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.7), 0 0 16px rgba(245, 158, 11, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+          }}
+        >
+          <div style={{ position: 'relative' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                background: 'var(--accent-primary)',
+                color: '#000000',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '14px',
+              }}
+            >
+              {activeCallPartner.name.charAt(0)}
+            </div>
+            <span
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: '#10b981',
+                boxShadow: '0 0 8px #10b981',
+              }}
+            />
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {activeCallPartner.name}
+              </span>
+              <span
+                style={{
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  background: 'rgba(16, 185, 129, 0.2)',
+                  color: '#10b981',
+                }}
+              >
+                {callDuration > 2 ? 'Connected' : 'Ringing...'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '10px' }}>
+                <div className="huddle-wave-bar" style={{ height: '8px' }} />
+                <div className="huddle-wave-bar" style={{ height: '12px', animationDelay: '-0.3s' }} />
+                <div className="huddle-wave-bar" style={{ height: '7px', animationDelay: '-0.5s' }} />
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                {activeCallPartner.type === 'voice' ? 'Direct Voice Call' : 'Direct Video Call'} &bull;{' '}
+                {Math.floor(callDuration / 60)}:{(callDuration % 60).toString().padStart(2, '0')}
+              </span>
+            </div>
+          </div>
+
+          {/* Call Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
+            <button
+              onClick={() => setIsCallMuted((p) => !p)}
+              className="btn btn-ghost"
+              style={{
+                padding: '8px',
+                borderRadius: '50%',
+                background: isCallMuted ? 'rgba(239, 68, 68, 0.2)' : 'var(--surface-3)',
+                color: isCallMuted ? '#ef4444' : 'var(--text-primary)',
+              }}
+              title={isCallMuted ? 'Unmute' : 'Mute'}
+            >
+              {isCallMuted ? <MicOff size={15} /> : <Mic size={15} />}
+            </button>
+
+            <button
+              onClick={handleEndCall}
+              style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '50%',
+                width: '34px',
+                height: '34px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 0 10px rgba(239, 68, 68, 0.4)',
+              }}
+              title="End Call"
+            >
+              <PhoneOff size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 1. LEFT CONVERSATION NAVIGATION DRAWER / ROSTER                           */}
@@ -868,7 +1274,7 @@ export const PulseDesk: React.FC = () => {
           zIndex: 1,
         }}
       >
-        {/* Top Header & Huddle Action Bar */}
+        {/* Top Header & WhatsApp-style Members Trigger */}
         <header
           style={{
             padding: '12px 24px',
@@ -887,6 +1293,7 @@ export const PulseDesk: React.FC = () => {
             {activeType === 'channel' ? (
               <>
                 <div
+                  onClick={() => setIsGroupInfoDrawerOpen(true)}
                   style={{
                     width: '36px',
                     height: '36px',
@@ -897,29 +1304,65 @@ export const PulseDesk: React.FC = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'var(--accent-primary)',
+                    cursor: 'pointer',
                   }}
+                  title="Click to view Group info & members"
                 >
                   <Hash size={18} />
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h1 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                    <h1
+                      onClick={() => setIsGroupInfoDrawerOpen(true)}
+                      style={{
+                        fontSize: '15px',
+                        fontWeight: 700,
+                        margin: 0,
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                      }}
+                      title="Click to view Group info & members"
+                    >
                       {activeChannel?.name || 'Group'}
                     </h1>
-                    <span
+
+                    {/* WhatsApp UX: Interactive Members Pill */}
+                    <button
+                      type="button"
+                      onClick={() => setIsGroupInfoDrawerOpen(true)}
+                      className="btn btn-ghost"
                       style={{
                         fontSize: '11px',
-                        color: 'var(--text-muted)',
-                        background: 'var(--surface-2)',
+                        color: 'var(--accent-primary)',
+                        background: 'rgba(245, 158, 11, 0.12)',
                         padding: '2px 8px',
                         borderRadius: '12px',
-                        border: '1px solid var(--border-hairline)',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
                       }}
+                      title="Click to view all members, call or message them directly"
                     >
-                      {activeChannel?.memberCount || 1} members
-                    </span>
+                      <Users size={12} />
+                      <span>{currentGroupMembers.length} members</span>
+                    </button>
                   </div>
-                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)', maxWidth: '500px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <p
+                    onClick={() => setIsGroupInfoDrawerOpen(true)}
+                    style={{
+                      margin: '2px 0 0',
+                      fontSize: '11px',
+                      color: 'var(--text-muted)',
+                      maxWidth: '500px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      cursor: 'pointer',
+                    }}
+                  >
                     {activeChannel?.topic}
                   </p>
                 </div>
@@ -975,8 +1418,31 @@ export const PulseDesk: React.FC = () => {
             )}
           </div>
 
-          {/* Action Bar (Huddle, Mention Task, Pinned) */}
+          {/* Action Bar (Members button, Huddle, Mention Task, Pinned) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* WhatsApp UX: Dedicated Members button */}
+            {activeType === 'channel' && (
+              <button
+                onClick={() => setIsGroupInfoDrawerOpen((prev) => !prev)}
+                className="btn btn-secondary"
+                style={{
+                  fontSize: '11px',
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderRadius: '8px',
+                  background: isGroupInfoDrawerOpen ? 'rgba(245, 158, 11, 0.15)' : 'var(--surface-2)',
+                  borderColor: isGroupInfoDrawerOpen ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                  color: isGroupInfoDrawerOpen ? 'var(--accent-primary)' : 'var(--text-primary)',
+                }}
+                title="View Group Members, Call & Direct Message (WhatsApp Style)"
+              >
+                <Users size={13} color="var(--accent-primary)" />
+                <span style={{ fontWeight: 600 }}>Members ({currentGroupMembers.length})</span>
+              </button>
+            )}
+
             {/* Start / Join Live Huddle Button */}
             <button
               onClick={() => {
@@ -2079,7 +2545,415 @@ export const PulseDesk: React.FC = () => {
       </main>
 
       {/* ========================================================================= */}
-      {/* 5. THREAD SLIDE-OVER DRAWER                                               */}
+      {/* 5. WHATSAPP UX: GROUP INFO & MEMBERS DRAWER                                */}
+      {/* ========================================================================= */}
+      {isGroupInfoDrawerOpen && (
+        <aside
+          style={{
+            width: '380px',
+            borderLeft: '1px solid var(--border-hairline)',
+            background: 'var(--surface-1)',
+            display: 'flex',
+            flexDirection: 'column',
+            flexShrink: 0,
+            zIndex: 20,
+            boxShadow: 'var(--shadow-lg)',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              padding: '14px 18px',
+              borderBottom: '1px solid var(--border-hairline)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.06) 0%, transparent 100%)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={16} color="var(--accent-primary)" />
+              <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Group Info & Members
+              </span>
+            </div>
+            <button
+              onClick={() => setIsGroupInfoDrawerOpen(false)}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+              title="Close"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* WhatsApp Style Hero Group Profile Card */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div
+              style={{
+                padding: '24px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                borderBottom: '1px solid var(--border-hairline)',
+                background: 'linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%)',
+              }}
+            >
+              <div
+                style={{
+                  width: '68px',
+                  height: '68px',
+                  borderRadius: '20px',
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%)',
+                  border: '2px solid var(--accent-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--accent-primary)',
+                  boxShadow: '0 0 20px rgba(245, 158, 11, 0.3)',
+                  marginBottom: '12px',
+                }}
+              >
+                <Hash size={32} />
+              </div>
+
+              <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                #{activeChannel?.name || 'engineering'}
+              </h2>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Group &bull; {currentGroupMembers.length} participants
+              </div>
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                  marginTop: '10px',
+                  lineHeight: 1.4,
+                  maxWidth: '300px',
+                }}
+              >
+                {activeChannel?.topic}
+              </p>
+
+              {/* WhatsApp Quick Action Tiles (Audio Call, Video Call, Add) */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginTop: '16px',
+                }}
+              >
+                <button
+                  onClick={() => {
+                    toggleHuddle(activeId);
+                    addToast({ type: 'info', message: '🎙️ Group Voice Huddle launched.' });
+                  }}
+                  className="btn btn-secondary"
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    width: '80px',
+                  }}
+                >
+                  <Phone size={15} color="var(--accent-primary)" />
+                  <span>Audio Call</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    addToast({ type: 'info', message: '📹 Group Video Call room created.' });
+                  }}
+                  className="btn btn-secondary"
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    width: '80px',
+                  }}
+                >
+                  <Video size={15} color="var(--accent-primary)" />
+                  <span>Video Call</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    addToast({ type: 'info', message: 'Invite link copied to clipboard.' });
+                  }}
+                  className="btn btn-secondary"
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    width: '80px',
+                  }}
+                >
+                  <UserPlus size={15} color="var(--accent-primary)" />
+                  <span>Add</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Shared Media / Links / Docs summary */}
+            <div
+              style={{
+                padding: '12px 20px',
+                borderBottom: '1px solid var(--border-hairline)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'var(--surface-2)',
+                cursor: 'pointer',
+              }}
+              onClick={() => setIsPinnedDrawerOpen(true)}
+            >
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Media, Links and Docs
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                18 Files &gt;
+              </span>
+            </div>
+
+            {/* Participants Section Header */}
+            <div style={{ padding: '16px 20px 8px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '10px',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  {filteredGroupMembers.length} Participants
+                </span>
+                <span style={{ fontSize: '10px', color: 'var(--accent-primary)' }}>
+                  Click icon to Call or DM
+                </span>
+              </div>
+
+              {/* Member Search Bar */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'var(--surface-0)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  marginBottom: '12px',
+                }}
+              >
+                <Search size={13} color="var(--text-muted)" />
+                <input
+                  type="text"
+                  placeholder="Search participants by name or role..."
+                  value={memberSearchQuery}
+                  onChange={(e) => setMemberSearchQuery(e.target.value)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    width: '100%',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Members List with WhatsApp-Style Direct Action Buttons */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {filteredGroupMembers.map((member) => {
+                  const isCurrent = member.userId === 'user-current';
+
+                  return (
+                    <div
+                      key={member.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--border-hairline)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {/* Avatar & Member Details */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                        <div style={{ position: 'relative' }}>
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: isCurrent ? 'var(--accent-primary)' : 'var(--surface-3)',
+                              color: isCurrent ? '#000000' : 'var(--text-primary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '13px',
+                              border: '1px solid var(--border-subtle)',
+                            }}
+                          >
+                            {isCurrent ? 'YOU' : member.name.charAt(0)}
+                          </div>
+                          <span
+                            style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              right: 0,
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              background:
+                                member.status === 'online'
+                                  ? '#10b981'
+                                  : member.status === 'away'
+                                  ? '#f59e0b'
+                                  : 'var(--text-muted)',
+                              border: '1px solid var(--surface-2)',
+                            }}
+                          />
+                        </div>
+
+                        <div style={{ overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span
+                              style={{
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                textOverflow: 'ellipsis',
+                                overflow: 'hidden',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {member.name}
+                            </span>
+
+                            {member.isAdmin && (
+                              <span
+                                style={{
+                                  fontSize: '9px',
+                                  fontWeight: 700,
+                                  textTransform: 'uppercase',
+                                  padding: '1px 5px',
+                                  borderRadius: '4px',
+                                  background: 'rgba(245, 158, 11, 0.2)',
+                                  color: 'var(--accent-primary)',
+                                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                                }}
+                              >
+                                Group Admin
+                              </span>
+                            )}
+                          </div>
+
+                          <div
+                            style={{
+                              fontSize: '11px',
+                              color: 'var(--text-muted)',
+                              textOverflow: 'ellipsis',
+                              overflow: 'hidden',
+                              whiteSpace: 'nowrap',
+                              marginTop: '1px',
+                            }}
+                          >
+                            {member.customStatus || member.role}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* WhatsApp UX Action Controls: Message & Call */}
+                      {!isCurrent && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                          {/* Direct Message (DM) */}
+                          <button
+                            onClick={() => handleDirectMessageMember(member)}
+                            className="btn btn-ghost"
+                            style={{
+                              padding: '6px 8px',
+                              borderRadius: '8px',
+                              background: 'var(--surface-3)',
+                              color: 'var(--accent-primary)',
+                            }}
+                            title={`Send direct message to ${member.name}`}
+                          >
+                            <MessageSquare size={13} />
+                          </button>
+
+                          {/* Direct Voice Call */}
+                          <button
+                            onClick={() => handleStartCallMember(member, 'voice')}
+                            className="btn btn-ghost"
+                            style={{
+                              padding: '6px 8px',
+                              borderRadius: '8px',
+                              background: 'var(--surface-3)',
+                              color: '#10b981',
+                            }}
+                            title={`Direct voice call ${member.name}`}
+                          >
+                            <Phone size={13} />
+                          </button>
+
+                          {/* Direct Video Call */}
+                          <button
+                            onClick={() => handleStartCallMember(member, 'video')}
+                            className="btn btn-ghost"
+                            style={{
+                              padding: '6px 8px',
+                              borderRadius: '8px',
+                              background: 'var(--surface-3)',
+                              color: 'var(--text-muted)',
+                            }}
+                            title={`Direct video call ${member.name}`}
+                          >
+                            <Video size={13} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6. THREAD SLIDE-OVER DRAWER                                               */}
       {/* ========================================================================= */}
       {activeThreadMessage && (
         <aside
@@ -2207,7 +3081,7 @@ export const PulseDesk: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 6. PINNED ITEMS DRAWER                                                    */}
+      {/* 7. PINNED ITEMS DRAWER                                                    */}
       {/* ========================================================================= */}
       {isPinnedDrawerOpen && (
         <aside
@@ -2281,7 +3155,7 @@ export const PulseDesk: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 7. MENTION SPRINT TASK MODAL                                              */}
+      {/* 8. MENTION SPRINT TASK MODAL                                              */}
       {/* ========================================================================= */}
       {isMentionTaskModalOpen && (
         <div
@@ -2428,7 +3302,7 @@ export const PulseDesk: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 8. CREATE GROUP MODAL                                                     */}
+      {/* 9. CREATE GROUP MODAL                                                     */}
       {/* ========================================================================= */}
       {isCreateChannelModalOpen && (
         <div
