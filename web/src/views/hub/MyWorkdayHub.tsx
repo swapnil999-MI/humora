@@ -235,11 +235,9 @@ export const MyWorkdayHub: React.FC = () => {
       >
         {/* Card 1: Shift-to-Sprint Reconciliation Meter */}
         <div
+          className="soft-card"
           style={{
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-md)',
-            padding: '18px 20px',
+            padding: '22px 24px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -368,11 +366,9 @@ export const MyWorkdayHub: React.FC = () => {
 
         {/* Card 2: Quick Shift Summary & Leave Balances */}
         <div
+          className="soft-card"
           style={{
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-md)',
-            padding: '18px 20px',
+            padding: '22px 24px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -429,12 +425,11 @@ export const MyWorkdayHub: React.FC = () => {
 
       {/* Engine 2: Zero-Effort Weekly Worklog-to-Timesheet Reconciliation */}
       <div
-        className="glass-panel"
+        className="soft-card"
         style={{
-          padding: '22px 24px',
-          background: 'linear-gradient(135deg, rgba(20, 24, 39, 0.95) 0%, rgba(13, 15, 23, 0.98) 100%)',
-          border: '1px solid rgba(99, 102, 241, 0.25)',
-          borderRadius: 'var(--radius-md)',
+          padding: '24px 26px',
+          border: '1px solid var(--border-accent)',
+          borderRadius: 'var(--radius-lg)',
           display: 'flex',
           flexDirection: 'column',
           gap: '16px',
@@ -447,8 +442,8 @@ export const MyWorkdayHub: React.FC = () => {
               style={{
                 padding: '8px',
                 borderRadius: '10px',
-                background: 'rgba(99, 102, 241, 0.2)',
-                color: '#818cf8',
+                background: 'var(--accent-subtle)',
+                color: 'var(--accent-primary)',
               }}
             >
               <FileCheck2 size={20} />
@@ -704,19 +699,15 @@ export const MyWorkdayHub: React.FC = () => {
                 placeholder="Add optional notes for your weekly timesheet submission..."
                 value={submissionNotes}
                 onChange={(e) => setSubmissionNotes(e.target.value)}
+                className="input-field"
                 style={{
                   flex: 1,
-                  padding: '8px 14px',
-                  borderRadius: '6px',
-                  background: 'var(--surface-2)',
-                  border: '1px solid var(--border-subtle)',
-                  color: '#fff',
-                  fontSize: '13px',
+                  height: '38px',
                 }}
               />
               <button
                 className="btn btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, height: '38px' }}
                 disabled={isSubmittingTimesheet}
                 onClick={async () => {
                   if (!weeklyTimesheet?.week_start_date) return;
@@ -744,10 +735,9 @@ export const MyWorkdayHub: React.FC = () => {
 
       {/* Row 2: Assigned Sprint Tasks & 1-Click Quick Time Logger */}
       <div
+        className="soft-card"
         style={{
-          background: 'var(--surface-1)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-md)',
+          borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
         }}
       >

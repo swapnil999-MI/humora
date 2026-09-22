@@ -350,9 +350,17 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
   return (
     <div className="cmd-palette-overlay" onClick={onClose}>
       <div className="cmd-palette-box" onClick={(e) => e.stopPropagation()}>
-        {/* Search Input */}
-        <div style={{ display: 'flex', alignItems: 'center', padding: '0 18px' }}>
-          <Search size={18} color="var(--accent-primary)" />
+        {/* Search Input Bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 20px',
+            borderBottom: '1px solid var(--border-hairline)',
+            background: 'var(--surface-1)',
+          }}
+        >
+          <Search size={20} color="var(--accent-primary)" strokeWidth={2} />
           <input
             ref={inputRef}
             type="text"
@@ -365,7 +373,7 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
             }}
             onKeyDown={handleKeyDown}
           />
-          <span className="cmd-k-kbd">ESC</span>
+          <kbd className="cmd-k-kbd">ESC</kbd>
         </div>
 
         {/* Results List */}
@@ -373,7 +381,7 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
           {filtered.length === 0 ? (
             <div
               style={{
-                padding: '36px',
+                padding: '44px 20px',
                 textAlign: 'center',
                 color: 'var(--text-muted)',
                 fontSize: '13px',
@@ -389,22 +397,33 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
                 onClick={item.action}
                 onMouseEnter={() => setSelectedIndex(idx)}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                   <div
                     style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      background: 'rgba(255, 255, 255, 0.05)',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: 'var(--radius-sm)',
+                      background: idx === selectedIndex ? 'var(--accent-subtle)' : 'var(--surface-2)',
+                      border: '1px solid var(--border-hairline)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      flexShrink: 0,
                     }}
                   >
                     {item.icon}
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        color: 'var(--text-primary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
                       {item.title}
                     </div>
                     {item.subtitle && (
@@ -413,6 +432,9 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
                           fontSize: '11px',
                           color: 'var(--text-muted)',
                           marginTop: '2px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
                         }}
                       >
                         {item.subtitle}
@@ -421,20 +443,25 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '12px' }}>
                   <span
                     style={{
                       fontSize: '10px',
                       textTransform: 'uppercase',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      background: 'rgba(255, 255, 255, 0.06)',
+                      padding: '2px 7px',
+                      borderRadius: 'var(--radius-xs)',
+                      background: 'var(--surface-2)',
                       color: 'var(--text-muted)',
-                      fontWeight: 600,
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      border: '1px solid var(--border-hairline)',
                     }}
                   >
                     {item.category}
                   </span>
+                  {item.shortcut && (
+                    <kbd className="cmd-k-kbd">{item.shortcut}</kbd>
+                  )}
                   <ArrowRight size={13} color="var(--text-muted)" />
                 </div>
               </div>
@@ -445,9 +472,9 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
         {/* Footer info bar */}
         <div
           style={{
-            padding: '10px 18px',
-            borderTop: '1px solid var(--border-subtle)',
-            background: 'rgba(0, 0, 0, 0.2)',
+            padding: '10px 20px',
+            borderTop: '1px solid var(--border-hairline)',
+            background: 'var(--surface-2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -455,15 +482,15 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
             color: 'var(--text-muted)',
           }}
         >
-          <div style={{ display: 'flex', gap: '14px' }}>
-            <span>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <kbd className="cmd-k-kbd">&uarr;&darr;</kbd> Navigate
             </span>
-            <span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <kbd className="cmd-k-kbd">&crarr;</kbd> Select
             </span>
           </div>
-          <span>Humora Universal Command Bar</span>
+          <span style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>Humora Spotlight Engine</span>
         </div>
       </div>
     </div>

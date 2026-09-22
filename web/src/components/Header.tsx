@@ -148,42 +148,22 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
         )}
       </div>
 
-      {/* Center: Quick Search Trigger */}
-      <div
+      {/* Center: High-Level Search Bar Trigger */}
+      <button
+        type="button"
+        className="header-search-bar"
         onClick={onOpenCommandPalette}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '5px 12px',
-          background: 'var(--surface-2)',
-          border: '1px solid var(--border-hairline)',
-          borderRadius: 'var(--radius-sm)',
-          cursor: 'pointer',
-          width: '260px',
-          justifyContent: 'space-between',
-          color: 'var(--text-muted)',
-          fontSize: '12px',
-          transition: 'all var(--transition-fast)',
-        }}
+        title="Universal Quick Search (Cmd+K)"
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Search size={13} strokeWidth={1.8} />
-          <span>Quick search or action...</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Search size={14} strokeWidth={2} color="var(--accent-primary)" />
+          <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Search employees, tickets, sprints...</span>
         </div>
-        <span
-          style={{
-            fontSize: '10px',
-            padding: '1px 5px',
-            borderRadius: 'var(--radius-xs)',
-            background: 'var(--surface-hover)',
-            color: 'var(--text-secondary)',
-            fontFamily: 'var(--font-mono)',
-          }}
-        >
-          &#8984;K
-        </span>
-      </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <kbd className="cmd-k-kbd">&#8984;</kbd>
+          <kbd className="cmd-k-kbd">K</kbd>
+        </div>
+      </button>
 
       {/* Right: Workforce Clock Widget & Action Trigger */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
