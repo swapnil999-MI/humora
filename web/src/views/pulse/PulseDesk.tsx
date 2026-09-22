@@ -1764,7 +1764,7 @@ export const PulseDesk: React.FC = () => {
                                 flex: 1,
                                 height: `${Math.max(10, (val / 100) * 20)}px`,
                                 borderRadius: '1px',
-                                background: isPlayed ? 'var(--accent-primary)' : 'rgba(255, 245, 230, 0.25)',
+                                background: isPlayed ? 'var(--accent-primary)' : 'var(--border-strong)',
                               }}
                             />
                           );
@@ -1848,7 +1848,7 @@ export const PulseDesk: React.FC = () => {
                                 <span>Logged: {hours}h / 8h</span>
                                 <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{progressPct}% Synced</span>
                               </div>
-                              <div style={{ height: '4px', width: '100%', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+                              <div style={{ height: '4px', width: '100%', background: 'var(--border-subtle)', borderRadius: '2px', overflow: 'hidden' }}>
                                 <div
                                   style={{
                                     height: '100%',
@@ -1910,7 +1910,8 @@ export const PulseDesk: React.FC = () => {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             padding: '6px 10px',
-                            background: 'rgba(0, 0, 0, 0.2)',
+                            background: 'var(--surface-3)',
+                            border: '1px solid var(--border-subtle)',
                             borderRadius: '6px',
                             gap: '8px',
                           }}
