@@ -27,6 +27,12 @@ export interface PulseReaction {
   users: string[]; // user IDs
 }
 
+export interface PulseVoiceNote {
+  duration: string;
+  waveform: number[];
+  transcription?: string;
+}
+
 export interface PulseMessage {
   id: string;
   conversationId: string;
@@ -40,6 +46,10 @@ export interface PulseMessage {
   attachments?: PulseAttachment[];
   taggedTasks?: PulseTaskTag[];
   reactions?: PulseReaction[];
+  voiceNote?: PulseVoiceNote;
+  threadRepliesCount?: number;
+  isPinned?: boolean;
+  isStarred?: boolean;
 }
 
 export interface PulseChannel {
@@ -50,6 +60,7 @@ export interface PulseChannel {
   memberCount: number;
   unreadCount: number;
   createdAt: string;
+  pinnedGoal?: string;
 }
 
 export interface PulseDirectMessage {
@@ -60,6 +71,7 @@ export interface PulseDirectMessage {
   role: string;
   department: string;
   status: 'online' | 'away' | 'busy' | 'offline';
+  statusCustom?: string;
   lastSeen?: string;
   unreadCount: number;
   lastMessageSnippet?: string;
@@ -75,6 +87,9 @@ export interface PulseState {
   messages: Record<string, PulseMessage[]>; // conversationId -> messages
   isCreateChannelModalOpen: boolean;
   isMentionTaskModalOpen: boolean;
+  isHuddleActive: boolean;
+  huddleChannelId: string | null;
+  activeThreadMessage: PulseMessage | null;
 
   // Actions
   setActiveConversation: (id: string, type: 'channel' | 'dm') => void;
@@ -83,9 +98,14 @@ export interface PulseState {
     conversationId: string,
     content: string,
     attachments?: PulseAttachment[],
-    taggedTasks?: PulseTaskTag[]
+    taggedTasks?: PulseTaskTag[],
+    voiceNote?: PulseVoiceNote
   ) => void;
   toggleReaction: (messageId: string, emoji: string, currentUserId: string) => void;
+  toggleStarMessage: (messageId: string) => void;
+  togglePinMessage: (messageId: string) => void;
+  toggleHuddle: (channelId: string) => void;
+  setActiveThreadMessage: (message: PulseMessage | null) => void;
   createChannel: (name: string, topic: string, isPrivate: boolean) => void;
   setCreateChannelModalOpen: (open: boolean) => void;
   setMentionTaskModalOpen: (open: boolean) => void;
@@ -100,6 +120,7 @@ const initialChannels: PulseChannel[] = [
     memberCount: 48,
     unreadCount: 0,
     createdAt: '2026-01-01',
+    pinnedGoal: 'Annual All-Hands Q3 sync scheduled for Friday 4:00 PM IST',
   },
   {
     id: 'chan-engineering',
@@ -109,6 +130,7 @@ const initialChannels: PulseChannel[] = [
     memberCount: 22,
     unreadCount: 3,
     createdAt: '2026-01-10',
+    pinnedGoal: 'Release v2.4 production freeze at 18:00 IST | Zero-downtime blue-green cutover',
   },
   {
     id: 'chan-product-design',
@@ -118,6 +140,7 @@ const initialChannels: PulseChannel[] = [
     memberCount: 14,
     unreadCount: 0,
     createdAt: '2026-02-01',
+    pinnedGoal: 'Champagne Amber Gold luxury token audit complete',
   },
   {
     id: 'chan-sprint-room',
@@ -127,6 +150,7 @@ const initialChannels: PulseChannel[] = [
     memberCount: 18,
     unreadCount: 1,
     createdAt: '2026-02-15',
+    pinnedGoal: 'Sprint 24 War Room: 0 members in burnout risk | Target 42 SP',
   },
 ];
 
@@ -235,6 +259,25 @@ const initialMessages: Record<string, PulseMessage[]> = {
         },
       ],
       reactions: [{ emoji: '🔥', count: 3, users: ['user-alex', 'user-sarah'] }],
+      threadRepliesCount: 2,
+    },
+    {
+      id: 'msg-eng-voice-1',
+      conversationId: 'chan-engineering',
+      senderId: 'user-sarah',
+      senderName: 'Sarah Jenkins',
+      senderRole: 'VP of Engineering',
+      content: 'Quick 45s audio memo on today\'s production release checklist and cutover schedule:',
+      timestamp: '10:12 AM',
+      createdAt: new Date(Date.now() - 3600000 * 1.5).toISOString(),
+      voiceNote: {
+        duration: '0:45',
+        waveform: [25, 45, 60, 85, 40, 75, 95, 100, 65, 45, 80, 90, 70, 50, 65, 85, 90, 40, 60, 75, 55, 35, 45, 25],
+        transcription: 'Team, please ensure health probes pass before swapping NGINX blue-green upstreams.',
+      },
+      reactions: [{ emoji: '🔥', count: 4, users: ['user-rohan', 'user-alex'] }, { emoji: '🚀', count: 2, users: ['user-priya'] }],
+      threadRepliesCount: 4,
+      isPinned: true,
     },
   ],
 
@@ -358,6 +401,9 @@ export const usePulseStore = create<PulseState>((set, get) => ({
   messages: initialMessages,
   isCreateChannelModalOpen: false,
   isMentionTaskModalOpen: false,
+  isHuddleActive: false,
+  huddleChannelId: null,
+  activeThreadMessage: null,
 
   setActiveConversation: (id, type) => {
     set((state) => {
@@ -374,8 +420,8 @@ export const usePulseStore = create<PulseState>((set, get) => ({
 
   setSearchQuery: (query) => set({ searchQuery: query }),
 
-  sendMessage: (conversationId, content, attachments = [], taggedTasks = []) => {
-    if (!content.trim() && attachments.length === 0 && taggedTasks.length === 0) return;
+  sendMessage: (conversationId, content, attachments = [], taggedTasks = [], voiceNote) => {
+    if (!content.trim() && attachments.length === 0 && taggedTasks.length === 0 && !voiceNote) return;
 
     const now = new Date();
     const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -391,6 +437,7 @@ export const usePulseStore = create<PulseState>((set, get) => ({
       createdAt: now.toISOString(),
       attachments: attachments.length > 0 ? attachments : undefined,
       taggedTasks: taggedTasks.length > 0 ? taggedTasks : undefined,
+      voiceNote: voiceNote || undefined,
       reactions: [],
     };
 
@@ -461,6 +508,47 @@ export const usePulseStore = create<PulseState>((set, get) => ({
       };
     });
   },
+
+  toggleStarMessage: (messageId) => {
+    set((state) => {
+      const activeMessages = state.messages[state.activeId] || [];
+      const updatedList = activeMessages.map((msg) =>
+        msg.id === messageId ? { ...msg, isStarred: !msg.isStarred } : msg
+      );
+      return {
+        messages: {
+          ...state.messages,
+          [state.activeId]: updatedList,
+        },
+      };
+    });
+  },
+
+  togglePinMessage: (messageId) => {
+    set((state) => {
+      const activeMessages = state.messages[state.activeId] || [];
+      const updatedList = activeMessages.map((msg) =>
+        msg.id === messageId ? { ...msg, isPinned: !msg.isPinned } : msg
+      );
+      return {
+        messages: {
+          ...state.messages,
+          [state.activeId]: updatedList,
+        },
+      };
+    });
+  },
+
+  toggleHuddle: (channelId) => {
+    set((state) => {
+      if (state.isHuddleActive && state.huddleChannelId === channelId) {
+        return { isHuddleActive: false, huddleChannelId: null };
+      }
+      return { isHuddleActive: true, huddleChannelId: channelId };
+    });
+  },
+
+  setActiveThreadMessage: (message) => set({ activeThreadMessage: message }),
 
   createChannel: (name, topic, isPrivate) => {
     const cleanName = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
