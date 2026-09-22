@@ -39,6 +39,7 @@ import {
   Reply,
   Copy,
   Check,
+  CheckCheck,
   Zap,
   Phone,
   PhoneCall,
@@ -47,6 +48,13 @@ import {
   VideoOff,
   ShieldCheck,
   MoreVertical,
+  Camera,
+  Folder,
+  ChevronDown,
+  CornerDownRight,
+  Bell,
+  BellOff,
+  Star,
 } from 'lucide-react';
 import {
   usePulseStore,
@@ -54,6 +62,8 @@ import {
   PulseTaskTag,
   PulseMessage,
   PulseVoiceNote,
+  PulseChannel,
+  PulseDirectMessage,
 } from '../../store/pulseStore';
 import { useWorkStore } from '../../store/workStore';
 import { useUiStore } from '../../store/uiStore';
@@ -104,11 +114,24 @@ export const PulseDesk: React.FC = () => {
   const [stagedAttachments, setStagedAttachments] = useState<PulseAttachment[]>([]);
   const [stagedTaskTags, setStagedTaskTags] = useState<PulseTaskTag[]>([]);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
 
-  // WhatsApp-like Group Members Drawer state
-  const [isGroupInfoDrawerOpen, setIsGroupInfoDrawerOpen] = useState(false);
+  // WhatsApp-Style Filter Pills (All, Unread, Groups, Direct)
+  const [chatFilter, setChatFilter] = useState<'all' | 'unread' | 'groups' | 'dms'>('all');
+
+  // WhatsApp-Style In-Chat Search Overlay
+  const [isChatSearchOpen, setIsChatSearchOpen] = useState(false);
+  const [inChatSearchQuery, setInChatSearchQuery] = useState('');
+
+  // WhatsApp-Style Three-Dot Menus
+  const [isSidebarMenuOpen, setIsSidebarMenuOpen] = useState(false);
+  const [isChatHeaderMenuOpen, setIsChatHeaderMenuOpen] = useState(false);
+
+  // WhatsApp-Style Info Drawer (Group Info or Contact Info)
+  const [isInfoDrawerOpen, setIsInfoDrawerOpen] = useState(false);
+  const [isPinnedDrawerOpen, setIsPinnedDrawerOpen] = useState(false);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [activeCallPartner, setActiveCallPartner] = useState<{
     name: string;
@@ -118,13 +141,11 @@ export const PulseDesk: React.FC = () => {
   const [callDuration, setCallDuration] = useState(0);
   const [isCallMuted, setIsCallMuted] = useState(false);
 
-  // Spicy tadka states
-  const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
-  const [isMicMuted, setIsMicMuted] = useState(false);
+  // Audio note playback simulation
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const [voiceElapsedSec, setVoiceElapsedSec] = useState(18);
-  const [isPinnedBannerExpanded, setIsPinnedBannerExpanded] = useState(true);
-  const [isPinnedDrawerOpen, setIsPinnedDrawerOpen] = useState(false);
+
+  // Thread discussion drawer
   const [threadInputText, setThreadInputText] = useState('');
   const [threadReplies, setThreadReplies] = useState<
     Record<string, { id: string; senderName: string; role: string; text: string; time: string }[]>
@@ -154,7 +175,7 @@ export const PulseDesk: React.FC = () => {
     ],
   });
 
-  // Channel creation modal state
+  // Group creation modal state
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelTopic, setNewChannelTopic] = useState('');
   const [isNewChannelPrivate, setIsNewChannelPrivate] = useState(false);
@@ -169,7 +190,7 @@ export const PulseDesk: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentMessages.length, activeId]);
 
-  // Voice note playback simulation
+  // Voice note playback timer
   useEffect(() => {
     let timer: any;
     if (playingVoiceId) {
@@ -199,33 +220,11 @@ export const PulseDesk: React.FC = () => {
     return () => clearInterval(callTimer);
   }, [activeCallPartner]);
 
-  // Monitor slash command triggers in input
-  useEffect(() => {
-    if (inputText.startsWith('/')) {
-      setIsSlashMenuOpen(true);
-    } else {
-      setIsSlashMenuOpen(false);
-    }
-  }, [inputText]);
-
   // Determine active conversation details
   const activeChannel = channels.find((c) => c.id === activeId);
   const activeDM = directMessages.find((dm) => dm.id === activeId);
 
-  // Filter channels and DMs based on search query
-  const filteredChannels = channels.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.topic.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  const filteredDMs = directMessages.filter(
-    (dm) =>
-      dm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      dm.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      dm.department.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Rich WhatsApp-style member roster for each squad/group
+  // WhatsApp Squad Members Data Roster
   const allSquadMembers: Record<string, GroupMember[]> = {
     'chan-engineering': [
       {
@@ -494,6 +493,35 @@ export const PulseDesk: React.FC = () => {
       t.assigneeName.toLowerCase().includes(taskSearchQuery.toLowerCase())
   );
 
+  // Filter Conversations for WhatsApp Left Sidebar
+  const combinedConversations = [
+    ...channels.map((c) => ({ ...c, isGroup: true })),
+    ...directMessages.map((d) => ({ ...d, isGroup: false })),
+  ];
+
+  const filteredConversations = combinedConversations.filter((item) => {
+    // Search query filter
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ((item as any).topic && (item as any).topic.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      ((item as any).role && (item as any).role.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    if (!matchesSearch) return false;
+
+    // Filter pill tabs
+    if (chatFilter === 'unread') return item.unreadCount > 0;
+    if (chatFilter === 'groups') return item.isGroup;
+    if (chatFilter === 'dms') return !item.isGroup;
+    return true;
+  });
+
+  // Filter messages in stream for In-Chat Search
+  const displayMessages = inChatSearchQuery.trim()
+    ? currentMessages.filter((m) =>
+        m.content.toLowerCase().includes(inChatSearchQuery.toLowerCase())
+      )
+    : currentMessages;
+
   // Send message handler
   const handleSend = () => {
     if (!inputText.trim() && stagedAttachments.length === 0 && stagedTaskTags.length === 0) return;
@@ -503,7 +531,7 @@ export const PulseDesk: React.FC = () => {
     setStagedAttachments([]);
     setStagedTaskTags([]);
     setIsEmojiPickerOpen(false);
-    setIsSlashMenuOpen(false);
+    setIsAttachMenuOpen(false);
   };
 
   // Keyboard shortcut in message textarea
@@ -531,6 +559,7 @@ export const PulseDesk: React.FC = () => {
     };
 
     setStagedAttachments((prev) => [...prev, newAtt]);
+    setIsAttachMenuOpen(false);
     addToast({ type: 'info', message: `Attached "${file.name}" to draft.` });
   };
 
@@ -553,7 +582,7 @@ export const PulseDesk: React.FC = () => {
     });
   };
 
-  // Simulate Instant Audio Memo Recording
+  // Simulate Instant Audio Memo Recording (WhatsApp Mic Button)
   const handleRecordAudioMemo = () => {
     const simulatedWaveform = [
       24, 42, 65, 88, 48, 72, 96, 100, 78, 55, 68, 86, 92, 60, 42, 76, 88, 56, 40, 72, 48, 28, 38,
@@ -565,22 +594,16 @@ export const PulseDesk: React.FC = () => {
       transcription:
         'Voice memo: Verified the zero-downtime blue-green health check scripts and NGINX configs.',
     };
-    sendMessage(
-      activeId,
-      '🎙️ Quick Voice Memo from production floor:',
-      [],
-      [],
-      voiceNote
-    );
-    addToast({ type: 'success', message: '🎙️ Voice note published with waveform visualizer.' });
+    sendMessage(activeId, '', [], [], voiceNote);
+    addToast({ type: 'success', message: '🎙️ Voice note recorded & sent.' });
   };
 
   // WhatsApp UX: Direct Message a Member
   const handleDirectMessageMember = (member: GroupMember) => {
-    setIsGroupInfoDrawerOpen(false);
+    setIsInfoDrawerOpen(false);
     if (member.dmId) {
       setActiveConversation(member.dmId, 'dm');
-      addToast({ type: 'success', message: `Opened 1:1 Direct Message with ${member.name}.` });
+      addToast({ type: 'success', message: `Switched to direct chat with ${member.name}.` });
     } else {
       addToast({
         type: 'info',
@@ -590,11 +613,11 @@ export const PulseDesk: React.FC = () => {
   };
 
   // WhatsApp UX: Start Call with Member
-  const handleStartCallMember = (member: GroupMember, type: 'voice' | 'video') => {
-    setActiveCallPartner({ name: member.name, role: member.role, type });
+  const handleStartCallMember = (partner: { name: string; role: string }, type: 'voice' | 'video') => {
+    setActiveCallPartner({ name: partner.name, role: partner.role, type });
     addToast({
       type: 'info',
-      message: `📞 Calling ${member.name} (${type === 'voice' ? 'Voice Call' : 'Video Call'})...`,
+      message: `📞 Calling ${partner.name} (${type === 'voice' ? 'Voice Call' : 'Video Call'})...`,
     });
   };
 
@@ -671,35 +694,6 @@ export const PulseDesk: React.FC = () => {
     addToast({ type: 'success', message: 'Thread reply posted.' });
   };
 
-  // Quick Slash Command Executor
-  const handleExecuteSlash = (cmd: string) => {
-    if (cmd === 'task') {
-      setInputText('');
-      setIsSlashMenuOpen(false);
-      setMentionTaskModalOpen(true);
-    } else if (cmd === 'huddle') {
-      setInputText('');
-      setIsSlashMenuOpen(false);
-      toggleHuddle(activeId);
-      addToast({
-        type: 'info',
-        message: isHuddleActive
-          ? 'Left voice huddle.'
-          : '🎙️ Joined Live Squad Voice Huddle with spatial audio.',
-      });
-    } else if (cmd === 'standup') {
-      setInputText(
-        `**Daily Standup Update**\n- **Yesterday:** Implemented payroll LOP deductions\n- **Today:** Reviewing traffic switch scripts\n- **Blockers:** None`
-      );
-      setIsSlashMenuOpen(false);
-    } else if (cmd === 'kudos') {
-      setInputText(`🎉 Huge shoutout and kudos to the squad for shipping the sprint deliverables ahead of time!`);
-      setIsSlashMenuOpen(false);
-    }
-  };
-
-  const activeHuddle = isHuddleActive && huddleChannelId === activeId;
-
   return (
     <div
       className="pulse-desk"
@@ -721,16 +715,6 @@ export const PulseDesk: React.FC = () => {
           width: '500px',
           height: '500px',
           background: 'radial-gradient(circle, rgba(245, 158, 11, 0.05) 0%, transparent 70%)',
-        }}
-      />
-      <div
-        className="pulse-ambient-glow"
-        style={{
-          bottom: '-10%',
-          left: '30%',
-          width: '450px',
-          height: '450px',
-          background: 'radial-gradient(circle, rgba(217, 119, 6, 0.04) 0%, transparent 70%)',
         }}
       />
 
@@ -860,11 +844,11 @@ export const PulseDesk: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 1. LEFT CONVERSATION NAVIGATION DRAWER / ROSTER                           */}
+      {/* 1. WHATSAPP WEB STYLE LEFT SIDEBAR: CHATS LIST & FILTER PILLS             */}
       {/* ========================================================================= */}
       <aside
         style={{
-          width: '280px',
+          width: '340px',
           borderRight: '1px solid var(--border-hairline)',
           background: 'var(--surface-1)',
           display: 'flex',
@@ -873,79 +857,160 @@ export const PulseDesk: React.FC = () => {
           zIndex: 1,
         }}
       >
-        {/* Header with Title & Quick Add Group */}
+        {/* WhatsApp Top Profile & Actions Header */}
         <div
           style={{
-            padding: '16px 18px',
+            padding: '10px 16px',
             borderBottom: '1px solid var(--border-hairline)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.04) 0%, transparent 100%)',
+            background: 'var(--surface-2)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div
-              style={{
-                width: '26px',
-                height: '26px',
-                borderRadius: '6px',
-                background: 'var(--accent-primary-subtle)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--accent-primary)',
-              }}
-            >
-              <Radio size={14} />
+          {/* User Profile Avatar with Status Ring */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ position: 'relative' }}>
+              <div
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '50%',
+                  background: 'var(--accent-primary)',
+                  color: '#000000',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                YOU
+              </div>
+              <span
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  width: '9px',
+                  height: '9px',
+                  borderRadius: '50%',
+                  background: '#10b981',
+                  border: '2px solid var(--surface-2)',
+                }}
+              />
             </div>
-            <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.04em' }}>
-              TEAM PULSE
-            </span>
-            <span
-              style={{
-                fontSize: '9px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                background: 'rgba(245, 158, 11, 0.18)',
-                color: 'var(--accent-primary)',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                letterSpacing: '0.06em',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
-              }}
-            >
-              Live
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Chats
+              </span>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                PeopleOS Team Pulse
+              </span>
+            </div>
           </div>
 
-          <button
-            onClick={() => setCreateChannelModalOpen(true)}
-            className="btn btn-ghost"
-            title="Create New Group"
-            style={{ padding: '6px 8px', borderRadius: '6px' }}
-          >
-            <Plus size={15} color="var(--accent-primary)" />
-          </button>
+          {/* Right Action Icons (Moments/Status, New Group, Menu) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
+            <button
+              onClick={() => addToast({ type: 'info', message: 'Team Presence Radar active.' })}
+              className="btn btn-ghost"
+              style={{ padding: '7px', borderRadius: '50%', color: 'var(--text-muted)' }}
+              title="Team Status & Radar"
+            >
+              <Radio size={18} />
+            </button>
+
+            <button
+              onClick={() => setCreateChannelModalOpen(true)}
+              className="btn btn-ghost"
+              style={{ padding: '7px', borderRadius: '50%', color: 'var(--text-muted)' }}
+              title="New Group Chat"
+            >
+              <Plus size={19} />
+            </button>
+
+            <button
+              onClick={() => setIsSidebarMenuOpen((p) => !p)}
+              className="btn btn-ghost"
+              style={{ padding: '7px', borderRadius: '50%', color: 'var(--text-muted)' }}
+              title="Menu"
+            >
+              <MoreVertical size={18} />
+            </button>
+
+            {/* Sidebar Menu Popover */}
+            {isSidebarMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '6px',
+                  width: '180px',
+                  background: 'var(--surface-3)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '10px',
+                  boxShadow: 'var(--shadow-popover)',
+                  padding: '6px',
+                  zIndex: 50,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setIsSidebarMenuOpen(false);
+                    setCreateChannelModalOpen(true);
+                  }}
+                  className="btn btn-ghost"
+                  style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px' }}
+                >
+                  New Group
+                </button>
+                <button
+                  onClick={() => {
+                    setIsSidebarMenuOpen(false);
+                    setIsPinnedDrawerOpen(true);
+                  }}
+                  className="btn btn-ghost"
+                  style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px' }}
+                >
+                  Starred & Pinned
+                </button>
+                <button
+                  onClick={() => {
+                    setIsSidebarMenuOpen(false);
+                    addToast({ type: 'info', message: 'Notification preferences saved.' });
+                  }}
+                  className="btn btn-ghost"
+                  style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px' }}
+                >
+                  Chat Settings
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Conversation Search Filter */}
-        <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-hairline)' }}>
+        {/* WhatsApp Search Bar */}
+        <div style={{ padding: '10px 12px 6px' }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
+              gap: '10px',
               background: 'var(--surface-2)',
               border: '1px solid var(--border-subtle)',
               borderRadius: '8px',
-              padding: '6px 10px',
+              padding: '6px 12px',
             }}
           >
-            <Search size={13} color="var(--text-muted)" />
+            <Search size={14} color="var(--text-muted)" />
             <input
               type="text"
-              placeholder="Filter groups or people..."
+              placeholder="Search or start a new chat"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -960,309 +1025,180 @@ export const PulseDesk: React.FC = () => {
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
               >
-                <X size={12} />
+                <X size={13} />
               </button>
             )}
           </div>
         </div>
 
-        {/* Scrollable Groups & Direct Messages Roster */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '12px 10px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '18px',
-          }}
-        >
-          {/* Section: Groups */}
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0 8px 6px',
-                fontSize: '10px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                color: 'var(--text-muted)',
-              }}
-            >
-              <span>Groups ({filteredChannels.length})</span>
+        {/* WhatsApp Filter Pills: All | Unread | Groups | Direct */}
+        <div style={{ padding: '4px 12px 10px', display: 'flex', gap: '6px', borderBottom: '1px solid var(--border-hairline)' }}>
+          {(['all', 'unread', 'groups', 'dms'] as const).map((filterKey) => {
+            const isActive = chatFilter === filterKey;
+            const labels = { all: 'All', unread: 'Unread', groups: 'Groups', dms: 'Direct' };
+
+            return (
               <button
-                onClick={() => setCreateChannelModalOpen(true)}
+                key={filterKey}
+                onClick={() => setChatFilter(filterKey)}
                 style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--accent-primary)',
-                  cursor: 'pointer',
+                  padding: '4px 12px',
+                  borderRadius: '16px',
                   fontSize: '11px',
                   fontWeight: 600,
-                  padding: 0,
+                  cursor: 'pointer',
+                  border: isActive
+                    ? '1px solid var(--accent-primary)'
+                    : '1px solid var(--border-subtle)',
+                  background: isActive ? 'rgba(245, 158, 11, 0.15)' : 'var(--surface-2)',
+                  color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)',
+                  transition: 'all var(--transition-fast)',
                 }}
               >
-                + Add
+                {labels[filterKey]}
               </button>
-            </div>
+            );
+          })}
+        </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {filteredChannels.map((c) => {
-                const isActive = activeType === 'channel' && activeId === c.id;
-                const hasHuddle = isHuddleActive && huddleChannelId === c.id;
+        {/* WhatsApp Scrollable Conversations Roster */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {filteredConversations.map((item) => {
+            const isGroup = item.isGroup;
+            const isActive = isGroup
+              ? activeType === 'channel' && activeId === item.id
+              : activeType === 'dm' && activeId === item.id;
 
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => setActiveConversation(c.id, 'channel')}
+            const timeDisplay = isGroup
+              ? (item as any).createdAt === '2026-02-15'
+                ? 'Yesterday'
+                : '10:42 AM'
+              : (item as any).lastMessageTime || 'Yesterday';
+
+            const snippet = isGroup
+              ? (item as any).topic
+              : (item as any).lastMessageSnippet || 'Hey team!';
+
+            return (
+              <div
+                key={item.id}
+                onClick={() => {
+                  setActiveConversation(item.id, isGroup ? 'channel' : 'dm');
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 16px',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid var(--border-hairline)',
+                  background: isActive ? 'var(--surface-3)' : 'transparent',
+                  transition: 'background var(--transition-fast)',
+                  borderLeft: isActive ? '3px solid var(--accent-primary)' : '3px solid transparent',
+                }}
+              >
+                {/* 48px Circular Avatar with Online Presence */}
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <div
                     style={{
-                      width: '100%',
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '50%',
+                      background: isGroup
+                        ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(217, 119, 6, 0.12) 100%)'
+                        : 'var(--surface-4)',
+                      border: '1px solid rgba(245, 158, 11, 0.25)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '7px 10px',
-                      borderRadius: '8px',
-                      background: isActive ? 'var(--surface-3)' : 'transparent',
-                      border: isActive
-                        ? '1px solid rgba(245, 158, 11, 0.3)'
-                        : '1px solid transparent',
-                      color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      transition: 'all var(--transition-fast)',
-                      textAlign: 'left',
+                      justifyContent: 'center',
+                      color: 'var(--accent-primary)',
+                      fontWeight: 700,
+                      fontSize: '15px',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                      {c.isPrivate ? (
-                        <Lock size={13} color={isActive ? 'var(--accent-primary)' : 'var(--text-muted)'} />
-                      ) : (
-                        <Hash size={13} color={isActive ? 'var(--accent-primary)' : 'var(--text-muted)'} />
-                      )}
+                    {isGroup ? <Hash size={22} /> : item.name.charAt(0)}
+                  </div>
+
+                  {!isGroup && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        right: 0,
+                        width: '11px',
+                        height: '11px',
+                        borderRadius: '50%',
+                        background: (item as any).status === 'online' ? '#10b981' : '#f59e0b',
+                        border: '2px solid var(--surface-1)',
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Name, Snippet & Timestamp Column */}
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: 'var(--text-primary)',
+                        textOverflow: 'ellipsis',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {item.name}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {timeDisplay}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden' }}>
+                      {/* WhatsApp Double Checkmark icon on snippet */}
+                      <CheckCheck size={14} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
                       <span
                         style={{
                           fontSize: '12px',
-                          fontWeight: isActive ? 600 : 500,
+                          color: 'var(--text-muted)',
                           textOverflow: 'ellipsis',
                           overflow: 'hidden',
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {c.name}
+                        {snippet}
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {hasHuddle && (
-                        <span
-                          title="Huddle Active"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '2px',
-                            padding: '1px 5px',
-                            background: 'rgba(245, 158, 11, 0.2)',
-                            borderRadius: '4px',
-                            fontSize: '9px',
-                            color: 'var(--accent-primary)',
-                            fontWeight: 700,
-                          }}
-                        >
-                          <Mic size={9} />
-                          <span>LIVE</span>
-                        </span>
-                      )}
-
-                      {c.unreadCount > 0 && (
-                        <span
-                          style={{
-                            background: 'var(--accent-primary)',
-                            color: '#000000',
-                            fontWeight: 700,
-                            fontSize: '10px',
-                            padding: '1px 6px',
-                            borderRadius: '10px',
-                          }}
-                        >
-                          {c.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Section: Direct Messages */}
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0 8px 6px',
-                fontSize: '10px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                color: 'var(--text-muted)',
-              }}
-            >
-              <span>Direct Messages ({filteredDMs.length})</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {filteredDMs.map((dm) => {
-                const isActive = activeType === 'dm' && activeId === dm.id;
-
-                return (
-                  <button
-                    key={dm.id}
-                    onClick={() => setActiveConversation(dm.id, 'dm')}
-                    style={{
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '7px 10px',
-                      borderRadius: '8px',
-                      background: isActive ? 'var(--surface-3)' : 'transparent',
-                      border: isActive
-                        ? '1px solid rgba(245, 158, 11, 0.3)'
-                        : '1px solid transparent',
-                      color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      transition: 'all var(--transition-fast)',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                      <div style={{ position: 'relative' }}>
-                        <div
-                          style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            background: 'var(--surface-4)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 700,
-                            fontSize: '10px',
-                            color: 'var(--accent-primary)',
-                            border: '1px solid var(--border-subtle)',
-                          }}
-                        >
-                          {dm.name.charAt(0)}
-                        </div>
-                        <span
-                          style={{
-                            position: 'absolute',
-                            bottom: '-1px',
-                            right: '-1px',
-                            width: '7px',
-                            height: '7px',
-                            borderRadius: '50%',
-                            border: '1px solid var(--surface-1)',
-                            background:
-                              dm.status === 'online'
-                                ? '#10b981'
-                                : dm.status === 'away'
-                                ? '#f59e0b'
-                                : 'var(--text-muted)',
-                          }}
-                        />
-                      </div>
-
-                      <div style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: isActive ? 600 : 500,
-                            textOverflow: 'ellipsis',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          {dm.name}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: '10px',
-                            color: 'var(--text-muted)',
-                            textOverflow: 'ellipsis',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          {dm.role}
-                        </div>
-                      </div>
-                    </div>
-
-                    {dm.unreadCount > 0 && (
+                    {item.unreadCount > 0 && (
                       <span
                         style={{
                           background: 'var(--accent-primary)',
                           color: '#000000',
                           fontWeight: 700,
                           fontSize: '10px',
-                          padding: '1px 6px',
+                          padding: '1px 7px',
                           borderRadius: '10px',
+                          flexShrink: 0,
                         }}
                       >
-                        {dm.unreadCount}
+                        {item.unreadCount}
                       </span>
                     )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* User Presence Footer Bar */}
-        <div
-          style={{
-            padding: '12px 14px',
-            borderTop: '1px solid var(--border-hairline)',
-            background: 'var(--surface-2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: '#10b981',
-                boxShadow: '0 0 6px #10b981',
-              }}
-            />
-            <span style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: 600 }}>
-              You (Online)
-            </span>
-          </div>
-          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-            🎧 In Deep Focus
-          </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </aside>
 
       {/* ========================================================================= */}
-      {/* 2. MAIN ACTIVE CONVERSATION CANVAS                                       */}
+      {/* 2. MAIN ACTIVE CONVERSATION CANVAS (WHATSAPP WEB UX)                     */}
       {/* ========================================================================= */}
       <main
         style={{
@@ -1274,430 +1210,258 @@ export const PulseDesk: React.FC = () => {
           zIndex: 1,
         }}
       >
-        {/* Top Header & WhatsApp-style Members Trigger */}
+        {/* WhatsApp Chat Top Navigation Header */}
         <header
           style={{
-            padding: '12px 24px',
+            padding: '10px 20px',
             borderBottom: '1px solid var(--border-hairline)',
-            background: 'rgba(24, 23, 21, 0.85)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
+            background: 'var(--surface-2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px',
+            zIndex: 10,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {activeType === 'channel' ? (
-              <>
-                <div
-                  onClick={() => setIsGroupInfoDrawerOpen(true)}
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '8px',
-                    background: 'var(--accent-primary-subtle)',
-                    border: '1px solid rgba(245, 158, 11, 0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--accent-primary)',
-                    cursor: 'pointer',
-                  }}
-                  title="Click to view Group info & members"
-                >
-                  <Hash size={18} />
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h1
-                      onClick={() => setIsGroupInfoDrawerOpen(true)}
-                      style={{
-                        fontSize: '15px',
-                        fontWeight: 700,
-                        margin: 0,
-                        color: 'var(--text-primary)',
-                        cursor: 'pointer',
-                      }}
-                      title="Click to view Group info & members"
-                    >
-                      {activeChannel?.name || 'Group'}
-                    </h1>
-
-                    {/* WhatsApp UX: Interactive Members Pill */}
-                    <button
-                      type="button"
-                      onClick={() => setIsGroupInfoDrawerOpen(true)}
-                      className="btn btn-ghost"
-                      style={{
-                        fontSize: '11px',
-                        color: 'var(--accent-primary)',
-                        background: 'rgba(245, 158, 11, 0.12)',
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        border: '1px solid rgba(245, 158, 11, 0.3)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                      title="Click to view all members, call or message them directly"
-                    >
-                      <Users size={12} />
-                      <span>{currentGroupMembers.length} members</span>
-                    </button>
-                  </div>
-                  <p
-                    onClick={() => setIsGroupInfoDrawerOpen(true)}
-                    style={{
-                      margin: '2px 0 0',
-                      fontSize: '11px',
-                      color: 'var(--text-muted)',
-                      maxWidth: '500px',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {activeChannel?.topic}
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: 'var(--surface-3)',
-                    border: '1px solid var(--border-subtle)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    color: 'var(--accent-primary)',
-                  }}
-                >
-                  {activeDM?.name.charAt(0) || 'U'}
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h1 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                      {activeDM?.name || 'Direct Message'}
-                    </h1>
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 600,
-                        textTransform: 'capitalize',
-                        padding: '1px 7px',
-                        borderRadius: '10px',
-                        background:
-                          activeDM?.status === 'online'
-                            ? 'rgba(16, 185, 129, 0.14)'
-                            : 'rgba(245, 158, 11, 0.14)',
-                        color:
-                          activeDM?.status === 'online' ? '#10b981' : 'var(--accent-primary)',
-                        border: '1px solid var(--border-hairline)',
-                      }}
-                    >
-                      {activeDM?.status}
-                    </span>
-                  </div>
-                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
-                    {activeDM?.role} &bull; {activeDM?.department}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Action Bar (Members button, Huddle, Mention Task, Pinned) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* WhatsApp UX: Dedicated Members button */}
-            {activeType === 'channel' && (
-              <button
-                onClick={() => setIsGroupInfoDrawerOpen((prev) => !prev)}
-                className="btn btn-secondary"
+          {/* Left Avatar & Clickable Info Area */}
+          <div
+            onClick={() => setIsInfoDrawerOpen(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+            title="Click for Contact / Group Info"
+          >
+            <div style={{ position: 'relative' }}>
+              <div
                 style={{
-                  fontSize: '11px',
-                  padding: '6px 12px',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: activeType === 'channel' ? 'var(--accent-primary-subtle)' : 'var(--surface-3)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  borderRadius: '8px',
-                  background: isGroupInfoDrawerOpen ? 'rgba(245, 158, 11, 0.15)' : 'var(--surface-2)',
-                  borderColor: isGroupInfoDrawerOpen ? 'var(--accent-primary)' : 'var(--border-subtle)',
-                  color: isGroupInfoDrawerOpen ? 'var(--accent-primary)' : 'var(--text-primary)',
+                  justifyContent: 'center',
+                  color: 'var(--accent-primary)',
+                  fontWeight: 700,
+                  fontSize: '15px',
                 }}
-                title="View Group Members, Call & Direct Message (WhatsApp Style)"
               >
-                <Users size={13} color="var(--accent-primary)" />
-                <span style={{ fontWeight: 600 }}>Members ({currentGroupMembers.length})</span>
-              </button>
-            )}
+                {activeType === 'channel' ? <Hash size={20} /> : activeDM?.name.charAt(0) || 'U'}
+              </div>
+              <span
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  background: '#10b981',
+                  border: '2px solid var(--surface-2)',
+                }}
+              />
+            </div>
 
-            {/* Start / Join Live Huddle Button */}
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {activeType === 'channel' ? `#${activeChannel?.name}` : activeDM?.name}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                {activeType === 'channel'
+                  ? 'Sarah, Alex, Rohan, Priya, You, Vikram...'
+                  : activeDM?.status === 'online'
+                  ? 'online'
+                  : 'last seen today at 10:42 AM'}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Action Icons: Video, Voice Call, In-Chat Search, Menu */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+            {/* Video Call Button */}
             <button
-              onClick={() => {
-                toggleHuddle(activeId);
-                addToast({
-                  type: 'info',
-                  message: activeHuddle
-                    ? 'Left voice huddle.'
-                    : '🎙️ Joined Live Squad Huddle with spatial audio.',
-                });
-              }}
-              className="btn btn-secondary"
-              style={{
-                fontSize: '11px',
-                padding: '6px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                borderRadius: '8px',
-                background: activeHuddle
-                  ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%)'
-                  : 'var(--surface-2)',
-                border: activeHuddle
-                  ? '1px solid var(--accent-primary)'
-                  : '1px solid var(--border-subtle)',
-                color: activeHuddle ? 'var(--accent-primary)' : 'var(--text-primary)',
-              }}
+              onClick={() =>
+                handleStartCallMember(
+                  { name: activeType === 'channel' ? activeChannel?.name || 'Group' : activeDM?.name || 'Contact', role: 'Live Session' },
+                  'video'
+                )
+              }
+              className="btn btn-ghost"
+              style={{ padding: '8px', borderRadius: '50%', color: 'var(--text-muted)' }}
+              title="Video Call"
             >
-              {activeHuddle ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '12px' }}>
-                  <div className="huddle-wave-bar" style={{ height: '12px' }} />
-                  <div className="huddle-wave-bar" style={{ height: '8px', animationDelay: '-0.2s' }} />
-                  <div className="huddle-wave-bar" style={{ height: '14px', animationDelay: '-0.4s' }} />
-                </div>
-              ) : (
-                <Mic size={13} color="var(--accent-primary)" />
-              )}
-              <span style={{ fontWeight: 600 }}>{activeHuddle ? 'Huddle Active' : 'Start Huddle'}</span>
+              <Video size={18} />
             </button>
 
-            {/* Mention Sprint Task Button */}
+            {/* Voice Call Button */}
             <button
-              onClick={() => setMentionTaskModalOpen(true)}
-              className="btn btn-secondary"
-              style={{
-                fontSize: '11px',
-                padding: '6px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                borderRadius: '8px',
-                border: '1px solid var(--border-subtle)',
-              }}
+              onClick={() =>
+                handleStartCallMember(
+                  { name: activeType === 'channel' ? activeChannel?.name || 'Group' : activeDM?.name || 'Contact', role: 'Voice Call' },
+                  'voice'
+                )
+              }
+              className="btn btn-ghost"
+              style={{ padding: '8px', borderRadius: '50%', color: 'var(--text-muted)' }}
+              title="Voice Call"
             >
-              <Hash size={13} color="var(--accent-primary)" />
-              <span>Mention Task</span>
+              <Phone size={17} />
             </button>
 
-            {/* Pinned Items Shortcut */}
+            {/* In-Chat Search Trigger */}
             <button
-              onClick={() => setIsPinnedDrawerOpen((prev) => !prev)}
+              onClick={() => setIsChatSearchOpen((p) => !p)}
               className="btn btn-ghost"
               style={{
-                fontSize: '11px',
-                padding: '6px 10px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                color: isPinnedDrawerOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
+                padding: '8px',
+                borderRadius: '50%',
+                color: isChatSearchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
               }}
-              title="View Pinned Items"
+              title="Search in chat"
             >
-              <Pin size={13} />
-              <span>Pinned</span>
+              <Search size={18} />
             </button>
+
+            {/* Three-Dot Chat Options Menu */}
+            <button
+              onClick={() => setIsChatHeaderMenuOpen((p) => !p)}
+              className="btn btn-ghost"
+              style={{ padding: '8px', borderRadius: '50%', color: 'var(--text-muted)' }}
+              title="More options"
+            >
+              <MoreVertical size={18} />
+            </button>
+
+            {/* Header Menu Dropdown */}
+            {isChatHeaderMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '6px',
+                  width: '190px',
+                  background: 'var(--surface-3)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '10px',
+                  boxShadow: 'var(--shadow-popover)',
+                  padding: '6px',
+                  zIndex: 50,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setIsChatHeaderMenuOpen(false);
+                    setIsInfoDrawerOpen(true);
+                  }}
+                  className="btn btn-ghost"
+                  style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px' }}
+                >
+                  {activeType === 'channel' ? 'Group Info' : 'Contact Info'}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsChatHeaderMenuOpen(false);
+                    setIsPinnedDrawerOpen(true);
+                  }}
+                  className="btn btn-ghost"
+                  style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px' }}
+                >
+                  Starred & Pinned
+                </button>
+                <button
+                  onClick={() => {
+                    setIsChatHeaderMenuOpen(false);
+                    addToast({ type: 'info', message: 'Chat notifications muted for 8 hours.' });
+                  }}
+                  className="btn btn-ghost"
+                  style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px' }}
+                >
+                  Mute Notifications
+                </button>
+                <button
+                  onClick={() => {
+                    setIsChatHeaderMenuOpen(false);
+                    addToast({ type: 'info', message: 'Chat cleared.' });
+                  }}
+                  className="btn btn-ghost"
+                  style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px', color: '#ef4444' }}
+                >
+                  Clear Messages
+                </button>
+              </div>
+            )}
           </div>
         </header>
 
-        {/* Active Huddle Floating Ribbon (When Active) */}
-        {activeHuddle && (
+        {/* WhatsApp In-Chat Search Overlay Banner */}
+        {isChatSearchOpen && (
           <div
             style={{
-              padding: '10px 24px',
-              background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.16) 0%, rgba(32, 30, 27, 0.9) 100%)',
-              borderBottom: '1px solid rgba(245, 158, 11, 0.3)',
+              padding: '8px 20px',
+              background: 'var(--surface-3)',
+              borderBottom: '1px solid var(--border-subtle)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+              gap: '12px',
+              animation: 'fadeIn 0.15s ease',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                <span className="huddle-wave-bar" style={{ height: '14px' }} />
-                <span className="huddle-wave-bar" style={{ height: '18px', animationDelay: '-0.3s' }} />
-                <span className="huddle-wave-bar" style={{ height: '10px', animationDelay: '-0.6s' }} />
-                <span className="huddle-wave-bar" style={{ height: '16px', animationDelay: '-0.1s' }} />
-              </div>
-              <div>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  Live Voice Huddle &bull; {activeChannel?.name || 'Session'}
-                </span>
-                <span style={{ fontSize: '11px', color: 'var(--accent-primary)', marginLeft: '8px' }}>
-                  (3 in room: Sarah Jenkins talking...)
-                </span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button
-                onClick={() => {
-                  setIsMicMuted((prev) => !prev);
-                  addToast({ type: 'info', message: isMicMuted ? 'Microphone unmuted' : 'Microphone muted' });
-                }}
-                className="btn btn-ghost"
-                style={{
-                  fontSize: '11px',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  background: isMicMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                  color: isMicMuted ? '#ef4444' : 'var(--accent-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                }}
-              >
-                {isMicMuted ? <MicOff size={13} /> : <Mic size={13} />}
-                <span>{isMicMuted ? 'Muted' : 'Speaking'}</span>
-              </button>
-
-              <button
-                onClick={() => toggleHuddle(activeId)}
-                className="btn btn-secondary"
-                style={{
-                  fontSize: '11px',
-                  padding: '4px 12px',
-                  borderRadius: '6px',
-                  borderColor: 'rgba(239, 68, 68, 0.4)',
-                  color: '#ef4444',
-                }}
-              >
-                Leave
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Pinned Sprint War Room Goal Banner */}
-        {activeChannel?.pinnedGoal && isPinnedBannerExpanded && (
-          <div
-            style={{
-              padding: '8px 24px',
-              background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.08) 0%, var(--surface-1) 100%)',
-              borderBottom: '1px solid rgba(245, 158, 11, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '11px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-              <span
-                style={{
-                  padding: '2px 6px',
-                  background: 'rgba(245, 158, 11, 0.2)',
-                  color: 'var(--accent-primary)',
-                  fontWeight: 700,
-                  borderRadius: '4px',
-                  letterSpacing: '0.04em',
-                }}
-              >
-                PINNED GOAL
+            <Search size={14} color="var(--accent-primary)" />
+            <input
+              type="text"
+              autoFocus
+              placeholder="Search in conversation..."
+              value={inChatSearchQuery}
+              onChange={(e) => setInChatSearchQuery(e.target.value)}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-primary)',
+                fontSize: '13px',
+                outline: 'none',
+              }}
+            />
+            {inChatSearchQuery && (
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                {displayMessages.length} matches
               </span>
-              <span style={{ color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {activeChannel.pinnedGoal}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span
-                style={{
-                  color: 'var(--text-muted)',
-                  fontSize: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <Clock size={11} />
-                <span>3h 45m left in sprint</span>
-              </span>
-              <button
-                onClick={() => setIsPinnedBannerExpanded(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
-                title="Dismiss"
-              >
-                <X size={12} />
-              </button>
-            </div>
+            )}
+            <button
+              onClick={() => {
+                setIsChatSearchOpen(false);
+                setInChatSearchQuery('');
+              }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+            >
+              <X size={15} />
+            </button>
           </div>
         )}
 
         {/* ========================================================================= */}
-        {/* 3. MESSAGE STREAM                                                        */}
+        {/* 3. CHAT STREAM CANVAS WITH WHATSAPP BUBBLE STYLING                        */}
         {/* ========================================================================= */}
         <div
+          className="whatsapp-chat-canvas"
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '20px 24px',
+            padding: '16px 24px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '18px',
+            gap: '8px',
           }}
         >
-          {/* Welcome Card */}
-          <div
-            style={{
-              padding: '16px 20px',
-              background: 'linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%)',
-              border: '1px solid var(--border-hairline)',
-              borderRadius: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '14px',
-            }}
-          >
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
-                background: 'var(--accent-primary-subtle)',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--accent-primary)',
-              }}
-            >
-              <Radio size={20} />
-            </div>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Welcome to {activeType === 'channel' ? `#${activeChannel?.name}` : activeDM?.name}
-              </h3>
-              <p style={{ margin: '3px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
-                Persistent squad space with audio voice notes, tagged manager sprint deliverables, and file uploads.
-              </p>
-            </div>
+          {/* Floating WhatsApp Date Separator Pill */}
+          <div className="whatsapp-date-pill">
+            TODAY
           </div>
 
-          {/* Render Messages */}
-          {currentMessages.map((msg) => {
+          {/* Render Messages in WhatsApp Bubbles */}
+          {displayMessages.map((msg) => {
             const isMe = msg.senderId === 'user-current';
             const isHovered = hoveredMessageId === msg.id;
             const replies = threadReplies[msg.id] || [];
@@ -1710,413 +1474,217 @@ export const PulseDesk: React.FC = () => {
                 style={{
                   position: 'relative',
                   display: 'flex',
-                  gap: '12px',
-                  alignItems: 'flex-start',
-                  padding: '8px 10px',
-                  borderRadius: '10px',
-                  background: isHovered ? 'rgba(255, 255, 255, 0.015)' : 'transparent',
-                  transition: 'background var(--transition-fast)',
+                  flexDirection: 'column',
+                  alignSelf: isMe ? 'flex-end' : 'flex-start',
+                  maxWidth: '68%',
+                  margin: '3px 0',
                 }}
               >
-                {/* Floating Message Quick-Actions Bar (On Hover) */}
+                {/* Floating Micro Hover Reactions Pill */}
                 {isHovered && (
                   <div
                     style={{
                       position: 'absolute',
-                      top: '-12px',
-                      right: '16px',
+                      top: '-18px',
+                      [isMe ? 'left' : 'right']: '0px',
                       background: 'var(--surface-3)',
                       border: '1px solid var(--border-subtle)',
-                      borderRadius: '8px',
-                      padding: '3px 6px',
+                      borderRadius: '16px',
+                      padding: '2px 6px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '4px',
                       boxShadow: 'var(--shadow-md)',
-                      zIndex: 10,
+                      zIndex: 20,
                     }}
                   >
                     <button
                       onClick={() => toggleReaction(msg.id, '👍', 'user-current')}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px', padding: '2px 4px' }}
-                      title="React 👍"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
                     >
                       👍
                     </button>
                     <button
+                      onClick={() => toggleReaction(msg.id, '❤️', 'user-current')}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
+                    >
+                      ❤️
+                    </button>
+                    <button
                       onClick={() => toggleReaction(msg.id, '🔥', 'user-current')}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px', padding: '2px 4px' }}
-                      title="React 🔥"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
                     >
                       🔥
                     </button>
                     <button
                       onClick={() => toggleReaction(msg.id, '🚀', 'user-current')}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px', padding: '2px 4px' }}
-                      title="React 🚀"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
                     >
                       🚀
                     </button>
-
-                    <div style={{ width: '1px', height: '14px', background: 'var(--border-hairline)', margin: '0 2px' }} />
-
                     <button
                       onClick={() => setActiveThreadMessage(msg)}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px 4px' }}
-                      title="Reply in Thread"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 2px' }}
+                      title="Reply"
                     >
-                      <Reply size={13} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        toggleStarMessage(msg.id);
-                        addToast({ type: 'info', message: msg.isStarred ? 'Unstarred message' : 'Starred message ⭐' });
-                      }}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: msg.isStarred ? 'var(--accent-primary)' : 'var(--text-muted)',
-                        padding: '2px 4px',
-                      }}
-                      title="Star Message"
-                    >
-                      <Bookmark size={13} fill={msg.isStarred ? 'var(--accent-primary)' : 'none'} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        togglePinMessage(msg.id);
-                        addToast({ type: 'info', message: msg.isPinned ? 'Unpinned message' : 'Pinned message to group 📌' });
-                      }}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: msg.isPinned ? 'var(--accent-primary)' : 'var(--text-muted)',
-                        padding: '2px 4px',
-                      }}
-                      title="Pin Message"
-                    >
-                      <Pin size={13} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(msg.content);
-                        addToast({ type: 'success', message: 'Message copied to clipboard.' });
-                      }}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px 4px' }}
-                      title="Copy Message Text"
-                    >
-                      <Copy size={13} />
+                      <Reply size={12} />
                     </button>
                   </div>
                 )}
 
-                {/* Sender Avatar */}
+                {/* Message Bubble Card */}
                 <div
+                  className={isMe ? 'whatsapp-bubble-out' : 'whatsapp-bubble-in'}
                   style={{
-                    width: '34px',
-                    height: '34px',
-                    borderRadius: '50%',
-                    background: isMe ? 'var(--accent-primary)' : 'var(--surface-3)',
-                    color: isMe ? '#000000' : 'var(--text-primary)',
-                    border: '1px solid var(--border-subtle)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: '12px',
-                    flexShrink: 0,
-                    boxShadow: 'var(--shadow-xs)',
+                    padding: '8px 12px',
+                    position: 'relative',
                   }}
                 >
-                  {isMe ? 'YOU' : msg.senderName.charAt(0)}
-                </div>
-
-                {/* Content Column */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {/* Sender Name in Group Chats for incoming messages */}
+                  {!isMe && activeType === 'channel' && (
+                    <div
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color:
+                          msg.senderName.includes('Sarah')
+                            ? 'var(--accent-primary)'
+                            : msg.senderName.includes('Alex')
+                            ? '#fbbf24'
+                            : '#f43f5e',
+                        marginBottom: '3px',
+                      }}
+                    >
                       {msg.senderName}
-                    </span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', background: 'var(--surface-2)', padding: '1px 6px', borderRadius: '4px' }}>
-                      {msg.senderRole}
-                    </span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-                      {msg.timestamp}
-                    </span>
+                    </div>
+                  )}
 
-                    {msg.isPinned && (
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          color: 'var(--accent-primary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '2px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        <Pin size={10} />
-                        <span>Pinned</span>
-                      </span>
-                    )}
-
-                    {msg.isStarred && (
-                      <Bookmark size={11} fill="var(--accent-primary)" color="var(--accent-primary)" />
-                    )}
-                  </div>
-
-                  {/* Text content */}
+                  {/* Text Content */}
                   {msg.content && (
                     <div
                       style={{
                         fontSize: '13px',
-                        lineHeight: 1.5,
+                        lineHeight: 1.45,
                         color: 'var(--text-primary)',
-                        whiteSpace: 'pre-wrap',
                         wordBreak: 'break-word',
+                        whiteSpace: 'pre-wrap',
                       }}
                     >
                       {msg.content}
                     </div>
                   )}
 
-                  {/* SPICY: Interactive Voice Note Waveform Player */}
+                  {/* WhatsApp-Style Voice Note Waveform Player */}
                   {msg.voiceNote && (
                     <div
                       style={{
-                        marginTop: '10px',
-                        padding: '12px 16px',
-                        borderRadius: '10px',
-                        background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, var(--surface-2) 100%)',
-                        border: '1px solid rgba(245, 158, 11, 0.25)',
                         display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px',
-                        maxWidth: '460px',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '4px 0',
+                        minWidth: '240px',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <button
-                          onClick={() => {
-                            if (playingVoiceId === msg.id) {
-                              setPlayingVoiceId(null);
-                            } else {
-                              setPlayingVoiceId(msg.id);
-                              setVoiceElapsedSec(0);
-                            }
-                          }}
-                          style={{
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '50%',
-                            background: 'var(--accent-primary)',
-                            border: 'none',
-                            color: '#000000',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            boxShadow: '0 0 10px rgba(245, 158, 11, 0.4)',
-                          }}
-                        >
-                          {playingVoiceId === msg.id ? <Pause size={16} /> : <Play size={16} />}
-                        </button>
+                      <button
+                        onClick={() => {
+                          if (playingVoiceId === msg.id) setPlayingVoiceId(null);
+                          else {
+                            setPlayingVoiceId(msg.id);
+                            setVoiceElapsedSec(0);
+                          }
+                        }}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          background: 'var(--accent-primary)',
+                          border: 'none',
+                          color: '#000000',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {playingVoiceId === msg.id ? <Pause size={14} /> : <Play size={14} />}
+                      </button>
 
-                        {/* Frequency Waveform Bars */}
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '3px', height: '28px' }}>
-                          {msg.voiceNote.waveform.map((val, idx) => {
-                            const isPlayed =
-                              playingVoiceId === msg.id
-                                ? idx / msg.voiceNote!.waveform.length <= voiceElapsedSec / 45
-                                : false;
+                      {/* Scrubber Waveform */}
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '2px', height: '20px' }}>
+                        {msg.voiceNote.waveform.map((val, idx) => {
+                          const isPlayed =
+                            playingVoiceId === msg.id
+                              ? idx / msg.voiceNote!.waveform.length <= voiceElapsedSec / 45
+                              : false;
 
-                            return (
-                              <div
-                                key={idx}
-                                style={{
-                                  flex: 1,
-                                  height: `${Math.max(15, (val / 100) * 28)}px`,
-                                  borderRadius: '2px',
-                                  background: isPlayed
-                                    ? 'var(--accent-primary)'
-                                    : 'rgba(255, 245, 230, 0.25)',
-                                  transition: 'background 0.15s ease',
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
-
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600, minWidth: '40px' }}>
-                          {playingVoiceId === msg.id
-                            ? `0:${voiceElapsedSec.toString().padStart(2, '0')}`
-                            : msg.voiceNote.duration}
-                        </span>
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                flex: 1,
+                                height: `${Math.max(10, (val / 100) * 20)}px`,
+                                borderRadius: '1px',
+                                background: isPlayed ? 'var(--accent-primary)' : 'rgba(255, 245, 230, 0.25)',
+                              }}
+                            />
+                          );
+                        })}
                       </div>
 
-                      {msg.voiceNote.transcription && (
-                        <div
-                          style={{
-                            fontSize: '11px',
-                            color: 'var(--text-muted)',
-                            fontStyle: 'italic',
-                            paddingTop: '4px',
-                            borderTop: '1px solid var(--border-hairline)',
-                          }}
-                        >
-                          {msg.voiceNote.transcription}
-                        </div>
-                      )}
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        {playingVoiceId === msg.id
+                          ? `0:${voiceElapsedSec.toString().padStart(2, '0')}`
+                          : msg.voiceNote.duration}
+                      </span>
                     </div>
                   )}
 
-                  {/* SPICY: Interactive Embedded Sprint Task Cards */}
+                  {/* Embedded Task Card in Bubble */}
                   {msg.taggedTasks && msg.taggedTasks.length > 0 && (
-                    <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       {msg.taggedTasks.map((task) => (
                         <div
                           key={task.id}
                           style={{
-                            padding: '12px 16px',
-                            borderRadius: '10px',
-                            background: 'var(--surface-2)',
-                            border: '1px solid rgba(245, 158, 11, 0.3)',
-                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                            maxWidth: '520px',
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            background: 'rgba(0, 0, 0, 0.2)',
+                            border: '1px solid rgba(245, 158, 11, 0.25)',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '8px',
+                            gap: '4px',
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span
-                                style={{
-                                  fontSize: '11px',
-                                  fontWeight: 800,
-                                  color: 'var(--accent-primary)',
-                                  background: 'rgba(245, 158, 11, 0.15)',
-                                  padding: '2px 8px',
-                                  borderRadius: '4px',
-                                  fontFamily: 'var(--font-mono)',
-                                }}
-                              >
-                                {task.key}
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: '10px',
-                                  fontWeight: 700,
-                                  textTransform: 'uppercase',
-                                  padding: '1px 6px',
-                                  borderRadius: '4px',
-                                  background:
-                                    task.priority === 'urgent'
-                                      ? 'rgba(244, 63, 94, 0.18)'
-                                      : 'rgba(245, 158, 11, 0.18)',
-                                  color:
-                                    task.priority === 'urgent' ? '#f43f5e' : 'var(--accent-primary)',
-                                }}
-                              >
-                                {task.priority}
-                              </span>
-                              {task.storyPoints && (
-                                <span
-                                  style={{
-                                    fontSize: '10px',
-                                    color: 'var(--text-muted)',
-                                    background: 'var(--surface-3)',
-                                    padding: '1px 6px',
-                                    borderRadius: '4px',
-                                  }}
-                                >
-                                  {task.storyPoints} SP
-                                </span>
-                              )}
-                            </div>
-
-                            <span
-                              style={{
-                                fontSize: '10px',
-                                color: 'var(--text-muted)',
-                                textTransform: 'capitalize',
-                              }}
-                            >
-                              {task.status.replace('_', ' ')}
+                            <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
+                              {task.key}
+                            </span>
+                            <span style={{ fontSize: '9px', fontWeight: 700, color: task.priority === 'urgent' ? '#f43f5e' : 'var(--accent-primary)', textTransform: 'uppercase' }}>
+                              {task.priority}
                             </span>
                           </div>
-
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
                             {task.title}
                           </div>
-
-                          {/* Progress bar on ticket card */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div
-                              style={{
-                                flex: 1,
-                                height: '4px',
-                                borderRadius: '2px',
-                                background: 'var(--surface-3)',
-                                overflow: 'hidden',
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: '75%',
-                                  height: '100%',
-                                  background: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)',
-                                }}
-                              />
-                            </div>
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>75% done</span>
-                          </div>
-
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              paddingTop: '6px',
-                              borderTop: '1px solid var(--border-hairline)',
-                            }}
-                          >
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                              Assigned by {task.assignedByManager} &bull; {task.assigneeName}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                              {task.assignedByManager}
                             </span>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ display: 'flex', gap: '4px' }}>
                               <button
                                 onClick={(e) => handleQuickLog30m(task.key, e)}
                                 className="btn btn-ghost"
-                                style={{
-                                  fontSize: '11px',
-                                  padding: '3px 8px',
-                                  borderRadius: '6px',
-                                  color: 'var(--accent-primary)',
-                                  fontWeight: 600,
-                                }}
-                                title="Quick log 30 minutes to timesheet"
+                                style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', color: 'var(--accent-primary)' }}
                               >
-                                + Quick Log 30m
+                                +30m
                               </button>
-
                               <button
                                 onClick={() => handleInspectTask(task)}
                                 className="btn btn-primary"
-                                style={{
-                                  fontSize: '11px',
-                                  padding: '3px 10px',
-                                  borderRadius: '6px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                }}
+                                style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px' }}
                               >
-                                <span>Inspect</span>
-                                <ChevronRight size={12} />
+                                Inspect
                               </button>
                             </div>
                           </div>
@@ -2127,288 +1695,219 @@ export const PulseDesk: React.FC = () => {
 
                   {/* Attachments */}
                   {msg.attachments && msg.attachments.length > 0 && (
-                    <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {msg.attachments.map((att) => (
                         <div
                           key={att.id}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '10px',
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            background: 'var(--surface-2)',
-                            border: '1px solid var(--border-hairline)',
-                            fontSize: '12px',
-                            color: 'var(--text-primary)',
+                            justifyContent: 'space-between',
+                            padding: '6px 10px',
+                            background: 'rgba(0, 0, 0, 0.2)',
+                            borderRadius: '6px',
+                            gap: '8px',
                           }}
                         >
-                          <FileText size={16} color="var(--accent-primary)" />
-                          <div>
-                            <div style={{ fontWeight: 600 }}>{att.name}</div>
-                            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{att.size}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                            <FileText size={14} color="var(--accent-primary)" />
+                            <span style={{ fontSize: '11px', color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                              {att.name}
+                            </span>
                           </div>
                           <button
                             onClick={() => addToast({ type: 'info', message: `Downloading ${att.name}...` })}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--accent-primary)',
-                              cursor: 'pointer',
-                              padding: '2px 4px',
-                            }}
-                            title="Download Attachment"
+                            style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: 0 }}
                           >
-                            <Download size={13} />
+                            <Download size={12} />
                           </button>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {/* Reaction Pills & Quick Reaction Bar */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
-                    {msg.reactions &&
-                      msg.reactions.map((rx, idx) => {
-                        const userReacted = rx.users.includes('user-current');
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => toggleReaction(msg.id, rx.emoji, 'user-current')}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '2px 8px',
-                              borderRadius: '12px',
-                              background: userReacted ? 'rgba(245, 158, 11, 0.2)' : 'var(--surface-2)',
-                              border: userReacted
-                                ? '1px solid var(--accent-primary)'
-                                : '1px solid var(--border-hairline)',
-                              color: 'var(--text-primary)',
-                              fontSize: '11px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <span>{rx.emoji}</span>
-                            <span style={{ fontWeight: 600, color: userReacted ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-                              {rx.count}
-                            </span>
-                          </button>
-                        );
-                      })}
+                  {/* Bottom Info Row: Timestamp + WhatsApp Double Checkmark (✓✓) */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      gap: '4px',
+                      marginTop: '4px',
+                    }}
+                  >
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                      {msg.timestamp}
+                    </span>
 
-                    {/* Thread Replies Button */}
-                    {(msg.threadRepliesCount || replies.length > 0) && (
-                      <button
-                        onClick={() => setActiveThreadMessage(msg)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          background: 'transparent',
-                          border: 'none',
-                          color: 'var(--accent-primary)',
-                          fontSize: '11px',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          padding: '2px 6px',
-                        }}
-                      >
-                        <MessageSquare size={12} />
-                        <span>
-                          {replies.length > 0 ? replies.length : msg.threadRepliesCount} replies
-                        </span>
-                      </button>
+                    {/* WhatsApp Read Receipt Double Checkmark */}
+                    {isMe && (
+                      <CheckCheck size={13} color="var(--accent-primary)" />
                     )}
                   </div>
                 </div>
+
+                {/* Overlapping Reaction Tag Pill (WhatsApp Style) */}
+                {msg.reactions && msg.reactions.length > 0 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '-8px',
+                      [isMe ? 'right' : 'left']: '8px',
+                      background: 'var(--surface-3)',
+                      border: '1px solid var(--border-hairline)',
+                      borderRadius: '12px',
+                      padding: '1px 6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      fontSize: '11px',
+                      boxShadow: 'var(--shadow-xs)',
+                      zIndex: 5,
+                    }}
+                  >
+                    {msg.reactions.map((r, i) => (
+                      <span key={i}>
+                        {r.emoji} {r.count > 1 ? r.count : ''}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
-
-          {/* Live Typing Indicator */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 12px',
-              fontSize: '11px',
-              color: 'var(--text-muted)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-            </div>
-            <span>Sarah Jenkins is typing...</span>
-          </div>
 
           <div ref={messagesEndRef} />
         </div>
 
         {/* ========================================================================= */}
-        {/* 4. LUXURY MESSAGE COMPOSER & FLOATING DOCK                                */}
+        {/* 4. WHATSAPP WEB STYLE BOTTOM COMPOSER                                     */}
         {/* ========================================================================= */}
         <footer
           style={{
-            padding: '16px 24px',
+            padding: '10px 16px',
             borderTop: '1px solid var(--border-hairline)',
-            background: 'rgba(24, 23, 21, 0.9)',
-            backdropFilter: 'blur(20px)',
+            background: 'var(--surface-2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
             position: 'relative',
           }}
         >
-          {/* Slash Commands Auto-Suggest Floating Popover */}
-          {isSlashMenuOpen && (
+          {/* WhatsApp Vertical Attachment Popover Menu */}
+          {isAttachMenuOpen && (
             <div
               style={{
                 position: 'absolute',
                 bottom: '100%',
-                left: '24px',
-                width: '320px',
+                left: '16px',
+                marginBottom: '10px',
                 background: 'var(--surface-3)',
                 border: '1px solid var(--border-subtle)',
-                borderRadius: '10px',
-                padding: '6px',
-                boxShadow: 'var(--shadow-lg)',
+                borderRadius: '12px',
+                padding: '8px',
+                boxShadow: 'var(--shadow-popover)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '2px',
-                marginBottom: '8px',
-                zIndex: 20,
+                gap: '4px',
+                zIndex: 40,
+                width: '180px',
               }}
             >
-              <div
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  color: 'var(--text-muted)',
-                  padding: '4px 8px',
+              <button
+                onClick={() => {
+                  setIsAttachMenuOpen(false);
+                  fileInputRef.current?.click();
                 }}
-              >
-                Quick Slash Commands
-              </div>
-              <button
-                onClick={() => handleExecuteSlash('task')}
                 className="btn btn-ghost"
-                style={{ justifyContent: 'flex-start', padding: '6px 8px', gap: '8px', fontSize: '12px' }}
+                style={{ justifyContent: 'flex-start', padding: '8px 10px', gap: '10px', fontSize: '12px' }}
               >
-                <Hash size={13} color="var(--accent-primary)" />
-                <span>/task - Tag and link sprint deliverable</span>
+                <FileText size={15} color="#3b82f6" />
+                <span>Document</span>
               </button>
+
               <button
-                onClick={() => handleExecuteSlash('huddle')}
+                onClick={() => {
+                  setIsAttachMenuOpen(false);
+                  fileInputRef.current?.click();
+                }}
                 className="btn btn-ghost"
-                style={{ justifyContent: 'flex-start', padding: '6px 8px', gap: '8px', fontSize: '12px' }}
+                style={{ justifyContent: 'flex-start', padding: '8px 10px', gap: '10px', fontSize: '12px' }}
               >
-                <Mic size={13} color="var(--accent-primary)" />
-                <span>/huddle - Start live squad voice huddle</span>
+                <ImageIcon size={15} color="#ec4899" />
+                <span>Photos & Videos</span>
               </button>
+
               <button
-                onClick={() => handleExecuteSlash('standup')}
+                onClick={() => {
+                  setIsAttachMenuOpen(false);
+                  setMentionTaskModalOpen(true);
+                }}
                 className="btn btn-ghost"
-                style={{ justifyContent: 'flex-start', padding: '6px 8px', gap: '8px', fontSize: '12px' }}
+                style={{ justifyContent: 'flex-start', padding: '8px 10px', gap: '10px', fontSize: '12px' }}
               >
-                <Clock size={13} color="var(--accent-primary)" />
-                <span>/standup - Insert daily standup format</span>
+                <Hash size={15} color="var(--accent-primary)" />
+                <span>Sprint Task</span>
               </button>
+
               <button
-                onClick={() => handleExecuteSlash('kudos')}
+                onClick={() => {
+                  setIsAttachMenuOpen(false);
+                  handleRecordAudioMemo();
+                }}
                 className="btn btn-ghost"
-                style={{ justifyContent: 'flex-start', padding: '6px 8px', gap: '8px', fontSize: '12px' }}
+                style={{ justifyContent: 'flex-start', padding: '8px 10px', gap: '10px', fontSize: '12px' }}
               >
-                <Sparkles size={13} color="var(--accent-primary)" />
-                <span>/kudos - Celebrate teammate deliverable</span>
+                <Mic size={15} color="#10b981" />
+                <span>Audio Memo</span>
               </button>
             </div>
           )}
 
-          {/* Staged Attachments & Tagged Tasks Tray */}
-          {(stagedAttachments.length > 0 || stagedTaskTags.length > 0) && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
-              {stagedTaskTags.map((task) => (
-                <div
-                  key={task.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 10px',
-                    borderRadius: '8px',
-                    background: 'rgba(245, 158, 11, 0.15)',
-                    border: '1px solid rgba(245, 158, 11, 0.3)',
-                    color: 'var(--accent-primary)',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                  }}
-                >
-                  <Hash size={12} />
-                  <span>
-                    [{task.key}] {task.title.slice(0, 28)}...
-                  </span>
-                  <button
-                    onClick={() => setStagedTaskTags((prev) => prev.filter((t) => t.id !== task.id))}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
+          {/* Attachment Paperclip Button */}
+          <button
+            onClick={() => setIsAttachMenuOpen((p) => !p)}
+            className="btn btn-ghost"
+            style={{ padding: '8px', borderRadius: '50%', color: isAttachMenuOpen ? 'var(--accent-primary)' : 'var(--text-muted)' }}
+            title="Attach"
+          >
+            <Paperclip size={19} />
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            style={{ display: 'none' }}
+          />
 
-              {stagedAttachments.map((att) => (
-                <div
-                  key={att.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 10px',
-                    borderRadius: '8px',
-                    background: 'var(--surface-2)',
-                    border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-primary)',
-                    fontSize: '11px',
-                  }}
-                >
-                  <Paperclip size={12} color="var(--accent-primary)" />
-                  <span>{att.name}</span>
-                  <button
-                    onClick={() => setStagedAttachments((prev) => prev.filter((a) => a.id !== att.id))}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Emoji Smiley Button */}
+          <button
+            onClick={() => setInputText((p) => p + ' 😊')}
+            className="btn btn-ghost"
+            style={{ padding: '8px', borderRadius: '50%', color: 'var(--text-muted)' }}
+            title="Emoji"
+          >
+            <Smile size={19} />
+          </button>
 
-          {/* Floating Composer Frame */}
+          {/* WhatsApp Pill Input Bar */}
           <div
             style={{
-              background: 'var(--surface-2)',
+              flex: 1,
+              background: 'var(--surface-1)',
               border: '1px solid var(--border-subtle)',
-              borderRadius: '12px',
-              padding: '10px 14px',
+              borderRadius: '24px',
+              padding: '8px 16px',
               display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
+              alignItems: 'center',
             }}
           >
             <textarea
-              rows={2}
+              rows={1}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={
-                activeType === 'channel'
-                  ? `Message #${activeChannel?.name}... (Type / for commands, Enter to send)`
-                  : `Direct message ${activeDM?.name}...`
-              }
+              placeholder="Type a message"
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -2421,133 +1920,55 @@ export const PulseDesk: React.FC = () => {
                 fontFamily: 'inherit',
               }}
             />
-
-            {/* Composer Action Toolbar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                {/* Mention Task Button */}
-                <button
-                  type="button"
-                  onClick={() => setMentionTaskModalOpen(true)}
-                  className="btn btn-ghost"
-                  style={{
-                    padding: '5px 8px',
-                    fontSize: '11px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    borderRadius: '6px',
-                    color: 'var(--accent-primary)',
-                  }}
-                  title="Mention sprint task (#)"
-                >
-                  <Hash size={13} />
-                  <span>Task</span>
-                </button>
-
-                {/* Simulate Audio Voice Note Button */}
-                <button
-                  type="button"
-                  onClick={handleRecordAudioMemo}
-                  className="btn btn-ghost"
-                  style={{
-                    padding: '5px 8px',
-                    fontSize: '11px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    borderRadius: '6px',
-                    color: 'var(--accent-primary)',
-                  }}
-                  title="Record Instant Audio Memo"
-                >
-                  <Mic size={13} />
-                  <span>Voice Memo</span>
-                </button>
-
-                {/* File Attachment Trigger */}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="btn btn-ghost"
-                  style={{
-                    padding: '5px 8px',
-                    fontSize: '11px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    borderRadius: '6px',
-                  }}
-                  title="Attach files or screenshots"
-                >
-                  <Paperclip size={13} color="var(--text-muted)" />
-                  <span>Attach</span>
-                </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  style={{ display: 'none' }}
-                />
-
-                {/* Quick Emoji Shortcuts */}
-                <button
-                  type="button"
-                  onClick={() => setInputText((p) => p + ' 🚀')}
-                  className="btn btn-ghost"
-                  style={{ padding: '4px 6px', borderRadius: '6px', fontSize: '12px' }}
-                  title="Add Rocket"
-                >
-                  🚀
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInputText((p) => p + ' 🔥')}
-                  className="btn btn-ghost"
-                  style={{ padding: '4px 6px', borderRadius: '6px', fontSize: '12px' }}
-                  title="Add Fire"
-                >
-                  🔥
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInputText((p) => p + ' 👍')}
-                  className="btn btn-ghost"
-                  style={{ padding: '4px 6px', borderRadius: '6px', fontSize: '12px' }}
-                  title="Add Thumbs Up"
-                >
-                  👍
-                </button>
-              </div>
-
-              {/* Send Button */}
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={!inputText.trim() && stagedAttachments.length === 0 && stagedTaskTags.length === 0}
-                className="btn btn-primary"
-                style={{
-                  padding: '7px 16px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  borderRadius: '8px',
-                }}
-              >
-                <span>Send</span>
-                <Send size={13} />
-              </button>
-            </div>
           </div>
+
+          {/* Right Action: Voice Memo (Mic) vs Send (Plane) */}
+          {inputText.trim().length > 0 || stagedAttachments.length > 0 || stagedTaskTags.length > 0 ? (
+            <button
+              onClick={handleSend}
+              className="btn btn-primary"
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+              title="Send message (Enter)"
+            >
+              <Send size={15} />
+            </button>
+          ) : (
+            <button
+              onClick={handleRecordAudioMemo}
+              className="btn btn-ghost"
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--accent-primary)',
+                background: 'rgba(245, 158, 11, 0.12)',
+                flexShrink: 0,
+              }}
+              title="Click to send audio voice memo"
+            >
+              <Mic size={18} />
+            </button>
+          )}
         </footer>
       </main>
 
       {/* ========================================================================= */}
-      {/* 5. WHATSAPP UX: GROUP INFO & MEMBERS DRAWER                                */}
+      {/* 5. WHATSAPP STYLE CONTACT / GROUP INFO RIGHT DRAWER                       */}
       {/* ========================================================================= */}
-      {isGroupInfoDrawerOpen && (
+      {isInfoDrawerOpen && (
         <aside
           style={{
             width: '380px',
@@ -2556,12 +1977,12 @@ export const PulseDesk: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             flexShrink: 0,
-            zIndex: 20,
+            zIndex: 30,
             boxShadow: 'var(--shadow-lg)',
             overflow: 'hidden',
           }}
         >
-          {/* Header */}
+          {/* WhatsApp Drawer Top Header */}
           <div
             style={{
               padding: '14px 18px',
@@ -2569,17 +1990,16 @@ export const PulseDesk: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.06) 0%, transparent 100%)',
+              background: 'var(--surface-2)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Users size={16} color="var(--accent-primary)" />
               <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Group Info & Members
+                {activeType === 'channel' ? 'Group Info' : 'Contact Info'}
               </span>
             </div>
             <button
-              onClick={() => setIsGroupInfoDrawerOpen(false)}
+              onClick={() => setIsInfoDrawerOpen(false)}
               style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
               title="Close"
             >
@@ -2587,24 +2007,24 @@ export const PulseDesk: React.FC = () => {
             </button>
           </div>
 
-          {/* WhatsApp Style Hero Group Profile Card */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
+            {/* WhatsApp Hero Profile Banner */}
             <div
               style={{
-                padding: '24px 20px',
+                padding: '28px 20px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 textAlign: 'center',
-                borderBottom: '1px solid var(--border-hairline)',
-                background: 'linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%)',
+                borderBottom: '8px solid var(--surface-0)',
+                background: 'var(--surface-1)',
               }}
             >
               <div
                 style={{
-                  width: '68px',
-                  height: '68px',
-                  borderRadius: '20px',
+                  width: '84px',
+                  height: '84px',
+                  borderRadius: '50%',
                   background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%)',
                   border: '2px solid var(--accent-primary)',
                   display: 'flex',
@@ -2613,43 +2033,31 @@ export const PulseDesk: React.FC = () => {
                   color: 'var(--accent-primary)',
                   boxShadow: '0 0 20px rgba(245, 158, 11, 0.3)',
                   marginBottom: '12px',
+                  fontWeight: 800,
+                  fontSize: '28px',
                 }}
               >
-                <Hash size={32} />
+                {activeType === 'channel' ? <Hash size={38} /> : activeDM?.name.charAt(0)}
               </div>
 
               <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                #{activeChannel?.name || 'engineering'}
+                {activeType === 'channel' ? `#${activeChannel?.name}` : activeDM?.name}
               </h2>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Group &bull; {currentGroupMembers.length} participants
+                {activeType === 'channel'
+                  ? `Group &bull; ${currentGroupMembers.length} participants`
+                  : `${activeDM?.role} &bull; ${activeDM?.department}`}
               </div>
-              <p
-                style={{
-                  fontSize: '12px',
-                  color: 'var(--text-secondary)',
-                  marginTop: '10px',
-                  lineHeight: 1.4,
-                  maxWidth: '300px',
-                }}
-              >
-                {activeChannel?.topic}
-              </p>
 
-              {/* WhatsApp Quick Action Tiles (Audio Call, Video Call, Add) */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  marginTop: '16px',
-                }}
-              >
+              {/* WhatsApp Quick Action Tiles (Call, Video, Search) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '16px' }}>
                 <button
-                  onClick={() => {
-                    toggleHuddle(activeId);
-                    addToast({ type: 'info', message: '🎙️ Group Voice Huddle launched.' });
-                  }}
+                  onClick={() =>
+                    handleStartCallMember(
+                      { name: activeType === 'channel' ? activeChannel?.name || 'Group' : activeDM?.name || 'Contact', role: 'Voice' },
+                      'voice'
+                    )
+                  }
                   className="btn btn-secondary"
                   style={{
                     padding: '8px 14px',
@@ -2658,19 +2066,22 @@ export const PulseDesk: React.FC = () => {
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '4px',
-                    fontSize: '10px',
+                    fontSize: '11px',
                     fontWeight: 600,
                     width: '80px',
                   }}
                 >
                   <Phone size={15} color="var(--accent-primary)" />
-                  <span>Audio Call</span>
+                  <span>Audio</span>
                 </button>
 
                 <button
-                  onClick={() => {
-                    addToast({ type: 'info', message: '📹 Group Video Call room created.' });
-                  }}
+                  onClick={() =>
+                    handleStartCallMember(
+                      { name: activeType === 'channel' ? activeChannel?.name || 'Group' : activeDM?.name || 'Contact', role: 'Video' },
+                      'video'
+                    )
+                  }
                   className="btn btn-secondary"
                   style={{
                     padding: '8px 14px',
@@ -2679,19 +2090,17 @@ export const PulseDesk: React.FC = () => {
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '4px',
-                    fontSize: '10px',
+                    fontSize: '11px',
                     fontWeight: 600,
                     width: '80px',
                   }}
                 >
                   <Video size={15} color="var(--accent-primary)" />
-                  <span>Video Call</span>
+                  <span>Video</span>
                 </button>
 
                 <button
-                  onClick={() => {
-                    addToast({ type: 'info', message: 'Invite link copied to clipboard.' });
-                  }}
+                  onClick={() => setIsChatSearchOpen(true)}
                   className="btn btn-secondary"
                   style={{
                     padding: '8px 14px',
@@ -2700,254 +2109,184 @@ export const PulseDesk: React.FC = () => {
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '4px',
-                    fontSize: '10px',
+                    fontSize: '11px',
                     fontWeight: 600,
                     width: '80px',
                   }}
                 >
-                  <UserPlus size={15} color="var(--accent-primary)" />
-                  <span>Add</span>
+                  <Search size={15} color="var(--accent-primary)" />
+                  <span>Search</span>
                 </button>
               </div>
             </div>
 
-            {/* Shared Media / Links / Docs summary */}
+            {/* About / Topic Card */}
             <div
               style={{
-                padding: '12px 20px',
-                borderBottom: '1px solid var(--border-hairline)',
+                padding: '16px 20px',
+                borderBottom: '8px solid var(--surface-0)',
+                background: 'var(--surface-1)',
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                {activeType === 'channel' ? 'Group Description' : 'About'}
+              </div>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                {activeType === 'channel' ? activeChannel?.topic : activeDM?.lastMessageSnippet || 'In Deep Flow 🎧'}
+              </p>
+            </div>
+
+            {/* Media, Links and Docs Section */}
+            <div
+              style={{
+                padding: '14px 20px',
+                borderBottom: '8px solid var(--surface-0)',
+                background: 'var(--surface-1)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                background: 'var(--surface-2)',
                 cursor: 'pointer',
               }}
               onClick={() => setIsPinnedDrawerOpen(true)}
             >
-              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                 Media, Links and Docs
               </span>
-              <span style={{ fontSize: '11px', color: 'var(--accent-primary)', fontWeight: 600 }}>
+              <span style={{ fontSize: '12px', color: 'var(--accent-primary)', fontWeight: 600 }}>
                 18 Files &gt;
               </span>
             </div>
 
-            {/* Participants Section Header */}
-            <div style={{ padding: '16px 20px 8px' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '10px',
-                }}
-              >
-                <span
+            {/* WhatsApp Participants Section (If Group) */}
+            {activeType === 'channel' && (
+              <div style={{ padding: '16px 20px', background: 'var(--surface-1)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                    {filteredGroupMembers.length} Participants
+                  </span>
+                </div>
+
+                {/* Member Search */}
+                <div
                   style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    color: 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    marginBottom: '10px',
                   }}
                 >
-                  {filteredGroupMembers.length} Participants
-                </span>
-                <span style={{ fontSize: '10px', color: 'var(--accent-primary)' }}>
-                  Click icon to Call or DM
-                </span>
-              </div>
+                  <Search size={13} color="var(--text-muted)" />
+                  <input
+                    type="text"
+                    placeholder="Search participants..."
+                    value={memberSearchQuery}
+                    onChange={(e) => setMemberSearchQuery(e.target.value)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      fontSize: '12px',
+                      width: '100%',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
 
-              {/* Member Search Bar */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'var(--surface-0)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '8px',
-                  padding: '6px 10px',
-                  marginBottom: '12px',
-                }}
-              >
-                <Search size={13} color="var(--text-muted)" />
-                <input
-                  type="text"
-                  placeholder="Search participants by name or role..."
-                  value={memberSearchQuery}
-                  onChange={(e) => setMemberSearchQuery(e.target.value)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--text-primary)',
-                    fontSize: '12px',
-                    width: '100%',
-                    outline: 'none',
-                  }}
-                />
-              </div>
+                {/* Participants Rows */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {filteredGroupMembers.map((member) => {
+                    const isCurrent = member.userId === 'user-current';
 
-              {/* Members List with WhatsApp-Style Direct Action Buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {filteredGroupMembers.map((member) => {
-                  const isCurrent = member.userId === 'user-current';
-
-                  return (
-                    <div
-                      key={member.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 12px',
-                        borderRadius: '10px',
-                        background: 'var(--surface-2)',
-                        border: '1px solid var(--border-hairline)',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      {/* Avatar & Member Details */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-                        <div style={{ position: 'relative' }}>
-                          <div
-                            style={{
-                              width: '36px',
-                              height: '36px',
-                              borderRadius: '50%',
-                              background: isCurrent ? 'var(--accent-primary)' : 'var(--surface-3)',
-                              color: isCurrent ? '#000000' : 'var(--text-primary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 700,
-                              fontSize: '13px',
-                              border: '1px solid var(--border-subtle)',
-                            }}
-                          >
-                            {isCurrent ? 'YOU' : member.name.charAt(0)}
-                          </div>
-                          <span
-                            style={{
-                              position: 'absolute',
-                              bottom: 0,
-                              right: 0,
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '50%',
-                              background:
-                                member.status === 'online'
-                                  ? '#10b981'
-                                  : member.status === 'away'
-                                  ? '#f59e0b'
-                                  : 'var(--text-muted)',
-                              border: '1px solid var(--surface-2)',
-                            }}
-                          />
-                        </div>
-
-                        <div style={{ overflow: 'hidden' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span
+                    return (
+                      <div
+                        key={member.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          background: 'var(--surface-2)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                          <div style={{ position: 'relative' }}>
+                            <div
                               style={{
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                color: 'var(--text-primary)',
-                                textOverflow: 'ellipsis',
-                                overflow: 'hidden',
-                                whiteSpace: 'nowrap',
+                                width: '34px',
+                                height: '34px',
+                                borderRadius: '50%',
+                                background: isCurrent ? 'var(--accent-primary)' : 'var(--surface-4)',
+                                color: isCurrent ? '#000000' : 'var(--text-primary)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 700,
+                                fontSize: '12px',
                               }}
                             >
-                              {member.name}
-                            </span>
+                              {isCurrent ? 'YOU' : member.name.charAt(0)}
+                            </div>
+                            <span
+                              style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                right: 0,
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                background: member.status === 'online' ? '#10b981' : '#f59e0b',
+                              }}
+                            />
+                          </div>
 
-                            {member.isAdmin && (
-                              <span
-                                style={{
-                                  fontSize: '9px',
-                                  fontWeight: 700,
-                                  textTransform: 'uppercase',
-                                  padding: '1px 5px',
-                                  borderRadius: '4px',
-                                  background: 'rgba(245, 158, 11, 0.2)',
-                                  color: 'var(--accent-primary)',
-                                  border: '1px solid rgba(245, 158, 11, 0.35)',
-                                }}
-                              >
-                                Group Admin
+                          <div style={{ overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {member.name}
                               </span>
-                            )}
-                          </div>
-
-                          <div
-                            style={{
-                              fontSize: '11px',
-                              color: 'var(--text-muted)',
-                              textOverflow: 'ellipsis',
-                              overflow: 'hidden',
-                              whiteSpace: 'nowrap',
-                              marginTop: '1px',
-                            }}
-                          >
-                            {member.customStatus || member.role}
+                              {member.isAdmin && (
+                                <span style={{ fontSize: '9px', fontWeight: 700, background: 'rgba(245, 158, 11, 0.2)', color: 'var(--accent-primary)', padding: '1px 4px', borderRadius: '4px' }}>
+                                  Admin
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                              {member.customStatus || member.role}
+                            </div>
                           </div>
                         </div>
+
+                        {!isCurrent && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <button
+                              onClick={() => handleDirectMessageMember(member)}
+                              className="btn btn-ghost"
+                              style={{ padding: '6px', borderRadius: '6px', color: 'var(--accent-primary)' }}
+                              title="Message"
+                            >
+                              <MessageSquare size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleStartCallMember(member, 'voice')}
+                              className="btn btn-ghost"
+                              style={{ padding: '6px', borderRadius: '6px', color: '#10b981' }}
+                              title="Voice call"
+                            >
+                              <Phone size={13} />
+                            </button>
+                          </div>
+                        )}
                       </div>
-
-                      {/* WhatsApp UX Action Controls: Message & Call */}
-                      {!isCurrent && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                          {/* Direct Message (DM) */}
-                          <button
-                            onClick={() => handleDirectMessageMember(member)}
-                            className="btn btn-ghost"
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '8px',
-                              background: 'var(--surface-3)',
-                              color: 'var(--accent-primary)',
-                            }}
-                            title={`Send direct message to ${member.name}`}
-                          >
-                            <MessageSquare size={13} />
-                          </button>
-
-                          {/* Direct Voice Call */}
-                          <button
-                            onClick={() => handleStartCallMember(member, 'voice')}
-                            className="btn btn-ghost"
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '8px',
-                              background: 'var(--surface-3)',
-                              color: '#10b981',
-                            }}
-                            title={`Direct voice call ${member.name}`}
-                          >
-                            <Phone size={13} />
-                          </button>
-
-                          {/* Direct Video Call */}
-                          <button
-                            onClick={() => handleStartCallMember(member, 'video')}
-                            className="btn btn-ghost"
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '8px',
-                              background: 'var(--surface-3)',
-                              color: 'var(--text-muted)',
-                            }}
-                            title={`Direct video call ${member.name}`}
-                          >
-                            <Video size={13} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </aside>
       )}
@@ -2964,10 +2303,9 @@ export const PulseDesk: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             flexShrink: 0,
-            zIndex: 10,
+            zIndex: 30,
           }}
         >
-          {/* Thread Header */}
           <div
             style={{
               padding: '14px 18px',
@@ -2991,14 +2329,7 @@ export const PulseDesk: React.FC = () => {
             </button>
           </div>
 
-          {/* Original Parent Message Card */}
-          <div
-            style={{
-              padding: '14px 18px',
-              borderBottom: '1px solid var(--border-hairline)',
-              background: 'var(--surface-2)',
-            }}
-          >
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-hairline)', background: 'var(--surface-2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
               <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
                 {activeThreadMessage.senderName}
@@ -3012,17 +2343,7 @@ export const PulseDesk: React.FC = () => {
             </p>
           </div>
 
-          {/* Thread Replies List */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '16px 18px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-            }}
-          >
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {(threadReplies[activeThreadMessage.id] || []).map((reply) => (
               <div key={reply.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -3031,22 +2352,13 @@ export const PulseDesk: React.FC = () => {
                   </span>
                   <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{reply.time}</span>
                 </div>
-                <div
-                  style={{
-                    fontSize: '12px',
-                    color: 'var(--text-secondary)',
-                    background: 'var(--surface-2)',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                  }}
-                >
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', background: 'var(--surface-2)', padding: '8px 12px', borderRadius: '8px' }}>
                   {reply.text}
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Thread Reply Composer */}
           <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border-hairline)' }}>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
@@ -3068,11 +2380,7 @@ export const PulseDesk: React.FC = () => {
                   outline: 'none',
                 }}
               />
-              <button
-                onClick={handleSendThreadReply}
-                className="btn btn-primary"
-                style={{ padding: '7px 12px', borderRadius: '8px' }}
-              >
+              <button onClick={handleSendThreadReply} className="btn btn-primary" style={{ padding: '7px 12px', borderRadius: '8px' }}>
                 <Send size={12} />
               </button>
             </div>
@@ -3092,7 +2400,7 @@ export const PulseDesk: React.FC = () => {
             display: 'flex',
             flexDirection: 'column',
             flexShrink: 0,
-            zIndex: 10,
+            zIndex: 30,
           }}
         >
           <div
@@ -3107,7 +2415,7 @@ export const PulseDesk: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Pin size={15} color="var(--accent-primary)" />
               <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Pinned in Group
+                Starred & Pinned
               </span>
             </div>
             <button
@@ -3119,14 +2427,7 @@ export const PulseDesk: React.FC = () => {
           </div>
 
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div
-              style={{
-                padding: '12px',
-                background: 'var(--surface-2)',
-                borderRadius: '8px',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
-              }}
-            >
+            <div style={{ padding: '12px', background: 'var(--surface-2)', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '4px' }}>
                 📌 SPRINT WAR ROOM GOAL
               </div>
@@ -3135,14 +2436,7 @@ export const PulseDesk: React.FC = () => {
               </p>
             </div>
 
-            <div
-              style={{
-                padding: '12px',
-                background: 'var(--surface-2)',
-                borderRadius: '8px',
-                border: '1px solid var(--border-subtle)',
-              }}
-            >
+            <div style={{ padding: '12px', background: 'var(--surface-2)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
                 📄 System Architecture Spec
               </div>
@@ -3184,7 +2478,6 @@ export const PulseDesk: React.FC = () => {
               overflow: 'hidden',
             }}
           >
-            {/* Modal Header */}
             <div
               style={{
                 padding: '16px 20px',
@@ -3208,7 +2501,6 @@ export const PulseDesk: React.FC = () => {
               </button>
             </div>
 
-            {/* Task Search Bar */}
             <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-hairline)' }}>
               <div
                 style={{
@@ -3240,7 +2532,6 @@ export const PulseDesk: React.FC = () => {
               </div>
             </div>
 
-            {/* Task List */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filteredSprintTasks.map((task) => (
                 <div
@@ -3259,14 +2550,7 @@ export const PulseDesk: React.FC = () => {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        fontWeight: 800,
-                        color: 'var(--accent-primary)',
-                        fontFamily: 'var(--font-mono)',
-                      }}
-                    >
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
                       {task.key}
                     </span>
                     <span
@@ -3275,12 +2559,8 @@ export const PulseDesk: React.FC = () => {
                         textTransform: 'uppercase',
                         padding: '1px 6px',
                         borderRadius: '4px',
-                        background:
-                          task.priority === 'urgent'
-                            ? 'rgba(244, 63, 94, 0.18)'
-                            : 'rgba(245, 158, 11, 0.18)',
-                        color:
-                          task.priority === 'urgent' ? '#f43f5e' : 'var(--accent-primary)',
+                        background: task.priority === 'urgent' ? 'rgba(244, 63, 94, 0.18)' : 'rgba(245, 158, 11, 0.18)',
+                        color: task.priority === 'urgent' ? '#f43f5e' : 'var(--accent-primary)',
                       }}
                     >
                       {task.priority}

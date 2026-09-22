@@ -151,33 +151,45 @@ High-precision compensation and statutory benefits hub:
 ---
 
 ### 5. Team Pulse Collaboration & Chat (`#pulse`)
-Enterprise real-time team communication and sprint collaboration hub:
-- **Workspace Navigation & Roaming**:
-  - Direct 4th domain on persistent App Rail (`Alt+3` or `<MessageSquare />` icon) with dynamic golden unread dot indicator.
-  - Sub-navigation drawer with itemized groups list, direct messages list, online/away presence badges, and a 1-click `+ New Group` modal trigger.
-- **Team Groups & 1:1 Direct Messages**:
-  - Preloaded public & private team groups (`#general`, `#engineering`, `#product-design`, `#sprint-war-room`).
-  - 1:1 direct messaging threads with engineering and management peers (Sarah Jenkins, Alex Rivera, Priya Sharma, Rohan Deshmukh).
-  - Search filtering across active groups and team conversations.
-- **Interactive Task Tagging & Sprint Mentioning**:
-  - Message composer includes a dedicated `# Mention Task` button opening a modal loaded with manager-assigned sprint tasks.
-  - Embedded ticket cards display ticket key (e.g., `PAY-101`), title, manager assignment attribution, status tag, and priority pill.
-  - **1-Click Quick Worklog**: Click `+ Quick Log 30m` directly on the embedded ticket card to immediately log time and synchronize timesheet reconciliation.
-  - **1-Click Deep Inspection**: Clicking "Inspect Task" directly opens the PeopleOS `IssueDrawer` slide-over with worklog logging presets, story points, and sprint comments.
-- **🎙️ Live Voice Huddles**:
-  - 1-Click "Start Huddle" button with live animated audio frequency wave bars (`.huddle-wave-bar`).
-  - Active huddle participant bar with glowing rings, mute/unmute microphone toggle, and spatial audio session indicators.
-- **Interactive Audio Voice Notes & Waveform Player**:
-  - Supports audio voice notes with animated 24-frequency bar waveforms, play/pause controls (`▶ / ⏸`), live playback timers, and speech-to-text transcriptions.
-  - Quick `Voice Memo` recorder shortcut directly in the composer.
-- **💬 Thread Discussion Slide-Over Drawer**:
-  - Click `X replies` or hover action `Reply in thread` to open a dedicated right slide-over drawer for deep, focused side discussions without cluttering the group stream.
-- **⚡ Floating Quick-Actions & Slash Commands**:
-  - Message hover toolbar: Instant emoji reactions (`👍`, `🔥`, `🚀`), `Reply in thread`, `Bookmark / Star ⭐`, `Pin 📌`, and `Copy text`.
-  - Slash command autocomplete menu triggered by typing `/` (`/task`, `/huddle`, `/standup`, `/kudos`).
-- **File & Media Sharing**:
-  - Native file picker attachment trigger (`📎 Attach`).
-  - Visual image thumbnail rendering with dimensions, file size, and lightbox click.
+Enterprise real-time team communication and sprint collaboration hub engineered with authentic **WhatsApp Web / WhatsApp Desktop UX** integrated into the luxury Champagne Amber Gold & Smoky Velvet Obsidian design system:
+
+- **WhatsApp Web Architecture & Navigation**:
+  - Direct domain on persistent App Rail (`Alt+3` or `<MessageSquare />` icon) with dynamic golden unread dot indicator.
+  - **Left WhatsApp Sidebar**:
+    - Top bar with user profile avatar, Status Radar button, `+` New Group trigger, and WhatsApp three-dot (`⋮`) overflow menu.
+    - WhatsApp search bar with clear button.
+    - **Filter Pills**: Quick 1-click filter row: `All`, `Unread`, `Groups`, `Direct`.
+    - **Conversation List**: 46px circular avatars with online beacons, amber double-checkmarks (`✓✓`) on sent snippets, delivery timestamps, and circular amber unread badges.
+- **WhatsApp Chat Stream & Bubbles**:
+  - Subtle obsidian radial dot canvas (`.whatsapp-chat-canvas`).
+  - Floating centered date separator pills (`TODAY`, `YESTERDAY`).
+  - **Right-Aligned Sent Bubbles (`.whatsapp-bubble-out`)**: Molten champagne amber gradient with soft border, timestamp, and amber double-checkmark (`✓✓`).
+  - **Left-Aligned Received Bubbles (`.whatsapp-bubble-in`)**: Mineral obsidian card background with sender name colored by identity.
+  - Floating corner reaction chips (`👍`, `❤️`, `🔥`) with tap counters.
+  - Micro hover action toolbar: Quick emoji reactions, Star/Pin, and contextual options.
+- **WhatsApp In-Chat Search Overlay**:
+  - Slide-down in-chat search bar accessible via chat header search icon (`🔍`), showing matching message counter and next/prev navigation.
+- **WhatsApp Bottom Composer**:
+  - `📎` Paperclip button opening vertical WhatsApp attachment menu (📄 Document, 🖼️ Photos & Videos, ⚡ Sprint Task, 🎙️ Audio Memo).
+  - `😊` Emoji picker toggle.
+  - Rounded pill text input field (`Type a message`).
+  - **Dynamic Action Button**: Displays a microphone icon (`🎙️`) when the message input is empty for 1-click voice memos; instantly transforms into a Send paper plane (`➤`) when text is entered.
+- **WhatsApp Right Info Drawer (Group Info & Contact Info)**:
+  - Click on the top chat header to open the WhatsApp slide-over info drawer.
+  - Hero profile card with large circular emblem, title, creation date / role, and quick action tiles (**Voice Call**, **Video Call**, **Search**).
+  - Media, Links and Docs summary tile (`18 Files >`).
+  - **Members Roster with Direct Calling & Messaging**:
+    - Member search bar with real-time roster filtering.
+    - Detailed list of all members with online status and roles.
+    - Direct 1-click action buttons on every member card: 💬 Direct Message (opens 1:1 DM immediately), 📞 Voice Call, 📹 Video Call.
+- **Active Call Floating Overlay**:
+  - Live call modal with animated pulsing rings, live duration counter (`Connected • 00:24`), animated audio waveform frequency bars, mute/unmute microphone toggle, and red end-call button.
+- **Interactive Sprint Task Tagging & Worklog Sync**:
+  - Embedded manager-assigned ticket cards with status pills, priority tags, and manager attribution.
+  - **1-Click Quick Worklog**: `+ Quick Log 30m` directly logs work into the biometric attendance reconciliation ledger.
+  - **1-Click Deep Inspection**: "Inspect Task" opens the full PeopleOS `IssueDrawer` slide-over.
+- **Audio Voice Notes & Waveform Player**:
+  - Voice notes with animated 24-frequency bar waveforms, play/pause controls (`▶ / ⏸`), live elapsed playback timers, and transcriptions.
   - Document & PDF cards with download triggers and extension indicators.
 - **Interactive Emoji Reactions**:
   - Instant one-click reactions (👍, ❤️, 🚀, 👀, 🔥) with active user highlighting and toggle counters.

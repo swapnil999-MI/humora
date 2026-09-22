@@ -1309,3 +1309,45 @@ p, span, div {
   z-index: 0;
 }
 
+/* ==========================================================================
+   WHATSAPP WEB UX CHAT CANVAS & BUBBLE STYLING
+   ========================================================================== */
+.whatsapp-chat-canvas {
+  background-color: var(--surface-0);
+  background-image: radial-gradient(rgba(245, 158, 11, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.whatsapp-bubble-out {
+  align-self: flex-end;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(217, 119, 6, 0.12) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 14px 14px 3px 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.whatsapp-bubble-in {
+  align-self: flex-start;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px 14px 14px 3px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.whatsapp-date-pill {
+  align-self: center;
+  background: rgba(32, 30, 27, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-hairline);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  box-shadow: var(--shadow-xs);
+  margin: 8px 0;
+}
+
