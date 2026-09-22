@@ -187,8 +187,10 @@ export const ShiftManagementDesk: React.FC = () => {
                 fontSize: '12px',
                 padding: '6px 14px',
                 borderRadius: '6px',
-                background: activeTab === 'catalog' ? 'var(--surface-4)' : 'transparent',
-                color: activeTab === 'catalog' ? '#ffffff' : 'var(--text-muted)',
+                background: activeTab === 'catalog' ? 'var(--accent-subtle)' : 'transparent',
+                color: activeTab === 'catalog' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                border: activeTab === 'catalog' ? '1px solid var(--accent-primary)' : '1px solid transparent',
+                fontWeight: activeTab === 'catalog' ? 600 : 500,
               }}
               onClick={() => setActiveTab('catalog')}
             >
@@ -200,8 +202,10 @@ export const ShiftManagementDesk: React.FC = () => {
                 fontSize: '12px',
                 padding: '6px 14px',
                 borderRadius: '6px',
-                background: activeTab === 'roster' ? 'var(--surface-4)' : 'transparent',
-                color: activeTab === 'roster' ? '#ffffff' : 'var(--text-muted)',
+                background: activeTab === 'roster' ? 'var(--accent-subtle)' : 'transparent',
+                color: activeTab === 'roster' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                border: activeTab === 'roster' ? '1px solid var(--accent-primary)' : '1px solid transparent',
+                fontWeight: activeTab === 'roster' ? 600 : 500,
               }}
               onClick={() => setActiveTab('roster')}
             >

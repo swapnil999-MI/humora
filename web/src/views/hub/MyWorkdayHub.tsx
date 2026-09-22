@@ -264,7 +264,7 @@ export const MyWorkdayHub: React.FC = () => {
                       ? 'var(--accent-emerald-subtle)'
                       : completionPct >= 40
                       ? 'var(--accent-amber-subtle)'
-                      : 'rgba(255, 255, 255, 0.05)',
+                      : 'var(--surface-hover)',
                   color:
                     completionPct >= 80
                       ? 'var(--accent-emerald)'
@@ -468,26 +468,26 @@ export const MyWorkdayHub: React.FC = () => {
                     letterSpacing: '0.04em',
                     background:
                       weeklyTimesheet?.submission_status === 'approved'
-                        ? 'rgba(16, 185, 129, 0.2)'
+                        ? 'var(--accent-emerald-subtle)'
                         : weeklyTimesheet?.submission_status === 'submitted'
-                        ? 'rgba(245, 158, 11, 0.2)'
+                        ? 'var(--accent-amber-subtle)'
                         : weeklyTimesheet?.submission_status === 'rejected'
-                        ? 'rgba(239, 68, 68, 0.2)'
-                        : 'rgba(255, 255, 255, 0.08)',
+                        ? 'var(--accent-rose-subtle)'
+                        : 'var(--surface-hover)',
                     color:
                       weeklyTimesheet?.submission_status === 'approved'
-                        ? '#34d399'
+                        ? 'var(--accent-emerald)'
                         : weeklyTimesheet?.submission_status === 'submitted'
-                        ? '#fbbf24'
+                        ? 'var(--accent-amber)'
                         : weeklyTimesheet?.submission_status === 'rejected'
-                        ? '#f87171'
+                        ? 'var(--accent-rose)'
                         : 'var(--text-secondary)',
                     border: `1px solid ${
                       weeklyTimesheet?.submission_status === 'approved'
                         ? 'rgba(16, 185, 129, 0.3)'
                         : weeklyTimesheet?.submission_status === 'submitted'
                         ? 'rgba(245, 158, 11, 0.3)'
-                        : 'rgba(255, 255, 255, 0.1)'
+                        : 'var(--border-hairline)'
                     }`,
                   }}
                 >
@@ -556,16 +556,14 @@ export const MyWorkdayHub: React.FC = () => {
                   padding: '12px 10px',
                   borderRadius: '10px',
                   background: isUnderLogged
-                    ? 'rgba(245, 158, 11, 0.05)'
+                    ? 'var(--accent-amber-subtle)'
                     : isWeekend
-                    ? 'rgba(255, 255, 255, 0.02)'
-                    : 'rgba(255, 255, 255, 0.03)',
+                    ? 'var(--surface-0)'
+                    : 'var(--surface-2)',
                   border: `1px solid ${
                     isUnderLogged
-                      ? 'rgba(245, 158, 11, 0.25)'
-                      : isWeekend
-                      ? 'rgba(255, 255, 255, 0.05)'
-                      : 'rgba(255, 255, 255, 0.08)'
+                      ? 'rgba(245, 158, 11, 0.3)'
+                      : 'var(--border-hairline)'
                   }`,
                   display: 'flex',
                   flexDirection: 'column',
@@ -574,7 +572,7 @@ export const MyWorkdayHub: React.FC = () => {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: isWeekend ? 'var(--text-muted)' : '#fff' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: isWeekend ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                     {day.day_of_week.slice(0, 3)}
                   </span>
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
@@ -612,19 +610,19 @@ export const MyWorkdayHub: React.FC = () => {
                       display: 'inline-block',
                       textTransform: 'uppercase',
                       background: isWeekend
-                        ? 'rgba(255, 255, 255, 0.05)'
+                        ? 'var(--surface-hover)'
                         : isUnderLogged
-                        ? 'rgba(245, 158, 11, 0.15)'
+                        ? 'var(--accent-amber-subtle)'
                         : isOverLogged
-                        ? 'rgba(99, 102, 241, 0.15)'
-                        : 'rgba(16, 185, 129, 0.15)',
+                        ? 'var(--accent-subtle)'
+                        : 'var(--accent-emerald-subtle)',
                       color: isWeekend
                         ? 'var(--text-muted)'
                         : isUnderLogged
-                        ? '#fbbf24'
+                        ? 'var(--accent-amber)'
                         : isOverLogged
-                        ? '#818cf8'
-                        : '#34d399',
+                        ? 'var(--accent-primary)'
+                        : 'var(--accent-emerald)',
                     }}
                   >
                     {isWeekend ? 'Off' : isUnderLogged ? 'Deficit' : isOverLogged ? 'Over' : 'Synced'}
@@ -639,17 +637,18 @@ export const MyWorkdayHub: React.FC = () => {
                         key={wl.issue_id}
                         style={{
                           fontSize: '10px',
-                          padding: '3px 4px',
-                          borderRadius: '4px',
-                          background: 'rgba(0, 0, 0, 0.3)',
+                          padding: '3px 6px',
+                          borderRadius: 'var(--radius-xs)',
+                          background: 'var(--surface-3)',
+                          border: '1px solid var(--border-hairline)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          color: '#e2e8f0',
+                          color: 'var(--text-primary)',
                         }}
                         title={wl.issue_title}
                       >
-                        <span style={{ fontWeight: 600, color: '#818cf8' }}>{wl.issue_key}</span>
+                        <span style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{wl.issue_key}</span>
                         <span>{wl.hours}h</span>
                       </div>
                     ))}
@@ -665,9 +664,9 @@ export const MyWorkdayHub: React.FC = () => {
           style={{
             marginTop: '8px',
             padding: '14px 18px',
-            borderRadius: '10px',
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border-hairline)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -852,7 +851,7 @@ export const MyWorkdayHub: React.FC = () => {
                             fontWeight: 600,
                             padding: '1px 6px',
                             borderRadius: '4px',
-                            background: 'rgba(255, 255, 255, 0.06)',
+                            background: 'var(--surface-hover)',
                             color: 'var(--text-secondary)',
                           }}
                         >

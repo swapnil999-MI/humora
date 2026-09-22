@@ -435,7 +435,7 @@ export const AttendanceDesk: React.FC = () => {
               background: 'transparent',
               border: 'none',
               borderBottom: activeTab === 'summary' ? '2px solid #3b82f6' : '2px solid transparent',
-              color: activeTab === 'summary' ? '#ffffff' : '#94a3b8',
+              color: activeTab === 'summary' ? 'var(--text-primary)' : 'var(--text-muted)',
               fontSize: '13px',
               fontWeight: 600,
               cursor: 'pointer',
@@ -454,7 +454,7 @@ export const AttendanceDesk: React.FC = () => {
               background: 'transparent',
               border: 'none',
               borderBottom: activeTab === 'regularization' ? '2px solid #3b82f6' : '2px solid transparent',
-              color: activeTab === 'regularization' ? '#ffffff' : '#94a3b8',
+              color: activeTab === 'regularization' ? 'var(--text-primary)' : 'var(--text-muted)',
               fontSize: '13px',
               fontWeight: 500,
               cursor: 'pointer',
@@ -488,7 +488,7 @@ export const AttendanceDesk: React.FC = () => {
               background: 'transparent',
               border: 'none',
               borderBottom: activeTab === 'onduty' ? '2px solid #3b82f6' : '2px solid transparent',
-              color: activeTab === 'onduty' ? '#ffffff' : '#94a3b8',
+              color: activeTab === 'onduty' ? 'var(--text-primary)' : 'var(--text-muted)',
               fontSize: '13px',
               fontWeight: 500,
               cursor: 'pointer',
@@ -557,7 +557,7 @@ export const AttendanceDesk: React.FC = () => {
               onClick={() => setViewMode('list')}
               style={{
                 background: viewMode === 'list' ? '#3b82f6' : 'transparent',
-                color: viewMode === 'list' ? '#ffffff' : '#94a3b8',
+                color: viewMode === 'list' ? 'var(--text-primary)' : 'var(--text-muted)',
                 border: 'none',
                 borderRadius: '4px',
                 padding: '4px 8px',
@@ -574,7 +574,7 @@ export const AttendanceDesk: React.FC = () => {
               onClick={() => setViewMode('matrix')}
               style={{
                 background: viewMode === 'matrix' ? '#3b82f6' : 'transparent',
-                color: viewMode === 'matrix' ? '#ffffff' : '#94a3b8',
+                color: viewMode === 'matrix' ? 'var(--text-primary)' : 'var(--text-muted)',
                 border: 'none',
                 borderRadius: '4px',
                 padding: '4px 8px',
@@ -591,7 +591,7 @@ export const AttendanceDesk: React.FC = () => {
               onClick={() => setViewMode('calendar')}
               style={{
                 background: viewMode === 'calendar' ? '#3b82f6' : 'transparent',
-                color: viewMode === 'calendar' ? '#ffffff' : '#94a3b8',
+                color: viewMode === 'calendar' ? 'var(--text-primary)' : 'var(--text-muted)',
                 border: 'none',
                 borderRadius: '4px',
                 padding: '4px 8px',
@@ -798,10 +798,10 @@ export const AttendanceDesk: React.FC = () => {
               }}
             >
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#ffffff', opacity: 0.9 }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)', opacity: 0.9 }}>
                   {isCheckedIn ? 'Check-out' : 'Check-in'}
                 </div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', fontFamily: 'monospace', letterSpacing: '0.02em' }}>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'monospace', letterSpacing: '0.02em' }}>
                   {isCheckedIn ? `${elapsedWorkTime} Hrs` : '00:00:00 Hrs'}
                 </div>
               </div>
@@ -815,7 +815,7 @@ export const AttendanceDesk: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#ffffff',
+                  color: 'var(--text-primary)',
                 }}
               >
                 {isCheckedIn ? <LogOut size={16} /> : <LogIn size={16} />}
@@ -874,7 +874,7 @@ export const AttendanceDesk: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#ffffff',
+                  color: 'var(--text-primary)',
                 }}
               >
                 <Camera size={16} />
@@ -1208,7 +1208,7 @@ export const AttendanceDesk: React.FC = () => {
                   onClick={() => setUnitMode('days')}
                   style={{
                     background: unitMode === 'days' ? '#3b82f6' : 'transparent',
-                    color: unitMode === 'days' ? '#ffffff' : '#94a3b8',
+                    color: unitMode === 'days' ? 'var(--text-primary)' : 'var(--text-muted)',
                     border: 'none',
                     borderRadius: '3px',
                     padding: '3px 10px',
@@ -1223,7 +1223,7 @@ export const AttendanceDesk: React.FC = () => {
                   onClick={() => setUnitMode('hours')}
                   style={{
                     background: unitMode === 'hours' ? '#3b82f6' : 'transparent',
-                    color: unitMode === 'hours' ? '#ffffff' : '#94a3b8',
+                    color: unitMode === 'hours' ? 'var(--text-primary)' : 'var(--text-muted)',
                     border: 'none',
                     borderRadius: '3px',
                     padding: '3px 10px',
@@ -1239,7 +1239,7 @@ export const AttendanceDesk: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#94a3b8' }}>
                 <div>
                   <span style={{ color: '#64748b' }}>Payable Days: </span>
-                  <strong style={{ color: '#ffffff' }}>3 Days</strong>
+                  <strong style={{ color: 'var(--text-primary)' }}>3 Days</strong>
                 </div>
 
                 <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.1)', paddingLeft: '16px' }}>
@@ -1471,7 +1471,7 @@ export const AttendanceDesk: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FileCheck2 size={18} color="#38bdf8" />
-                <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: '#ffffff' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                   {regularizeType === 'missed_punch'
                     ? 'Request Regularization (Missed Punch)'
                     : regularizeType === 'on_duty'
@@ -1528,7 +1528,7 @@ export const AttendanceDesk: React.FC = () => {
                     border: '1px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: '6px',
                     padding: '8px 12px',
-                    color: '#ffffff',
+                    color: 'var(--text-primary)',
                     fontSize: '13px',
                   }}
                 />
@@ -1549,7 +1549,7 @@ export const AttendanceDesk: React.FC = () => {
                       border: '1px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: '6px',
                       padding: '8px 12px',
-                      color: '#ffffff',
+                      color: 'var(--text-primary)',
                       fontSize: '13px',
                     }}
                   />
@@ -1568,7 +1568,7 @@ export const AttendanceDesk: React.FC = () => {
                       border: '1px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: '6px',
                       padding: '8px 12px',
-                      color: '#ffffff',
+                      color: 'var(--text-primary)',
                       fontSize: '13px',
                     }}
                   />
@@ -1590,7 +1590,7 @@ export const AttendanceDesk: React.FC = () => {
                     border: '1px solid rgba(255, 255, 255, 0.12)',
                     borderRadius: '6px',
                     padding: '8px 12px',
-                    color: '#ffffff',
+                    color: 'var(--text-primary)',
                     fontSize: '13px',
                     outline: 'none',
                   }}
@@ -1620,7 +1620,7 @@ export const AttendanceDesk: React.FC = () => {
                     border: 'none',
                     borderRadius: '6px',
                     padding: '8px 18px',
-                    color: '#ffffff',
+                    color: 'var(--text-primary)',
                     fontSize: '12px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -1879,7 +1879,7 @@ export const AttendanceDesk: React.FC = () => {
                         <div
                           style={{
                             background: 'rgba(16, 185, 129, 0.9)',
-                            color: '#ffffff',
+                            color: 'var(--text-primary)',
                             padding: '6px 14px',
                             borderRadius: '20px',
                             fontSize: '12px',
@@ -1897,7 +1897,7 @@ export const AttendanceDesk: React.FC = () => {
                         <div
                           style={{
                             background: 'rgba(239, 68, 68, 0.95)',
-                            color: '#ffffff',
+                            color: 'var(--text-primary)',
                             padding: '6px 14px',
                             borderRadius: '20px',
                             fontSize: '11px',
@@ -2052,7 +2052,7 @@ export const AttendanceDesk: React.FC = () => {
                       disabled={isVerifyingFace || verificationFeedback.status === 'success'}
                       style={{
                         background: verificationFeedback.status === 'success' ? '#10b981' : '#6366f1',
-                        color: '#ffffff',
+                        color: 'var(--text-primary)',
                         border: 'none',
                         borderRadius: '8px',
                         padding: '10px 22px',

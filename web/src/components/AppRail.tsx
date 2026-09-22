@@ -29,128 +29,67 @@ export const AppRail: React.FC<{ onOpenCommandPalette: () => void }> = ({
     (teamRegularizations || []).filter((r) => r.status === 'pending').length;
 
   return (
-    <aside
-      style={{
-        width: '56px',
-        background: 'var(--surface-1)',
-        borderRight: '1px solid var(--border-hairline)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '12px 0',
-        zIndex: 60,
-        userSelect: 'none',
-        flexShrink: 0,
-      }}
-    >
-      {/* Top: Brand Emblem & Domain Switchers */}
+    <aside className="app-rail">
+      {/* Top: Brand Emblem & Workspace Domain Switchers */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', width: '100%' }}>
-        {/* Brand Logo: Clean Precision Indigo */}
-        <div
+        {/* Brand Emblem */}
+        <button
+          type="button"
           style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: 'var(--radius-sm)',
+            width: '34px',
+            height: '34px',
+            borderRadius: 'var(--radius-md)',
             background: 'var(--accent-primary)',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.25), var(--shadow-sm)',
+            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 6px var(--accent-ring)',
             cursor: 'pointer',
+            transition: 'transform var(--transition-fast)',
           }}
           title="Humora Enterprise Platform"
           onClick={() => dispatch(navigateToPage('hub'))}
         >
-          <Building2 size={17} color="#ffffff" />
-        </div>
+          <Building2 size={18} color="#ffffff" strokeWidth={2} />
+        </button>
 
         <div style={{ width: '28px', height: '1px', background: 'var(--border-hairline)' }} />
 
         {/* Domain 1: Employee Self-Service Space (ESS) */}
         <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
-          {workspace === 'employee' && (
-            <div
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: '3px',
-                height: '18px',
-                background: 'var(--accent-primary)',
-                borderRadius: '0 3px 3px 0',
-              }}
-            />
-          )}
+          {workspace === 'employee' && <div className="app-rail-indicator" />}
           <button
-            className="btn-ghost"
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: 'var(--radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: workspace === 'employee' ? 'var(--surface-hover)' : 'transparent',
-              color: workspace === 'employee' ? '#ffffff' : 'var(--text-muted)',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'all var(--transition-fast)',
-            }}
+            type="button"
+            className={`app-rail-btn ${workspace === 'employee' ? 'active' : ''}`}
             onClick={() => dispatch(setWorkspace('employee'))}
-            title="Employee Self-Service Space (Alt+0)"
+            title="Employee Self-Service (Alt+0)"
           >
-            <Compass size={18} />
+            <Compass size={19} strokeWidth={1.8} />
           </button>
         </div>
 
         {/* Domain 2: Management & Operations Console (MSS) */}
         <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
-          {workspace === 'management' && (
-            <div
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: '3px',
-                height: '18px',
-                background: 'var(--accent-primary)',
-                borderRadius: '0 3px 3px 0',
-              }}
-            />
-          )}
+          {workspace === 'management' && <div className="app-rail-indicator" />}
           <button
-            className="btn-ghost"
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: 'var(--radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: workspace === 'management' ? 'var(--surface-hover)' : 'transparent',
-              color: workspace === 'management' ? '#ffffff' : 'var(--text-muted)',
-              border: 'none',
-              cursor: 'pointer',
-              position: 'relative',
-              transition: 'all var(--transition-fast)',
-            }}
+            type="button"
+            className={`app-rail-btn ${workspace === 'management' ? 'active' : ''}`}
             onClick={() => dispatch(setWorkspace('management'))}
-            title="Management & Operations Console (Alt+1)"
+            title="Management Console (Alt+1)"
           >
-            <ShieldCheck size={18} />
+            <ShieldCheck size={19} strokeWidth={1.8} />
             {pendingApprovalsCount > 0 && (
               <span
                 style={{
                   position: 'absolute',
-                  top: '6px',
-                  right: '6px',
-                  width: '7px',
-                  height: '7px',
+                  top: '5px',
+                  right: '5px',
+                  width: '8px',
+                  height: '8px',
                   borderRadius: '50%',
-                  background: '#f59e0b',
+                  background: 'var(--accent-amber)',
+                  boxShadow: '0 0 6px var(--accent-amber)',
                 }}
               />
             )}
@@ -159,59 +98,25 @@ export const AppRail: React.FC<{ onOpenCommandPalette: () => void }> = ({
 
         {/* Domain 3: Agile Work & Projects */}
         <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
-          {workspace === 'work' && (
-            <div
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: '3px',
-                height: '18px',
-                background: 'var(--accent-primary)',
-                borderRadius: '0 3px 3px 0',
-              }}
-            />
-          )}
+          {workspace === 'work' && <div className="app-rail-indicator" />}
           <button
-            className="btn-ghost"
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: 'var(--radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: workspace === 'work' ? 'var(--surface-hover)' : 'transparent',
-              color: workspace === 'work' ? '#ffffff' : 'var(--text-muted)',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'all var(--transition-fast)',
-            }}
+            type="button"
+            className={`app-rail-btn ${workspace === 'work' ? 'active' : ''}`}
             onClick={() => dispatch(setWorkspace('work'))}
             title="Agile Projects & Sprints (Alt+2)"
           >
-            <Kanban size={18} />
+            <Kanban size={19} strokeWidth={1.8} />
           </button>
         </div>
 
         {/* Command Palette Trigger */}
         <button
-          className="btn-ghost"
-          style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: 'var(--radius-sm)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-          }}
+          type="button"
+          className="app-rail-btn"
           onClick={onOpenCommandPalette}
           title="Universal Search (Cmd+K)"
         >
-          <Search size={17} />
+          <Search size={18} strokeWidth={1.8} />
         </button>
       </div>
 
@@ -219,47 +124,35 @@ export const AppRail: React.FC<{ onOpenCommandPalette: () => void }> = ({
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', width: '100%' }}>
         {/* Toggle Sub-Nav Pane */}
         <button
-          className="btn-ghost"
-          style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: 'var(--radius-sm)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-          }}
+          type="button"
+          className="app-rail-btn"
+          style={{ width: '34px', height: '34px' }}
           onClick={() => dispatch(toggleSidebar())}
           title={isSidebarCollapsed ? 'Expand Sidebar (Cmd+\\)' : 'Collapse Sidebar (Cmd+\\)'}
         >
-          {isSidebarCollapsed ? <PanelLeft size={17} /> : <PanelLeftClose size={17} />}
+          {isSidebarCollapsed ? <PanelLeft size={17} strokeWidth={1.8} /> : <PanelLeftClose size={17} strokeWidth={1.8} />}
         </button>
 
-        {/* User Avatar with Presence Ring - Navigate to ESS My Profile */}
+        {/* User Avatar with Presence Ring */}
         <div style={{ position: 'relative' }}>
-          <div
+          <button
+            type="button"
             style={{
               width: '32px',
               height: '32px',
               borderRadius: '50%',
-              background:
-                activePage === 'profile'
-                  ? 'var(--accent-primary)'
-                  : 'var(--surface-3)',
+              background: activePage === 'profile' ? 'var(--accent-primary)' : 'var(--surface-hover)',
               border: '1px solid var(--border-subtle)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontWeight: 600,
-              color:
-                activePage === 'profile'
-                  ? '#ffffff'
-                  : 'var(--text-primary)',
+              fontWeight: 700,
+              color: activePage === 'profile' ? '#ffffff' : 'var(--text-primary)',
               fontSize: '12px',
               cursor: 'pointer',
-              boxShadow: 'var(--shadow-sm)',
+              boxShadow: 'var(--shadow-xs)',
               transition: 'all var(--transition-fast)',
+              padding: 0,
             }}
             title={`${user?.email} - My Profile (ESS)`}
             onClick={() => dispatch(navigateToPage('profile'))}
@@ -278,43 +171,32 @@ export const AppRail: React.FC<{ onOpenCommandPalette: () => void }> = ({
             ) : (
               user?.email?.charAt(0).toUpperCase() || 'U'
             )}
-          </div>
+          </button>
 
-          {/* Pulsing Status Dot */}
+          {/* Status Presence Dot */}
           <span
             className={`status-dot ${isPunchedIn ? 'active' : ''}`}
             style={{
               position: 'absolute',
               bottom: '-1px',
               right: '-1px',
-              width: '8px',
-              height: '8px',
               border: '2px solid var(--surface-1)',
             }}
-            title={isPunchedIn ? 'Active Workday (Checked In)' : 'Away / Checked Out'}
+            title={isPunchedIn ? 'Active Workday (Punched In)' : 'Away / Punched Out'}
           />
         </div>
 
-        {/* Dedicated Sign Out Button */}
+        {/* Sign Out Button */}
         <button
-          className="btn-ghost"
-          style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: 'var(--radius-sm)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-dim)',
-            cursor: 'pointer',
-            padding: 0,
-          }}
+          type="button"
+          className="app-rail-btn"
+          style={{ width: '30px', height: '30px', color: 'var(--text-dim)' }}
           onClick={() => {
             if (confirm('Sign out from Humora?')) dispatch(logout());
           }}
-          title="Sign out from Humora"
+          title="Sign out"
         >
-          <LogOut size={13} />
+          <LogOut size={14} strokeWidth={1.8} />
         </button>
       </div>
     </aside>

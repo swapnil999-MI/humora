@@ -185,7 +185,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#ffffff',
+                color: 'var(--text-primary)',
                 boxShadow: '0 4px 12px rgba(79, 70, 229, 0.4)',
               }}
             >
@@ -193,7 +193,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#ffffff' }}>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
                   Run Automated Monthly Payroll
                 </h2>
                 <span
@@ -251,7 +251,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <Calendar size={18} color="#818cf8" />
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>Payroll Period:</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Payroll Period:</span>
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -260,7 +260,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                   background: 'var(--surface-0)',
                   border: '1px solid var(--border-subtle)',
                   borderRadius: '8px',
-                  color: '#ffffff',
+                  color: 'var(--text-primary)',
                   padding: '6px 12px',
                   fontSize: '13px',
                   cursor: 'pointer',
@@ -282,7 +282,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                   background: 'var(--surface-0)',
                   border: '1px solid var(--border-subtle)',
                   borderRadius: '8px',
-                  color: '#ffffff',
+                  color: 'var(--text-primary)',
                   padding: '6px 12px',
                   fontSize: '13px',
                   cursor: 'pointer',
@@ -347,7 +347,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                 <CheckCircle2 size={20} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
                   Payroll Run Successfully Executed & Locked!
                 </div>
                 <div style={{ fontSize: '12px', color: '#a7f3d0', marginTop: '2px' }}>
@@ -409,7 +409,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
                     Employees Included
                   </div>
-                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#ffffff', marginTop: '4px' }}>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }}>
                     {previewData.total_employees}
                   </div>
                 </div>
@@ -479,7 +479,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                     borderBottom: '1px solid var(--border-hairline)',
                     fontSize: '13px',
                     fontWeight: 600,
-                    color: '#ffffff',
+                    color: 'var(--text-primary)',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
@@ -512,7 +512,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                           key={emp.employee_id}
                           style={{
                             borderBottom: '1px solid var(--border-hairline)',
-                            color: '#ffffff',
+                            color: 'var(--text-primary)',
                           }}
                         >
                           <td style={{ padding: '12px 16px' }}>

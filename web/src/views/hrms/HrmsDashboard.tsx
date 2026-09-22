@@ -650,7 +650,7 @@ export const HrmsDashboard: React.FC = () => {
                   borderRadius: '6px',
                   textTransform: 'capitalize',
                   background: statusFilter === filter ? 'var(--surface-4)' : 'transparent',
-                  color: statusFilter === filter ? '#ffffff' : 'var(--text-muted)',
+                  color: statusFilter === filter ? 'var(--text-primary)' : 'var(--text-muted)',
                 }}
                 onClick={() => setStatusFilter(filter)}
               >

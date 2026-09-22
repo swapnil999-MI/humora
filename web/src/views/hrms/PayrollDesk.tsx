@@ -162,7 +162,7 @@ export const PayrollDesk: React.FC = () => {
     background: 'var(--surface-0)',
     border: '1px solid var(--border-subtle)',
     borderRadius: '8px',
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: '13px',
     fontFamily: 'inherit',
     outline: 'none',
@@ -229,7 +229,7 @@ export const PayrollDesk: React.FC = () => {
               fontWeight: 700,
               margin: '0 0 6px',
               letterSpacing: '-0.02em',
-              color: '#ffffff',
+              color: 'var(--text-primary)',
             }}
           >
             My Payroll & Compensation Hub
@@ -260,7 +260,7 @@ export const PayrollDesk: React.FC = () => {
               gap: '8px',
               background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%)',
               border: '1px solid rgba(99, 102, 241, 0.4)',
-              color: '#ffffff',
+              color: 'var(--text-primary)',
               boxShadow: '0 4px 14px rgba(0, 0, 0, 0.2)',
             }}
           >
@@ -329,7 +329,7 @@ export const PayrollDesk: React.FC = () => {
             </div>
           </div>
           <div style={{ marginTop: '12px' }}>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
               {formatINR(latestPayslip ? latestPayslip.net_pay : 128300)}
             </div>
             <div
@@ -381,7 +381,7 @@ export const PayrollDesk: React.FC = () => {
             </div>
           </div>
           <div style={{ marginTop: '12px' }}>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
               {formatINR(compensationStructure?.annual_ctc || 1800000)}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -422,7 +422,7 @@ export const PayrollDesk: React.FC = () => {
             </div>
           </div>
           <div style={{ marginTop: '12px' }}>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: '#ffffff', textTransform: 'capitalize' }}>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
               {declarationForm?.regime || 'new'} Regime
             </div>
             <div style={{ fontSize: '11px', color: '#22d3ee', marginTop: '4px', fontWeight: 500 }}>
@@ -463,7 +463,7 @@ export const PayrollDesk: React.FC = () => {
             </div>
           </div>
           <div style={{ marginTop: '12px' }}>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
               {formatINR(
                 reimbursementClaims
                   ?.filter((c) => c.status === 'approved' || c.status === 'reimbursed')
@@ -493,7 +493,7 @@ export const PayrollDesk: React.FC = () => {
             background: 'transparent',
             border: 'none',
             borderBottom: activeTab === 'payslips' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            color: activeTab === 'payslips' ? '#ffffff' : 'var(--text-muted)',
+            color: activeTab === 'payslips' ? 'var(--text-primary)' : 'var(--text-muted)',
             fontSize: '13px',
             fontWeight: 600,
             padding: '10px 16px',
@@ -514,7 +514,7 @@ export const PayrollDesk: React.FC = () => {
             background: 'transparent',
             border: 'none',
             borderBottom: activeTab === 'ctc' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            color: activeTab === 'ctc' ? '#ffffff' : 'var(--text-muted)',
+            color: activeTab === 'ctc' ? 'var(--text-primary)' : 'var(--text-muted)',
             fontSize: '13px',
             fontWeight: 600,
             padding: '10px 16px',
@@ -535,7 +535,7 @@ export const PayrollDesk: React.FC = () => {
             background: 'transparent',
             border: 'none',
             borderBottom: activeTab === 'it_declaration' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            color: activeTab === 'it_declaration' ? '#ffffff' : 'var(--text-muted)',
+            color: activeTab === 'it_declaration' ? 'var(--text-primary)' : 'var(--text-muted)',
             fontSize: '13px',
             fontWeight: 600,
             padding: '10px 16px',
@@ -556,7 +556,7 @@ export const PayrollDesk: React.FC = () => {
             background: 'transparent',
             border: 'none',
             borderBottom: activeTab === 'reimbursements' ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            color: activeTab === 'reimbursements' ? '#ffffff' : 'var(--text-muted)',
+            color: activeTab === 'reimbursements' ? 'var(--text-primary)' : 'var(--text-muted)',
             fontSize: '13px',
             fontWeight: 600,
             padding: '10px 16px',
@@ -576,7 +576,7 @@ export const PayrollDesk: React.FC = () => {
       {activeTab === 'payslips' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 4px', color: '#ffffff' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 4px', color: 'var(--text-primary)' }}>
               Monthly Payslip History
             </h2>
             <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -618,7 +618,7 @@ export const PayrollDesk: React.FC = () => {
                   </div>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
+                      <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
                         {ps.pay_period}
                       </h3>
                       <span
@@ -681,7 +681,7 @@ export const PayrollDesk: React.FC = () => {
                 >
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Net Pay</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
                       {formatINR(ps.net_pay)}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
@@ -739,7 +739,7 @@ export const PayrollDesk: React.FC = () => {
               gap: '12px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ffffff', fontWeight: 600, fontSize: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontWeight: 600, fontSize: '14px' }}>
               <Calculator size={16} color="#818cf8" />
               <span>How Humora Calculates Your Salary</span>
             </div>
@@ -777,7 +777,7 @@ export const PayrollDesk: React.FC = () => {
                 <div style={{ color: '#f87171', fontWeight: 600, marginBottom: '4px' }}>2. Biometric LOP Deduction</div>
                 <div style={{ color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                   Automatic calculation from check-ins:
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: '#ffffff', marginTop: '3px' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-primary)', marginTop: '3px' }}>
                     (Gross ÷ Month Calendar Days) × Absent Days
                   </div>
                 </div>
@@ -816,7 +816,7 @@ export const PayrollDesk: React.FC = () => {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 4px', color: '#ffffff' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 4px', color: 'var(--text-primary)' }}>
                 Cost to Company (CTC) Structure
               </h2>
               <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -857,37 +857,37 @@ export const PayrollDesk: React.FC = () => {
                   </td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 500 }}>Basic Salary</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Basic Salary</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>50% of Monthly Gross</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.basic || 75000)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.basic || 75000) * 12)}</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 500 }}>House Rent Allowance (HRA)</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>House Rent Allowance (HRA)</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>20% of Monthly Gross</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.hra || 30000)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.hra || 30000) * 12)}</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 500 }}>Conveyance Allowance</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Conveyance Allowance</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Standard Travel Exemption</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.conveyance || 3200)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.conveyance || 3200) * 12)}</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 500 }}>Medical Allowance</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Medical Allowance</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Medical Expense Allowance</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.medical_allowance || 2500)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.medical_allowance || 2500) * 12)}</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 500 }}>Special Allowance</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Special Allowance</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Flexible Gross Balancing</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.special_allowance || 39300)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.special_allowance || 39300) * 12)}</td>
                 </tr>
                 <tr style={{ background: 'var(--surface-2)', borderBottom: '2px solid var(--border-subtle)', fontWeight: 700 }}>
-                  <td style={{ padding: '12px 16px', color: '#ffffff' }}>Total Gross Earnings (A)</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>Total Gross Earnings (A)</td>
                   <td style={{ padding: '12px 16px' }}></td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: '#34d399', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.monthly_gross || 150000)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: '#34d399', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.monthly_gross || 150000) * 12)}</td>
@@ -900,25 +900,25 @@ export const PayrollDesk: React.FC = () => {
                   </td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 500 }}>Employer Provident Fund (PF)</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Employer Provident Fund (PF)</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>12% of Basic</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.employer_pf || 9000)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.employer_pf || 9000) * 12)}</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 500 }}>Employee Provident Fund (PF)</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Employee Provident Fund (PF)</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>12% of Basic</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.provident_fund || 9000)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.provident_fund || 9000) * 12)}</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 500 }}>Gratuity</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Gratuity</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>4.81% of Basic</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.gratuity || 3607)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.gratuity || 3607) * 12)}</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 500 }}>Professional Tax (PT)</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Professional Tax (PT)</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Statutory State Levy</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.professional_tax || 200)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.professional_tax || 200) * 12)}</td>
@@ -926,7 +926,7 @@ export const PayrollDesk: React.FC = () => {
 
                 {/* Net Take-Home Highlight */}
                 <tr style={{ background: 'rgba(99, 102, 241, 0.12)', borderTop: '2px solid rgba(99, 102, 241, 0.3)' }}>
-                  <td style={{ padding: '16px', color: '#ffffff', fontWeight: 700, fontSize: '13px' }}>
+                  <td style={{ padding: '16px', color: 'var(--text-primary)', fontWeight: 700, fontSize: '13px' }}>
                     Estimated Monthly Take-Home (Pre-TDS)
                   </td>
                   <td style={{ padding: '16px' }}></td>
@@ -961,7 +961,7 @@ export const PayrollDesk: React.FC = () => {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
               <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 4px', color: '#ffffff' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 4px', color: 'var(--text-primary)' }}>
                   Tax Regime Planner (FY {declarationForm.financial_year})
                 </h2>
                 <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -990,7 +990,7 @@ export const PayrollDesk: React.FC = () => {
                     border: 'none',
                     cursor: 'pointer',
                     background: declarationForm.regime === 'new' ? 'var(--accent-primary)' : 'transparent',
-                    color: declarationForm.regime === 'new' ? '#ffffff' : 'var(--text-muted)',
+                    color: declarationForm.regime === 'new' ? 'var(--text-primary)' : 'var(--text-muted)',
                     transition: 'all 0.15s ease',
                   }}
                 >
@@ -1007,7 +1007,7 @@ export const PayrollDesk: React.FC = () => {
                     border: 'none',
                     cursor: 'pointer',
                     background: declarationForm.regime === 'old' ? 'var(--accent-primary)' : 'transparent',
-                    color: declarationForm.regime === 'old' ? '#ffffff' : 'var(--text-muted)',
+                    color: declarationForm.regime === 'old' ? 'var(--text-primary)' : 'var(--text-muted)',
                     transition: 'all 0.15s ease',
                   }}
                 >
@@ -1033,7 +1033,7 @@ export const PayrollDesk: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <Sparkles size={20} color="#818cf8" />
                 <div>
-                  <div style={{ fontWeight: 600, color: '#ffffff', fontSize: '13px' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
                     Tax Optimizer Recommendation
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -1046,7 +1046,7 @@ export const PayrollDesk: React.FC = () => {
               <div style={{ display: 'flex', gap: '24px' }}>
                 <div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Forecasted Monthly TDS</div>
-                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', fontFamily: 'var(--font-mono)' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                     {formatINR(declarationForm.monthly_tds)}
                   </div>
                 </div>
@@ -1076,7 +1076,7 @@ export const PayrollDesk: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldCheck size={18} color="#34d399" />
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
                   Chapter VI-A Tax Deductions & Exemptions
                 </h3>
               </div>
@@ -1208,7 +1208,7 @@ export const PayrollDesk: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 4px', color: '#ffffff' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 4px', color: 'var(--text-primary)' }}>
                 Reimbursements & Flexible Benefit Plan (FBP)
               </h2>
               <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -1260,7 +1260,7 @@ export const PayrollDesk: React.FC = () => {
                   </div>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
+                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
                         {claim.category_name}
                       </h4>
                       <span
@@ -1374,7 +1374,7 @@ export const PayrollDesk: React.FC = () => {
                 background: 'var(--surface-1)',
               }}
             >
-              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
                 Submit Reimbursement Claim
               </h3>
               <button

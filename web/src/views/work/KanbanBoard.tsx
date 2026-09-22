@@ -125,9 +125,10 @@ export const KanbanBoard: React.FC = () => {
                 style={{
                   padding: '3px 8px',
                   fontSize: '11px',
-                  background: priorityFilter === p ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.04)',
-                  color: priorityFilter === p ? '#a5b4fc' : 'var(--text-muted)',
-                  border: priorityFilter === p ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid transparent',
+                  background: priorityFilter === p ? 'var(--accent-subtle)' : 'var(--surface-2)',
+                  color: priorityFilter === p ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  border: priorityFilter === p ? '1px solid var(--accent-primary)' : '1px solid var(--border-hairline)',
+                  fontWeight: priorityFilter === p ? 600 : 500,
                 }}
                 onClick={() => setPriorityFilter(p)}
               >
@@ -146,9 +147,10 @@ export const KanbanBoard: React.FC = () => {
                 style={{
                   padding: '3px 8px',
                   fontSize: '11px',
-                  background: typeFilter === t ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.04)',
-                  color: typeFilter === t ? '#a5b4fc' : 'var(--text-muted)',
-                  border: typeFilter === t ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid transparent',
+                  background: typeFilter === t ? 'var(--accent-subtle)' : 'var(--surface-2)',
+                  color: typeFilter === t ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  border: typeFilter === t ? '1px solid var(--accent-primary)' : '1px solid var(--border-hairline)',
+                  fontWeight: typeFilter === t ? 600 : 500,
                 }}
                 onClick={() => setTypeFilter(t)}
               >
@@ -237,7 +239,7 @@ const KanbanColumnComponent: React.FC<ColumnProps> = ({ column, isOnline }) => {
               fontSize: '11px',
               padding: '1px 6px',
               borderRadius: 'var(--radius-full)',
-              background: 'rgba(255, 255, 255, 0.06)',
+              background: 'var(--surface-hover)',
               color: 'var(--text-secondary)',
               fontWeight: 500,
             }}
@@ -349,7 +351,7 @@ const KanbanCardComponent: React.FC<{ issue: Issue; isOnline: boolean }> = ({ is
           style={{
             height: '2px',
             borderRadius: '9999px',
-            background: 'rgba(255, 255, 255, 0.08)',
+            background: 'var(--border-subtle)',
             marginBottom: '8px',
             overflow: 'hidden',
           }}
@@ -373,7 +375,7 @@ const KanbanCardComponent: React.FC<{ issue: Issue; isOnline: boolean }> = ({ is
           fontSize: '11px',
           color: 'var(--text-muted)',
           paddingTop: '8px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+          borderTop: '1px solid var(--border-hairline)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -383,8 +385,8 @@ const KanbanCardComponent: React.FC<{ issue: Issue; isOnline: boolean }> = ({ is
                 width: '18px',
                 height: '18px',
                 borderRadius: '50%',
-                background: 'rgba(99, 102, 241, 0.25)',
-                color: '#818cf8',
+                background: 'var(--accent-subtle)',
+                color: 'var(--accent-primary)',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',

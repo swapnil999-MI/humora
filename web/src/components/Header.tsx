@@ -4,16 +4,13 @@ import { setCreateIssueOpen } from '../store/uiSlice';
 import { recordPunch } from '../store/hrmsSlice';
 import {
   Kanban,
-  Users,
   Search,
   Plus,
   ChevronRight,
   ShieldCheck,
-  Clock,
   LogIn,
   LogOut,
   Compass,
-  Activity,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -76,10 +73,11 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 24px',
+        padding: '0 20px',
         zIndex: 40,
         flexShrink: 0,
         userSelect: 'none',
+        transition: 'background-color var(--transition-smooth), border-color var(--transition-smooth)',
       }}
     >
       {/* Left: Contextual Breadcrumb */}
@@ -87,7 +85,7 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
         {workspace === 'employee' ? (
           <>
             <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Compass size={14} />
+              <Compass size={14} strokeWidth={1.8} />
               Employee Space
             </span>
             <ChevronRight size={12} color="var(--text-dim)" />
@@ -106,7 +104,7 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
         ) : workspace === 'management' ? (
           <>
             <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ShieldCheck size={14} color="#818cf8" />
+              <ShieldCheck size={14} strokeWidth={1.8} color="var(--accent-primary)" />
               Management Console
             </span>
             <ChevronRight size={12} color="var(--text-dim)" />
@@ -131,12 +129,12 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
         ) : (
           <>
             <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Kanban size={14} />
+              <Kanban size={14} strokeWidth={1.8} />
               Agile Work
             </span>
             <ChevronRight size={12} color="var(--text-dim)" />
             <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
-              [{activeProject?.key || 'HUM'}] {activeProject?.name || 'Project'}
+              [{activeProject?.key || 'ACME'}] {activeProject?.name || 'Main Project'}
             </span>
             <ChevronRight size={12} color="var(--text-dim)" />
             <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
@@ -158,11 +156,11 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
           alignItems: 'center',
           gap: '8px',
           padding: '5px 12px',
-          background: 'var(--surface-3)',
+          background: 'var(--surface-2)',
           border: '1px solid var(--border-hairline)',
           borderRadius: 'var(--radius-sm)',
           cursor: 'pointer',
-          width: '280px',
+          width: '260px',
           justifyContent: 'space-between',
           color: 'var(--text-muted)',
           fontSize: '12px',
@@ -170,16 +168,16 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Search size={13} />
-          <span>Quick jump or action...</span>
+          <Search size={13} strokeWidth={1.8} />
+          <span>Quick search or action...</span>
         </div>
         <span
           style={{
             fontSize: '10px',
             padding: '1px 5px',
-            borderRadius: '4px',
-            background: 'rgba(255, 255, 255, 0.06)',
-            color: 'var(--text-dim)',
+            borderRadius: 'var(--radius-xs)',
+            background: 'var(--surface-hover)',
+            color: 'var(--text-secondary)',
             fontFamily: 'var(--font-mono)',
           }}
         >
@@ -188,7 +186,7 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
       </div>
 
       {/* Right: Workforce Clock Widget & Action Trigger */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         {/* Attendance Punch Mini Desk */}
         <div
           style={{
@@ -197,7 +195,7 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
             gap: '10px',
             padding: '4px 10px',
             borderRadius: 'var(--radius-sm)',
-            background: 'var(--surface-3)',
+            background: 'var(--surface-2)',
             border: '1px solid var(--border-hairline)',
           }}
         >
@@ -207,7 +205,7 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
               <path
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 fill="none"
-                stroke="rgba(255, 255, 255, 0.1)"
+                stroke="var(--border-subtle)"
                 strokeWidth="3.5"
               />
               <path
@@ -231,6 +229,7 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
           </div>
 
           <button
+            type="button"
             className={`btn btn-sm ${attendanceSummary?.punched_in ? 'btn-danger' : 'btn-success'}`}
             onClick={handlePunchToggle}
             disabled={isPunching}
@@ -240,12 +239,12 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
               '...'
             ) : attendanceSummary?.punched_in ? (
               <>
-                <LogOut size={12} />
+                <LogOut size={12} strokeWidth={2} />
                 Out
               </>
             ) : (
               <>
-                <LogIn size={12} />
+                <LogIn size={12} strokeWidth={2} />
                 In
               </>
             )}
@@ -254,21 +253,23 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
 
         {/* Theme Toggle Button */}
         <button
-          className="btn btn-ghost btn-sm"
+          type="button"
+          className="btn btn-secondary btn-sm"
           style={{ width: '32px', height: '32px', padding: 0 }}
           title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
           onClick={toggleTheme}
         >
-          {theme === 'dark' ? <Sun size={15} color="#fbbf24" /> : <Moon size={15} color="var(--text-muted)" />}
+          {theme === 'dark' ? <Sun size={15} color="#fbbf24" strokeWidth={2} /> : <Moon size={15} color="var(--text-secondary)" strokeWidth={2} />}
         </button>
 
         {/* New Issue Button in Work Mode */}
         {workspace === 'work' && (
           <button
+            type="button"
             className="btn btn-primary btn-sm"
             onClick={() => dispatch(setCreateIssueOpen(true))}
           >
-            <Plus size={13} />
+            <Plus size={13} strokeWidth={2} />
             Issue (C)
           </button>
         )}
@@ -276,3 +277,5 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
     </header>
   );
 };
+
+export default Header;
