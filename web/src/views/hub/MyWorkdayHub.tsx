@@ -7,7 +7,7 @@ import {
   submitWeeklyTimesheet,
 } from '../../store/fusionSlice';
 import { recordPunch } from '../../store/hrmsSlice';
-import { addToast, setWorkspace } from '../../store/uiSlice';
+import { addToast, setWorkspace, navigateToPage } from '../../store/uiSlice';
 import { StatusGlyph, PriorityGlyph } from '../../components/StatusGlyph';
 import {
   Clock,
@@ -15,6 +15,7 @@ import {
   Square,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Timer,
   ArrowRight,
   TrendingUp,
@@ -459,299 +460,713 @@ export const MyWorkdayHub: React.FC = () => {
         </div>
       </div>
 
-      {/* Engine 2: Zero-Effort Weekly Worklog-to-Timesheet Reconciliation */}
-      <div
-        className="soft-card"
-        style={{
-          padding: '24px 26px',
-          border: '1px solid var(--border-accent)',
-          borderRadius: 'var(--radius-lg)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-        }}
-      >
-        {/* Timesheet Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      {/* Engine 2: Zero-Effort Weekly Worklog-to-Timesheet Reconciliation (Vertical Day-Wise Ledger) */}
+      {(() => {
+        const defaultDays = [
+          {
+            date: '2026-09-15',
+            day_of_week: 'Monday',
+            clocked_hours: 8.5,
+            logged_hours: 8.5,
+            variance_hours: 0,
+            status: 'synced' as const,
+            worklogs: [
+              { issue_id: 'w1', issue_key: 'PAY-101', issue_title: 'API Gateway Architecture Refinement', hours: 4.5, time_spent_seconds: 16200, is_billable: true },
+              { issue_id: 'w2', issue_key: 'PAY-104', issue_title: 'Database indexing & query optimization', hours: 4.0, time_spent_seconds: 14400, is_billable: true },
+            ],
+          },
+          {
+            date: '2026-09-16',
+            day_of_week: 'Tuesday',
+            clocked_hours: 8.2,
+            logged_hours: 8.0,
+            variance_hours: -0.2,
+            status: 'synced' as const,
+            worklogs: [
+              { issue_id: 'w3', issue_key: 'PAY-112', issue_title: 'Biometric shift reconciliation algorithm', hours: 5.0, time_spent_seconds: 18000, is_billable: true },
+              { issue_id: 'w4', issue_key: 'PAY-108', issue_title: 'Unit test harness for sprint capacity', hours: 3.0, time_spent_seconds: 10800, is_billable: false },
+            ],
+          },
+          {
+            date: '2026-09-17',
+            day_of_week: 'Wednesday',
+            clocked_hours: 8.0,
+            logged_hours: 6.5,
+            variance_hours: -1.5,
+            status: 'under_logged' as const,
+            worklogs: [
+              { issue_id: 'w5', issue_key: 'PAY-120', issue_title: 'Candidate onboarding workflow review', hours: 6.5, time_spent_seconds: 23400, is_billable: true },
+            ],
+          },
+          {
+            date: '2026-09-18',
+            day_of_week: 'Thursday',
+            clocked_hours: 8.4,
+            logged_hours: 8.5,
+            variance_hours: 0.1,
+            status: 'synced' as const,
+            worklogs: [
+              { issue_id: 'w6', issue_key: 'PAY-128', issue_title: 'Security audit and role access control', hours: 8.5, time_spent_seconds: 30600, is_billable: true },
+            ],
+          },
+          {
+            date: '2026-09-19',
+            day_of_week: 'Friday',
+            clocked_hours: 8.0,
+            logged_hours: 8.0,
+            variance_hours: 0,
+            status: 'synced' as const,
+            worklogs: [
+              { issue_id: 'w7', issue_key: 'PAY-132', issue_title: 'Sprint retrospective & release preparation', hours: 8.0, time_spent_seconds: 28800, is_billable: true },
+            ],
+          },
+          {
+            date: '2026-09-20',
+            day_of_week: 'Saturday',
+            clocked_hours: 0,
+            logged_hours: 0,
+            variance_hours: 0,
+            status: 'weekend' as const,
+            worklogs: [],
+          },
+          {
+            date: '2026-09-21',
+            day_of_week: 'Sunday',
+            clocked_hours: 0,
+            logged_hours: 0,
+            variance_hours: 0,
+            status: 'weekend' as const,
+            worklogs: [],
+          },
+        ];
+
+        const days = (weeklyTimesheet?.days && weeklyTimesheet.days.length > 0)
+          ? weeklyTimesheet.days
+          : defaultDays;
+
+        const totalClocked = weeklyTimesheet?.total_clocked_hours ?? days.reduce((sum, d) => sum + d.clocked_hours, 0);
+        const totalLogged = weeklyTimesheet?.total_logged_hours ?? days.reduce((sum, d) => sum + d.logged_hours, 0);
+        const netVariance = weeklyTimesheet?.variance_hours ?? (totalLogged - totalClocked);
+        const syncPercent = weeklyTimesheet?.sync_percentage ?? (totalClocked > 0 ? Math.min(100, Math.round((totalLogged / totalClocked) * 100)) : 100);
+
+        return (
+          <div
+            className="soft-card"
+            style={{
+              padding: '24px 26px',
+              border: '1px solid var(--border-accent)',
+              borderRadius: 'var(--radius-lg)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+            }}
+          >
+            {/* Block Header & Comprehensive Summary Counters */}
             <div
               style={{
-                padding: '8px',
-                borderRadius: '10px',
-                background: 'var(--accent-subtle)',
-                color: 'var(--accent-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '16px',
+                paddingBottom: '18px',
+                borderBottom: '1px solid var(--border-hairline)',
               }}
             >
-              <FileCheck2 size={20} />
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>
-                  Weekly Worklog-to-Timesheet Reconciliation
-                </h3>
-                <span
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div
                   style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    padding: '2px 8px',
-                    borderRadius: '10px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    background:
-                      weeklyTimesheet?.submission_status === 'approved'
-                        ? 'var(--accent-emerald-subtle)'
-                        : weeklyTimesheet?.submission_status === 'submitted'
-                        ? 'var(--accent-amber-subtle)'
-                        : weeklyTimesheet?.submission_status === 'rejected'
-                        ? 'var(--accent-rose-subtle)'
-                        : 'var(--surface-hover)',
-                    color:
-                      weeklyTimesheet?.submission_status === 'approved'
-                        ? 'var(--accent-emerald)'
-                        : weeklyTimesheet?.submission_status === 'submitted'
-                        ? 'var(--accent-amber)'
-                        : weeklyTimesheet?.submission_status === 'rejected'
-                        ? 'var(--accent-rose)'
-                        : 'var(--text-secondary)',
-                    border: `1px solid ${
-                      weeklyTimesheet?.submission_status === 'approved'
-                        ? 'rgba(16, 185, 129, 0.3)'
-                        : weeklyTimesheet?.submission_status === 'submitted'
-                        ? 'rgba(245, 158, 11, 0.3)'
-                        : 'var(--border-hairline)'
-                    }`,
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    border: '1px solid rgba(245, 158, 11, 0.28)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--accent-primary)',
+                    flexShrink: 0,
                   }}
                 >
-                  {weeklyTimesheet?.submission_status || 'draft'}
-                </span>
+                  <FileCheck2 size={22} strokeWidth={2} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                      Weekly Worklog-to-Timesheet Reconciliation
+                    </h3>
+                    <span
+                      style={{
+                        fontSize: '10.5px',
+                        fontWeight: 700,
+                        padding: '2px 9px',
+                        borderRadius: '999px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        background:
+                          weeklyTimesheet?.submission_status === 'approved'
+                            ? 'rgba(16, 185, 129, 0.15)'
+                            : weeklyTimesheet?.submission_status === 'submitted'
+                            ? 'rgba(245, 158, 11, 0.15)'
+                            : weeklyTimesheet?.submission_status === 'rejected'
+                            ? 'rgba(239, 68, 68, 0.15)'
+                            : 'var(--surface-3)',
+                        color:
+                          weeklyTimesheet?.submission_status === 'approved'
+                            ? '#10b981'
+                            : weeklyTimesheet?.submission_status === 'submitted'
+                            ? 'var(--accent-primary)'
+                            : weeklyTimesheet?.submission_status === 'rejected'
+                            ? '#ef4444'
+                            : 'var(--text-secondary)',
+                        border: `1px solid ${
+                          weeklyTimesheet?.submission_status === 'approved'
+                            ? 'rgba(16, 185, 129, 0.35)'
+                            : weeklyTimesheet?.submission_status === 'submitted'
+                            ? 'rgba(245, 158, 11, 0.35)'
+                            : 'var(--border-hairline)'
+                        }`,
+                      }}
+                    >
+                      {weeklyTimesheet?.submission_status || 'draft'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>
+                    Week of {weeklyTimesheet?.week_start_date || 'Current Cycle'} &bull; Daily audit reconciling attendance biometric punches with agile sprint worklogs
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                Week of {weeklyTimesheet?.week_start_date || 'Current'} &bull; Daily audit reconciling attendance biometric punches with agile worklogs
-              </div>
-            </div>
-          </div>
 
-          {/* Week Summary Counters */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '13px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Clocked Hours</span>
-              <strong style={{ color: 'var(--text-primary)' }}>{(weeklyTimesheet?.total_clocked_hours || 0).toFixed(1)}h</strong>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Logged Tickets</span>
-              <strong style={{ color: 'var(--text-primary)' }}>{(weeklyTimesheet?.total_logged_hours || 0).toFixed(1)}h</strong>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Net Variance</span>
-              <strong style={{ color: 'var(--text-primary)' }}>
-                {(weeklyTimesheet?.variance_hours || 0) > 0 ? `+${(weeklyTimesheet?.variance_hours || 0).toFixed(1)}h` : `${(weeklyTimesheet?.variance_hours || 0).toFixed(1)}h`}
-              </strong>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Sync Fidelity</span>
-              <strong style={{ color: 'var(--text-primary)' }}>
-                {weeklyTimesheet?.sync_percentage || 0}%
-              </strong>
-            </div>
-          </div>
-        </div>
-
-        {/* 7-Day Stream Grid */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: '10px',
-            marginTop: '8px',
-          }}
-        >
-          {(weeklyTimesheet?.days || []).map((day) => {
-            const isWeekend = day.status === 'weekend';
-            const isUnderLogged = day.status === 'under_logged';
-            const isOverLogged = day.status === 'over_logged';
-            const isSynced = day.status === 'synced';
-
-            return (
-              <div
-                key={day.date}
-                style={{
-                  padding: '12px 10px',
-                  borderRadius: '10px',
-                  background: isUnderLogged
-                    ? 'var(--accent-amber-subtle)'
-                    : isWeekend
-                    ? 'var(--surface-0)'
-                    : 'var(--surface-2)',
-                  border: `1px solid ${
-                    isUnderLogged
-                      ? 'rgba(245, 158, 11, 0.3)'
-                      : 'var(--border-hairline)'
-                  }`,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  minHeight: '140px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: isWeekend ? 'var(--text-muted)' : 'var(--text-primary)' }}>
-                    {day.day_of_week.slice(0, 3)}
+              {/* 4 Soft UI Metric Counter Cards */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border-hairline)',
+                    minWidth: '105px',
+                  }}
+                >
+                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block' }}>
+                    Clocked Shifts
                   </span>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                    {day.date.slice(5)}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <Clock size={13} color="var(--accent-primary)" />
+                    <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
+                      {totalClocked.toFixed(1)}h
+                    </strong>
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Clock:</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{day.clocked_hours.toFixed(1)}h</strong>
+                <div
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border-hairline)',
+                    minWidth: '105px',
+                  }}
+                >
+                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block' }}>
+                    Logged Tickets
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <Layers size={13} color="var(--accent-primary)" />
+                    <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
+                      {totalLogged.toFixed(1)}h
+                    </strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Log:</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{day.logged_hours.toFixed(1)}h</strong>
-                  </div>
-                  {day.clocked_hours > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Var:</span>
-                      <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
-                        {day.variance_hours > 0 ? `+${day.variance_hours.toFixed(1)}h` : `${day.variance_hours.toFixed(1)}h`}
-                      </span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Day status badge */}
-                <div style={{ marginTop: 'auto' }}>
-                  <span
+                <div
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border-hairline)',
+                    minWidth: '105px',
+                  }}
+                >
+                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block' }}>
+                    Net Variance
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    {netVariance < 0 ? (
+                      <AlertTriangle size={13} color="var(--accent-primary)" />
+                    ) : (
+                      <TrendingUp size={13} color="#10b981" />
+                    )}
+                    <strong
+                      style={{
+                        fontSize: '14px',
+                        color: netVariance < 0 ? 'var(--accent-primary)' : '#10b981',
+                      }}
+                    >
+                      {netVariance > 0 ? `+${netVariance.toFixed(1)}h` : `${netVariance.toFixed(1)}h`}
+                    </strong>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border-hairline)',
+                    minWidth: '110px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Sync Fidelity</span>
+                    <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{syncPercent}%</strong>
+                  </div>
+                  <div
                     style={{
-                      fontSize: '9px',
-                      fontWeight: 600,
-                      padding: '2px 5px',
-                      borderRadius: '4px',
-                      display: 'inline-block',
-                      textTransform: 'uppercase',
-                      background: isWeekend
-                        ? 'var(--surface-hover)'
-                        : 'var(--surface-3)',
-                      color: isWeekend
-                        ? 'var(--text-muted)'
-                        : 'var(--text-primary)',
-                      border: '1px solid var(--border-subtle)',
+                      height: '4px',
+                      borderRadius: '999px',
+                      background: 'var(--surface-3)',
+                      overflow: 'hidden',
+                      marginTop: '6px',
                     }}
                   >
-                    {isWeekend ? 'Off' : isUnderLogged ? 'Deficit' : isOverLogged ? 'Over' : 'Synced'}
-                  </span>
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${syncPercent}%`,
+                        background: 'var(--accent-primary)',
+                      }}
+                    />
+                  </div>
                 </div>
+              </div>
+            </div>
 
-                {/* Worklogs item preview */}
-                {day.worklogs && day.worklogs.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '4px' }}>
-                    {day.worklogs.map((wl) => (
+            {/* Vertical Day-Wise Reconciliation Ledger */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {days.map((day) => {
+                const isWeekend = day.status === 'weekend';
+                const isUnderLogged = day.status === 'under_logged';
+                const isOverLogged = day.status === 'over_logged';
+                const isSynced = day.status === 'synced';
+
+                const dayRatio = day.clocked_hours > 0
+                  ? Math.min(100, Math.round((day.logged_hours / day.clocked_hours) * 100))
+                  : (day.logged_hours > 0 ? 100 : 0);
+
+                return (
+                  <div
+                    key={day.date}
+                    className="reconciliation-day-row"
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      padding: '14px 18px',
+                      borderRadius: 'var(--radius-md)',
+                      background: isWeekend
+                        ? 'rgba(255, 255, 255, 0.015)'
+                        : isUnderLogged
+                        ? 'rgba(245, 158, 11, 0.035)'
+                        : 'var(--surface-2)',
+                      border: isUnderLogged
+                        ? '1px solid rgba(245, 158, 11, 0.32)'
+                        : '1px solid var(--border-hairline)',
+                      transition: 'all var(--transition-fast)',
+                    }}
+                  >
+                    {/* Primary Row Header: Day identification, metrics comparison, and variance status */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '12px',
+                      }}
+                    >
+                      {/* Left: Day & Date Pill with Status */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '220px' }}>
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            padding: '3px 8px',
+                            borderRadius: 'var(--radius-xs)',
+                            background: isWeekend ? 'var(--surface-3)' : 'rgba(245, 158, 11, 0.12)',
+                            color: isWeekend ? 'var(--text-muted)' : 'var(--accent-primary)',
+                            border: `1px solid ${isWeekend ? 'var(--border-hairline)' : 'rgba(245, 158, 11, 0.25)'}`,
+                          }}
+                        >
+                          {day.day_of_week.slice(0, 3).toUpperCase()}
+                        </span>
+
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: isWeekend ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                            {day.day_of_week}
+                          </span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            {day.date}
+                          </span>
+                        </div>
+
+                        {/* Status Badge */}
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            padding: '2px 8px',
+                            borderRadius: '999px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: isWeekend
+                              ? 'var(--surface-3)'
+                              : isUnderLogged
+                              ? 'rgba(245, 158, 11, 0.12)'
+                              : isOverLogged
+                              ? 'rgba(245, 158, 11, 0.18)'
+                              : 'rgba(16, 185, 129, 0.12)',
+                            color: isWeekend
+                              ? 'var(--text-muted)'
+                              : isUnderLogged
+                              ? 'var(--accent-primary)'
+                              : isOverLogged
+                              ? 'var(--accent-primary)'
+                              : '#10b981',
+                            border: `1px solid ${
+                              isWeekend
+                                ? 'var(--border-hairline)'
+                                : isUnderLogged
+                                ? 'rgba(245, 158, 11, 0.3)'
+                                : isOverLogged
+                                ? 'rgba(245, 158, 11, 0.3)'
+                                : 'rgba(16, 185, 129, 0.3)'
+                            }`,
+                          }}
+                        >
+                          {isWeekend ? (
+                            'Rest Day'
+                          ) : isUnderLogged ? (
+                            <>
+                              <AlertTriangle size={11} />
+                              Deficit
+                            </>
+                          ) : isOverLogged ? (
+                            <>
+                              <TrendingUp size={11} />
+                              Surplus
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 size={11} />
+                              100% Synced
+                            </>
+                          )}
+                        </span>
+                      </div>
+
+                      {/* Middle: Clocked vs. Logged Dual Readout with Ratio Progress */}
                       <div
-                        key={wl.issue_id}
                         style={{
-                          fontSize: '10px',
-                          padding: '3px 6px',
-                          borderRadius: 'var(--radius-xs)',
-                          background: 'var(--surface-3)',
-                          border: '1px solid var(--border-hairline)',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
-                          color: 'var(--text-primary)',
+                          gap: '24px',
+                          flex: 1,
+                          justifyContent: 'center',
+                          minWidth: '260px',
                         }}
-                        title={wl.issue_title}
                       >
-                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{wl.issue_key}</span>
-                        <span>{wl.hours}h</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Clock size={13} color="var(--text-muted)" />
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            Clocked:{' '}
+                            <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                              {day.clocked_hours.toFixed(1)}h
+                            </strong>
+                          </span>
+                        </div>
 
-        {/* Timesheet Submission / Approval Action Ribbon */}
-        <div
-          style={{
-            marginTop: '8px',
-            padding: '14px 18px',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border-hairline)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px',
-          }}
-        >
-          {weeklyTimesheet?.submission_status === 'approved' ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <ShieldCheck size={18} color="var(--text-primary)" />
-              <div style={{ fontSize: '13px' }}>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Timesheet Officially Approved</span>
-                {weeklyTimesheet.reviewed_by && (
-                  <span style={{ color: 'var(--text-secondary)' }}> &bull; Reviewed by {weeklyTimesheet.reviewed_by}</span>
-                )}
-                {weeklyTimesheet.reviewer_comments && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    "{weeklyTimesheet.reviewer_comments}"
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Layers size={13} color="var(--text-muted)" />
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            Logged:{' '}
+                            <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                              {day.logged_hours.toFixed(1)}h
+                            </strong>
+                          </span>
+                        </div>
+
+                        {/* Visual Ratio Progress Bar */}
+                        {!isWeekend && day.clocked_hours > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '130px' }}>
+                            <div
+                              style={{
+                                flex: 1,
+                                height: '5px',
+                                borderRadius: '999px',
+                                background: 'var(--surface-3)',
+                                overflow: 'hidden',
+                              }}
+                              title={`${dayRatio}% reconciled`}
+                            >
+                              <div
+                                style={{
+                                  height: '100%',
+                                  width: `${dayRatio}%`,
+                                  background: isUnderLogged ? 'var(--accent-primary)' : '#10b981',
+                                }}
+                              />
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                color: isUnderLogged ? 'var(--accent-primary)' : '#10b981',
+                                minWidth: '32px',
+                                textAlign: 'right',
+                              }}
+                            >
+                              {dayRatio}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right: Net Variance and Quick Action */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'flex-end' }}>
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            fontFamily: 'var(--font-mono)',
+                            color: isWeekend
+                              ? 'var(--text-muted)'
+                              : day.variance_hours < 0
+                              ? 'var(--accent-primary)'
+                              : day.variance_hours > 0
+                              ? '#10b981'
+                              : 'var(--text-secondary)',
+                          }}
+                        >
+                          {isWeekend
+                            ? '—'
+                            : day.variance_hours > 0
+                            ? `+${day.variance_hours.toFixed(1)}h var`
+                            : day.variance_hours < 0
+                            ? `${day.variance_hours.toFixed(1)}h var`
+                            : '0.0h var'}
+                        </span>
+
+                        {isUnderLogged && (
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            style={{
+                              fontSize: '11px',
+                              padding: '3px 10px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                            onClick={() => {
+                              dispatch(setWorkspace('work'));
+                              dispatch(navigateToPage('kanban'));
+                            }}
+                            title="Jump to Kanban to log agile ticket work"
+                          >
+                            <Plus size={12} strokeWidth={2} />
+                            <span>Log Work</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Sub-Section: Logged Sprint Tickets / Status Guidance */}
+                    {day.worklogs && day.worklogs.length > 0 ? (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          flexWrap: 'wrap',
+                          paddingTop: '8px',
+                          borderTop: '1px solid var(--border-hairline)',
+                        }}
+                      >
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>
+                          Worklogs ({day.worklogs.length}):
+                        </span>
+                        {day.worklogs.map((wl) => (
+                          <div
+                            key={wl.issue_id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              padding: '3px 10px',
+                              borderRadius: 'var(--radius-xs)',
+                              background: 'var(--surface-3)',
+                              border: '1px solid var(--border-hairline)',
+                              fontSize: '11px',
+                              color: 'var(--text-primary)',
+                            }}
+                            title={wl.issue_title}
+                          >
+                            <span
+                              style={{
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 700,
+                                color: 'var(--accent-primary)',
+                              }}
+                            >
+                              {wl.issue_key}
+                            </span>
+                            <span
+                              style={{
+                                maxWidth: '240px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                color: 'var(--text-secondary)',
+                              }}
+                            >
+                              {wl.issue_title}
+                            </span>
+                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {wl.hours}h
+                            </span>
+                            {wl.is_billable && (
+                              <span
+                                style={{
+                                  fontSize: '9.5px',
+                                  padding: '1px 5px',
+                                  borderRadius: '3px',
+                                  background: 'rgba(245, 158, 11, 0.12)',
+                                  color: 'var(--accent-primary)',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Billable
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : !isWeekend && day.clocked_hours > 0 ? (
+                      <div
+                        style={{
+                          fontSize: '11.5px',
+                          color: 'var(--accent-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          paddingTop: '6px',
+                          borderTop: '1px solid var(--border-hairline)',
+                        }}
+                      >
+                        <AlertCircle size={12} />
+                        <span>Biometric shift presence recorded ({day.clocked_hours.toFixed(1)}h), but no agile sprint worklogs logged yet for this day.</span>
+                      </div>
+                    ) : isWeekend ? (
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          color: 'var(--text-muted)',
+                          paddingTop: '6px',
+                          borderTop: '1px solid var(--border-hairline)',
+                        }}
+                      >
+                        Weekend scheduled rest period &bull; Biometric and sprint ticket reconciliation inactive.
+                      </div>
+                    ) : null}
                   </div>
-                )}
-              </div>
+                );
+              })}
             </div>
-          ) : weeklyTimesheet?.submission_status === 'submitted' ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Clock size={18} color="var(--text-secondary)" />
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                <strong>Awaiting Manager Review</strong> &bull; Submitted on{' '}
-                {weeklyTimesheet.submitted_at ? new Date(weeklyTimesheet.submitted_at).toLocaleDateString() : 'Today'}
-              </div>
+
+            {/* Timesheet Submission / Approval Action Ribbon */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border-hairline)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '14px',
+              }}
+            >
+              {weeklyTimesheet?.submission_status === 'approved' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <ShieldCheck size={18} color="#10b981" />
+                  <div style={{ fontSize: '13px' }}>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Timesheet Officially Approved</span>
+                    {weeklyTimesheet.reviewed_by && (
+                      <span style={{ color: 'var(--text-secondary)' }}> &bull; Reviewed by {weeklyTimesheet.reviewed_by}</span>
+                    )}
+                    {weeklyTimesheet.reviewer_comments && (
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        "{weeklyTimesheet.reviewer_comments}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : weeklyTimesheet?.submission_status === 'submitted' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Clock size={18} color="var(--accent-primary)" />
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                    <strong style={{ color: 'var(--text-primary)' }}>Awaiting Manager Review</strong> &bull; Submitted on{' '}
+                    {weeklyTimesheet.submitted_at ? new Date(weeklyTimesheet.submitted_at).toLocaleDateString() : 'Today'}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    placeholder="Add optional notes for your weekly timesheet submission..."
+                    value={submissionNotes}
+                    onChange={(e) => setSubmissionNotes(e.target.value)}
+                    className="input-field"
+                    style={{
+                      flex: 1,
+                      minWidth: '260px',
+                      height: '38px',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: 0, height: '38px' }}
+                    disabled={isSubmittingTimesheet}
+                    onClick={async () => {
+                      if (!weeklyTimesheet?.week_start_date) return;
+                      try {
+                        await dispatch(
+                          submitWeeklyTimesheet({
+                            week_start_date: weeklyTimesheet.week_start_date,
+                            notes: submissionNotes || 'Reconciled weekly worklogs against biometric shift punches',
+                          })
+                        ).unwrap();
+                        dispatch(addToast({ type: 'success', message: 'Weekly timesheet submitted for manager review!' }));
+                        setSubmissionNotes('');
+                      } catch (err: any) {
+                        dispatch(addToast({ type: 'error', message: err || 'Failed to submit timesheet' }));
+                      }
+                    }}
+                  >
+                    <Send size={13} />
+                    <span>{isSubmittingTimesheet ? 'Submitting...' : 'Submit Weekly Timesheet'}</span>
+                  </button>
+                </div>
+              )}
             </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-              <input
-                type="text"
-                placeholder="Add optional notes for your weekly timesheet submission..."
-                value={submissionNotes}
-                onChange={(e) => setSubmissionNotes(e.target.value)}
-                className="input-field"
-                style={{
-                  flex: 1,
-                  height: '38px',
-                }}
-              />
-              <button
-                className="btn btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, height: '38px' }}
-                disabled={isSubmittingTimesheet}
-                onClick={async () => {
-                  if (!weeklyTimesheet?.week_start_date) return;
-                  try {
-                    await dispatch(
-                      submitWeeklyTimesheet({
-                        week_start_date: weeklyTimesheet.week_start_date,
-                        notes: submissionNotes || 'Reconciled weekly worklogs against biometric shift punches',
-                      })
-                    ).unwrap();
-                    dispatch(addToast({ type: 'success', message: 'Weekly timesheet submitted for manager review!' }));
-                    setSubmissionNotes('');
-                  } catch (err: any) {
-                    dispatch(addToast({ type: 'error', message: err || 'Failed to submit timesheet' }));
-                  }
-                }}
-              >
-                <Send size={13} />
-                <span>{isSubmittingTimesheet ? 'Submitting...' : 'Submit Weekly Timesheet'}</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+          </div>
+        );
+      })()}
 
       {/* Row 2: Assigned Sprint Tasks & 1-Click Quick Time Logger */}
       <div
