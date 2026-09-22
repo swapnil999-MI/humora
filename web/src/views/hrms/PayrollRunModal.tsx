@@ -508,7 +508,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                       </tr>
                     </thead>
                     <tbody>
-                      {previewData.employees.map((emp) => (
+                      {previewData.employees?.map((emp) => (
                         <tr
                           key={emp.employee_id}
                           style={{
