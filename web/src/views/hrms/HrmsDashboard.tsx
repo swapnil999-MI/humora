@@ -613,7 +613,7 @@ export const HrmsDashboard: React.FC = () => {
               Leave History & Applications
             </h3>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-              Track approval status and sandwich rule breakdown for all submitted requests.
+              Track approval status and details for all submitted requests.
             </p>
           </div>
 
@@ -679,11 +679,6 @@ export const HrmsDashboard: React.FC = () => {
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{leave.total_days}</span>
-                      {leave.sandwich_days_added > 0 && (
-                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '6px' }}>
-                          (+{leave.sandwich_days_added} sandwich)
-                        </span>
-                      )}
                     </td>
                     <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', maxWidth: '260px' }}>
                       {leave.reason || '-'}
@@ -840,22 +835,6 @@ export const HrmsDashboard: React.FC = () => {
                       {currentPreview.projected_balance} days
                     </span>
                   </div>
-
-                  {currentPreview.sandwich_rule_active && (
-                    <div
-                      style={{
-                        background: 'var(--surface-3)',
-                        color: 'var(--text-secondary)',
-                        border: '1px solid var(--border-subtle)',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        marginTop: '4px',
-                      }}
-                    >
-                      Sandwich rule detected: intervening weekend/holidays ({currentPreview.sandwich_days_added}d) count as leave.
-                    </div>
-                  )}
                 </div>
               )}
 

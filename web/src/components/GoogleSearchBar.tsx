@@ -194,7 +194,7 @@ export const GoogleSearchBar: React.FC = () => {
       id: 'page-leaves',
       category: 'pages',
       title: 'Leaves & Absence Planner',
-      subtitle: 'Apply for leave, sandwich policies & quotas',
+      subtitle: 'Apply for leave, absence balances & quotas',
       badge: 'ESS Page',
       icon: <Calendar size={15} color="var(--accent-primary)" />,
       action: () => {
