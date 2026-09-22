@@ -142,7 +142,7 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
     category: 'Navigation',
     title: 'Go to My Payroll & Payslips (Zoho Payroll)',
     subtitle: 'Monthly salary slips, CTC structure, IT declarations & FBP claims',
-    icon: <CreditCard size={16} color="#6366f1" />,
+    icon: <CreditCard size={16} color="var(--accent-primary)" />,
     action: () => {
       dispatch(navigateToPage('payroll'));
       onClose();

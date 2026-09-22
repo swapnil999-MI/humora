@@ -808,7 +808,7 @@ export const CompanySettingsDesk: React.FC = () => {
                       width: '40px',
                       height: '40px',
                       borderRadius: '6px',
-                      background: '#4f46e5',
+                      background: 'var(--accent-primary)',
                       overflow: 'hidden',
                       display: 'flex',
                       alignItems: 'center',

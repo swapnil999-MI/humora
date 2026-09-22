@@ -181,12 +181,12 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                 width: '42px',
                 height: '42px',
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                background: 'var(--accent-gradient)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'var(--text-primary)',
-                boxShadow: '0 4px 12px rgba(79, 70, 229, 0.4)',
+                color: '#ffffff',
+                boxShadow: '0 4px 12px var(--accent-ring)',
               }}
             >
               <Sparkles size={22} />
@@ -631,8 +631,8 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
-                background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
+                background: 'var(--accent-gradient)',
+                boxShadow: '0 4px 14px var(--accent-ring)',
               }}
             >
               {isExecuting ? (

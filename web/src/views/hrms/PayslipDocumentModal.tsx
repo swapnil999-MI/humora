@@ -202,7 +202,7 @@ export const PayslipDocumentModal: React.FC<PayslipDocumentModalProps> = ({
                     width: '64px',
                     height: '64px',
                     borderRadius: '10px',
-                    background: '#4f46e5',
+                    background: 'var(--accent-primary)',
                     color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',

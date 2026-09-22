@@ -559,7 +559,7 @@ export const TeamCapacityDesk: React.FC = () => {
                             style={{
                               height: '100%',
                               width: `${loadPercent}%`,
-                              background: isOverloaded ? '#ef4444' : '#6366f1',
+                              background: isOverloaded ? '#ef4444' : 'var(--accent-primary)',
                               borderRadius: '3px',
                             }}
                           />
@@ -933,7 +933,7 @@ export const TeamCapacityDesk: React.FC = () => {
                           style={{
                             height: '100%',
                             width: `${Math.min(100, epic.budget_burn_pct)}%`,
-                            background: epic.is_over_budget ? '#ef4444' : 'linear-gradient(90deg, #6366f1, #10b981)',
+                            background: epic.is_over_budget ? '#ef4444' : 'var(--accent-gradient)',
                           }}
                         />
                       </div>

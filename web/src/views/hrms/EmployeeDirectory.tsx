@@ -436,7 +436,7 @@ export const EmployeeDirectory: React.FC = () => {
 
                 <label
                   style={{
-                    background: '#3b82f6',
+                    background: 'var(--accent-primary)',
                     color: '#ffffff',
                     padding: '8px 16px',
                     borderRadius: '6px',
@@ -574,7 +574,7 @@ export const EmployeeDirectory: React.FC = () => {
                   }
                 }}
                 style={{
-                  background: enrollImages.length === 0 ? '#4b5563' : '#6366f1',
+                  background: enrollImages.length === 0 ? '#4b5563' : 'var(--accent-primary)',
                   border: 'none',
                   borderRadius: '6px',
                   padding: '8px 18px',

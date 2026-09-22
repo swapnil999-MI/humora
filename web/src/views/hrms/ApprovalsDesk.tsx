@@ -253,7 +253,7 @@ export const ApprovalsDesk: React.FC = () => {
           {pendingRegularizations.length > 0 && (
             <span
               style={{
-                background: '#6366f1',
+                background: 'var(--accent-primary)',
                 color: '#fff',
                 padding: '1px 6px',
                 borderRadius: '10px',

@@ -248,7 +248,7 @@ export const TeamRadarDesk: React.FC = () => {
                           : member.presence_status === 'on_break'
                           ? '#f59e0b'
                           : member.presence_status === 'on_leave'
-                          ? '#3b82f6'
+                          ? 'var(--text-muted)'
                           : '#ef4444',
                     }}
                   />
