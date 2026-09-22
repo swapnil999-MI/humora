@@ -331,13 +331,13 @@ export const SubNavPane: React.FC = () => {
                 className="btn btn-ghost btn-sm"
                 style={{ padding: '2px 6px', height: 'auto' }}
                 onClick={() => setCreateChannelModalOpen(true)}
-                title="Create Channel"
+                title="Create Group"
               >
                 <Plus size={13} strokeWidth={2} />
               </button>
             </div>
 
-            {/* Channels List */}
+            {/* Groups List */}
             <div style={{ marginBottom: '14px' }}>
               <div
                 style={{
@@ -349,7 +349,7 @@ export const SubNavPane: React.FC = () => {
                   padding: '4px 8px',
                 }}
               >
-                Channels
+                Groups
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {channels.map((c) => (
@@ -463,7 +463,7 @@ export const SubNavPane: React.FC = () => {
             onClick={() => setCreateChannelModalOpen(true)}
           >
             <Plus size={13} strokeWidth={2} />
-            <span>New Channel</span>
+            <span>New Group</span>
           </button>
         ) : (
           <button

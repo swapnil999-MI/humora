@@ -154,11 +154,11 @@ High-precision compensation and statutory benefits hub:
 Enterprise real-time team communication and sprint collaboration hub:
 - **Workspace Navigation & Roaming**:
   - Direct 4th domain on persistent App Rail (`Alt+3` or `<MessageSquare />` icon) with dynamic golden unread dot indicator.
-  - Sub-navigation drawer with itemized channels list, direct messages list, online/away presence badges, and a 1-click `+ New Channel` modal trigger.
-- **Group Channels & 1:1 Direct Messages**:
-  - Preloaded public & private squad channels (`#general`, `#engineering`, `#product-design`, `#sprint-war-room`).
+  - Sub-navigation drawer with itemized groups list, direct messages list, online/away presence badges, and a 1-click `+ New Group` modal trigger.
+- **Team Groups & 1:1 Direct Messages**:
+  - Preloaded public & private team groups (`#general`, `#engineering`, `#product-design`, `#sprint-war-room`).
   - 1:1 direct messaging threads with engineering and management peers (Sarah Jenkins, Alex Rivera, Priya Sharma, Rohan Deshmukh).
-  - Search filtering across active channels and team conversations.
+  - Search filtering across active groups and team conversations.
 - **Interactive Task Tagging & Sprint Mentioning**:
   - Message composer includes a dedicated `# Mention Task` button opening a modal loaded with manager-assigned sprint tasks.
   - Embedded ticket cards display ticket key (e.g., `PAY-101`), title, manager assignment attribution, status tag, and priority pill.

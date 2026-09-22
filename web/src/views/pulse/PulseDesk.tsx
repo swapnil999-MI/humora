@@ -212,7 +212,7 @@ export const PulseDesk: React.FC = () => {
     setNewChannelName('');
     setNewChannelTopic('');
     setIsNewChannelPrivate(false);
-    addToast({ type: 'success', message: `Created channel #${newChannelName}.` });
+    addToast({ type: 'success', message: `Created group #${newChannelName}.` });
   };
 
   // Inspect task in IssueDrawer
@@ -306,7 +306,7 @@ export const PulseDesk: React.FC = () => {
           <button
             onClick={() => setCreateChannelModalOpen(true)}
             className="btn btn-ghost"
-            title="Create New Channel"
+            title="Create New Group"
             style={{ padding: '6px 8px', borderRadius: '6px' }}
           >
             <Plus size={16} color="var(--accent-primary)" />
@@ -329,7 +329,7 @@ export const PulseDesk: React.FC = () => {
             <Search size={14} color="var(--text-muted)" />
             <input
               type="text"
-              placeholder="Filter channels or people..."
+              placeholder="Filter groups or people..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -354,7 +354,7 @@ export const PulseDesk: React.FC = () => {
 
         {/* Channels & DMs Scrollable Lists */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Section: Channels */}
+          {/* Section: Groups */}
           <div>
             <div
               style={{
@@ -369,7 +369,7 @@ export const PulseDesk: React.FC = () => {
                 color: 'var(--text-muted)',
               }}
             >
-              <span>Channels ({filteredChannels.length})</span>
+              <span>Groups ({filteredChannels.length})</span>
               <button
                 onClick={() => setCreateChannelModalOpen(true)}
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '11px', padding: 0 }}
@@ -584,7 +584,7 @@ export const PulseDesk: React.FC = () => {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <h1 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                      {activeChannel?.name || 'Channel'}
+                      {activeChannel?.name || 'Group'}
                     </h1>
                     <span
                       style={{
@@ -1381,7 +1381,7 @@ export const PulseDesk: React.FC = () => {
               }}
             >
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Create Team Pulse Channel
+                Create Team Pulse Group
               </h3>
               <button
                 onClick={() => setCreateChannelModalOpen(false)}
@@ -1394,7 +1394,7 @@ export const PulseDesk: React.FC = () => {
             <form onSubmit={handleCreateChannelSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Channel Name *
+                  Group Name *
                 </label>
                 <div
                   style={{
@@ -1432,7 +1432,7 @@ export const PulseDesk: React.FC = () => {
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="What is this channel about?"
+                  placeholder="What is this group about?"
                   value={newChannelTopic}
                   onChange={(e) => setNewChannelTopic(e.target.value)}
                   style={{
@@ -1458,7 +1458,7 @@ export const PulseDesk: React.FC = () => {
                   style={{ accentColor: 'var(--accent-primary)', width: '16px', height: '16px' }}
                 />
                 <label htmlFor="isPrivateCheck" style={{ fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                  Make this channel private (invitation only)
+                  Make this group private (invitation only)
                 </label>
               </div>
 
@@ -1476,7 +1476,7 @@ export const PulseDesk: React.FC = () => {
                   className="btn btn-primary"
                   style={{ padding: '7px 18px', fontSize: '12px', fontWeight: 600 }}
                 >
-                  Create Channel
+                  Create Group
                 </button>
               </div>
             </form>
