@@ -1616,7 +1616,9 @@ export const PulseDesk: React.FC = () => {
                   flexDirection: 'column',
                   alignSelf: isMe ? 'flex-end' : 'flex-start',
                   maxWidth: '68%',
-                  margin: '3px 0',
+                  margin: '4px 0',
+                  marginRight: isMe ? '8px' : '0',
+                  marginLeft: !isMe ? '8px' : '0',
                 }}
               >
                 {/* Floating Micro Hover Reactions Pill */}
@@ -1679,6 +1681,36 @@ export const PulseDesk: React.FC = () => {
                     position: 'relative',
                   }}
                 >
+                  {/* WhatsApp Top Triangular Corner Notch / Tail with continuous border */}
+                  {isMe ? (
+                    <span className="whatsapp-tail-out" aria-hidden="true">
+                      <svg viewBox="-1 0 9 13" width="9" height="13" style={{ display: 'block', overflow: 'visible' }}>
+                        <path
+                          className="tail-fill"
+                          d="M -1 0 H 5.188 C 6.958 0 7.526 1.156 6.467 2.568 L 0 11.193 L -1 11.193 Z"
+                        />
+                        <path
+                          className="tail-stroke"
+                          fill="none"
+                          d="M -1 0.5 H 5.188 C 6.958 0.5 7.526 1.156 6.467 2.568 L 0 11.193"
+                        />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span className="whatsapp-tail-in" aria-hidden="true">
+                      <svg viewBox="0 0 9 13" width="9" height="13" style={{ display: 'block', overflow: 'visible' }}>
+                        <path
+                          className="tail-fill"
+                          d="M 9 0 H 2.812 C 1.042 0 0.474 1.156 1.533 2.568 L 8 11.193 L 9 11.193 Z"
+                        />
+                        <path
+                          className="tail-stroke"
+                          fill="none"
+                          d="M 9 0.5 H 2.812 C 1.042 0.5 0.474 1.156 1.533 2.568 L 8 11.193"
+                        />
+                      </svg>
+                    </span>
+                  )}
                   {/* Sender Name in Group Chats for incoming messages */}
                   {!isMe && activeType === 'channel' && (
                     <div
