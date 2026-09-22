@@ -360,7 +360,7 @@ export const SubNavPane: React.FC = () => {
       </div>
 
       {/* Bottom Quick Action */}
-      <div style={{ paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+      <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-hairline)' }}>
         {workspace === 'employee' ? (
           <button
             className="btn btn-secondary btn-sm"

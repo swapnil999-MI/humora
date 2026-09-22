@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/store';
 import { setCreateIssueOpen } from '../store/uiSlice';
 import { recordPunch } from '../store/hrmsSlice';
@@ -14,6 +14,8 @@ import {
   LogOut,
   Compass,
   Activity,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
@@ -23,6 +25,19 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
   const { workspace, activePage } = useAppSelector((state) => state.ui);
   const { attendanceSummary, isPunching } = useAppSelector((state) => state.hrms);
   const { activeProject } = useAppSelector((state) => state.work);
+
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('humora_theme') as 'dark' | 'light') || 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('humora_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   const handlePunchToggle = () => {
     const isCurrentlyIn = attendanceSummary?.punched_in;
@@ -55,7 +70,7 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
   return (
     <header
       style={{
-        height: '48px',
+        height: '52px',
         background: 'var(--surface-1)',
         borderBottom: '1px solid var(--border-hairline)',
         display: 'flex',
@@ -236,6 +251,16 @@ export const Header: React.FC<{ onOpenCommandPalette: () => void }> = ({
             )}
           </button>
         </div>
+
+        {/* Theme Toggle Button */}
+        <button
+          className="btn btn-ghost btn-sm"
+          style={{ width: '32px', height: '32px', padding: 0 }}
+          title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+          onClick={toggleTheme}
+        >
+          {theme === 'dark' ? <Sun size={15} color="#fbbf24" /> : <Moon size={15} color="var(--text-muted)" />}
+        </button>
 
         {/* New Issue Button in Work Mode */}
         {workspace === 'work' && (
