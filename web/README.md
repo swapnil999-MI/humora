@@ -162,7 +162,19 @@ Enterprise real-time team communication and sprint collaboration hub:
 - **Interactive Task Tagging & Sprint Mentioning**:
   - Message composer includes a dedicated `# Mention Task` button opening a modal loaded with manager-assigned sprint tasks.
   - Embedded ticket cards display ticket key (e.g., `PAY-101`), title, manager assignment attribution, status tag, and priority pill.
+  - **1-Click Quick Worklog**: Click `+ Quick Log 30m` directly on the embedded ticket card to immediately log time and synchronize timesheet reconciliation.
   - **1-Click Deep Inspection**: Clicking "Inspect Task" directly opens the PeopleOS `IssueDrawer` slide-over with worklog logging presets, story points, and sprint comments.
+- **🎙️ Live Voice Huddles**:
+  - 1-Click "Start Huddle" button with live animated audio frequency wave bars (`.huddle-wave-bar`).
+  - Active huddle participant bar with glowing rings, mute/unmute microphone toggle, and spatial audio session indicators.
+- **Interactive Audio Voice Notes & Waveform Player**:
+  - Supports audio voice notes with animated 24-frequency bar waveforms, play/pause controls (`▶ / ⏸`), live playback timers, and speech-to-text transcriptions.
+  - Quick `Voice Memo` recorder shortcut directly in the composer.
+- **💬 Thread Discussion Slide-Over Drawer**:
+  - Click `X replies` or hover action `Reply in thread` to open a dedicated right slide-over drawer for deep, focused side discussions without cluttering the group stream.
+- **⚡ Floating Quick-Actions & Slash Commands**:
+  - Message hover toolbar: Instant emoji reactions (`👍`, `🔥`, `🚀`), `Reply in thread`, `Bookmark / Star ⭐`, `Pin 📌`, and `Copy text`.
+  - Slash command autocomplete menu triggered by typing `/` (`/task`, `/huddle`, `/standup`, `/kudos`).
 - **File & Media Sharing**:
   - Native file picker attachment trigger (`📎 Attach`).
   - Visual image thumbnail rendering with dimensions, file size, and lightbox click.
