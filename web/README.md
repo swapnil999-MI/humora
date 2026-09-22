@@ -24,7 +24,8 @@
    - [2. Agile Project Management & Sprints (`#work`)](#2-agile-project-management--sprints-work)
    - [3. HRMS Core & Workforce Administration (`#hrms`)](#3-hrms-core--workforce-administration-hrms)
    - [4. My Payrolls & Payslips Desk (`#payroll`)](#4-my-payrolls--payslips-desk-payroll)
-   - [5. Universal Search & Ergonomics](#5-universal-search--ergonomics)
+   - [5. Team Pulse Collaboration & Chat (`#pulse`)](#5-team-pulse-collaboration--chat-pulse)
+   - [6. Universal Search & Ergonomics](#6-universal-search--ergonomics)
 5. [Keyboard Navigation & Shortcuts (`?`)](#-keyboard-navigation--shortcuts-)
 6. [Folder & Directory Structure](#-folder--directory-structure)
 7. [API Integration & State Management](#-api-integration--state-management)
@@ -149,7 +150,29 @@ High-precision compensation and statutory benefits hub:
 
 ---
 
-### 5. Universal Search & Ergonomics
+### 5. Team Pulse Collaboration & Chat (`#pulse`)
+Enterprise real-time team communication and sprint collaboration hub:
+- **Workspace Navigation & Roaming**:
+  - Direct 4th domain on persistent App Rail (`Alt+3` or `<MessageSquare />` icon) with dynamic golden unread dot indicator.
+  - Sub-navigation drawer with itemized channels list, direct messages list, online/away presence badges, and a 1-click `+ New Channel` modal trigger.
+- **Group Channels & 1:1 Direct Messages**:
+  - Preloaded public & private squad channels (`#general`, `#engineering`, `#product-design`, `#sprint-war-room`).
+  - 1:1 direct messaging threads with engineering and management peers (Sarah Jenkins, Alex Rivera, Priya Sharma, Rohan Deshmukh).
+  - Search filtering across active channels and team conversations.
+- **Interactive Task Tagging & Sprint Mentioning**:
+  - Message composer includes a dedicated `# Mention Task` button opening a modal loaded with manager-assigned sprint tasks.
+  - Embedded ticket cards display ticket key (e.g., `PAY-101`), title, manager assignment attribution, status tag, and priority pill.
+  - **1-Click Deep Inspection**: Clicking "Inspect Task" directly opens the PeopleOS `IssueDrawer` slide-over with worklog logging presets, story points, and sprint comments.
+- **File & Media Sharing**:
+  - Native file picker attachment trigger (`📎 Attach`).
+  - Visual image thumbnail rendering with dimensions, file size, and lightbox click.
+  - Document & PDF cards with download triggers and extension indicators.
+- **Interactive Emoji Reactions**:
+  - Instant one-click reactions (👍, ❤️, 🚀, 👀, 🔥) with active user highlighting and toggle counters.
+
+---
+
+### 6. Universal Search & Ergonomics
 - **Google Search Bar**:
   - Universal search modal accessible from header or `Cmd+K`.
   - **Substring Highlighting**: Automatically highlights matched keywords in real-time (`<mark className="search-highlight">`).

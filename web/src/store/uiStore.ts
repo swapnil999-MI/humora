@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type WorkspaceType = 'employee' | 'management' | 'work';
+export type WorkspaceType = 'employee' | 'management' | 'work' | 'pulse';
 export type HrmsTab =
   | 'dashboard'
   | 'directory'
@@ -33,7 +33,9 @@ export type PageId =
   // Agile Work Space
   | 'kanban'
   | 'list'
-  | 'backlog';
+  | 'backlog'
+  // Team Pulse Collaboration Space
+  | 'pulse';
 
 export interface ToastMessage {
   id: string;
@@ -217,6 +219,11 @@ export const useUiStore = create<UiState>((set) => ({
           workspace = 'work';
           workTab = 'backlog';
           break;
+
+        // Team Pulse
+        case 'pulse':
+          workspace = 'pulse';
+          break;
       }
       return { activePage: page, workspace, hrmsTab, workTab, viewMode };
     });
@@ -236,6 +243,8 @@ export const useUiStore = create<UiState>((set) => ({
             : state.viewMode === 'list'
             ? 'list'
             : 'kanban';
+      } else if (workspace === 'pulse') {
+        activePage = 'pulse';
       }
       if (state.workspace === workspace && state.activePage === activePage) return state;
       syncHash(activePage);

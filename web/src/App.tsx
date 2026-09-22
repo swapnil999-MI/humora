@@ -59,6 +59,7 @@ export const App: React.FC = () => {
         'kanban',
         'list',
         'backlog',
+        'pulse',
       ];
       if (validPages.includes(rawHash as PageId)) {
         dispatch(navigateToPage(rawHash as PageId));
@@ -80,7 +81,7 @@ export const App: React.FC = () => {
     }
   }, [dispatch, isAuthenticated]);
 
-  // Global Keyboard Navigation (Cmd+K, Cmd+\, Alt+0, Alt+1, Alt+2, C)
+  // Global Keyboard Navigation (Cmd+K, Cmd+\, Alt+0, Alt+1, Alt+2, Alt+3, C)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Focus Header Google Search Bar with Cmd+K or Ctrl+K
@@ -112,6 +113,9 @@ export const App: React.FC = () => {
       } else if (e.altKey && e.key === '2') {
         e.preventDefault();
         dispatch(setWorkspace('work'));
+      } else if (e.altKey && e.key === '3') {
+        e.preventDefault();
+        dispatch(setWorkspace('pulse'));
       } else if (e.key.toLowerCase() === 'c' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         dispatch(setCreateIssueOpen(true));

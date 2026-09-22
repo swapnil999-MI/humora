@@ -15,6 +15,7 @@ import { CompanySettingsPage } from './hrms/CompanySettingsPage';
 import { KanbanPage } from './work/KanbanPage';
 import { ListPage } from './work/ListPage';
 import { BacklogPage } from './work/BacklogPage';
+import { PulsePage } from './pulse/PulsePage';
 
 interface PageRouterProps {
   onOpenCandidateWizard?: (token: string) => void;
@@ -59,6 +60,10 @@ export const PageRouter: React.FC<PageRouterProps> = ({ onOpenCandidateWizard })
       return <ListPage />;
     case 'backlog':
       return <BacklogPage />;
+
+    // Team Pulse Collaboration
+    case 'pulse':
+      return <PulsePage />;
 
     default:
       return <HubPage />;

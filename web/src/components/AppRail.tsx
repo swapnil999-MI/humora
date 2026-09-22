@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../store/store';
+import { useAppDispatch, useAppSelector, usePulseStore } from '../store/store';
 import { navigateToPage, setWorkspace, toggleSidebar } from '../store/uiSlice';
 import { logout } from '../store/authSlice';
 import { PeopleOSLogo } from './PeopleOSLogo';
@@ -14,6 +14,7 @@ import {
   Building2,
   User,
   Clock,
+  MessageSquare,
 } from 'lucide-react';
 
 export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
@@ -45,6 +46,11 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
   const pendingApprovalsCount =
     (companyLeaves || []).filter((l) => l.status === 'pending').length +
     (teamRegularizations || []).filter((r) => r.status === 'pending').length;
+
+  const { channels, directMessages } = usePulseStore();
+  const pulseUnreadCount =
+    (channels || []).reduce((sum, c) => sum + (c.unreadCount || 0), 0) +
+    (directMessages || []).reduce((sum, d) => sum + (d.unreadCount || 0), 0);
 
   return (
     <aside className="app-rail">
@@ -124,6 +130,36 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
             title="Agile Projects & Sprints (Alt+2)"
           >
             <Kanban size={19} strokeWidth={1.8} />
+          </button>
+        </div>
+
+        {/* Domain 4: Team Pulse (Chat, Channels, Mentions) */}
+        <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
+          {workspace === 'pulse' && <div className="app-rail-indicator" />}
+          <button
+            type="button"
+            className={`app-rail-btn ${workspace === 'pulse' ? 'active' : ''}`}
+            onClick={() => {
+              dispatch(setWorkspace('pulse'));
+              dispatch(navigateToPage('pulse'));
+            }}
+            title="Team Pulse - Real-time Chat & Mentions (Alt+3)"
+          >
+            <MessageSquare size={19} strokeWidth={1.8} />
+            {pulseUnreadCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '6px',
+                  right: '6px',
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: 'var(--accent-primary)',
+                  boxShadow: '0 0 6px rgba(245, 158, 11, 0.6)',
+                }}
+              />
+            )}
           </button>
         </div>
 
