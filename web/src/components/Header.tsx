@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/store';
-import { setCreateIssueOpen, navigateToPage } from '../store/uiSlice';
+import { setCreateIssueOpen, navigateToPage, toggleNotificationDrawer } from '../store/uiSlice';
 import { recordPunch } from '../store/hrmsSlice';
 import { GoogleSearchBar } from './GoogleSearchBar';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
@@ -16,11 +16,12 @@ import {
   Sun,
   Moon,
   HelpCircle,
+  Bell,
 } from 'lucide-react';
 
 export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
   const dispatch = useAppDispatch();
-  const { workspace, activePage } = useAppSelector((state) => state.ui);
+  const { workspace, activePage, isNotificationDrawerOpen, notifications } = useAppSelector((state) => state.ui);
   const { attendanceSummary, isPunching } = useAppSelector((state) => state.hrms);
   const { activeProject } = useAppSelector((state) => state.work);
 
@@ -287,6 +288,59 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
             )}
           </button>
         </div>
+
+        {/* Notifications Drawer Toggle */}
+        <button
+          type="button"
+          className={`btn btn-sm ${isNotificationDrawerOpen ? 'btn-primary' : 'btn-secondary'}`}
+          style={{
+            position: 'relative',
+            width: '32px',
+            height: '32px',
+            padding: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          title={
+            (notifications || []).filter((n) => !n.read).length > 0
+              ? `Notifications (${(notifications || []).filter((n) => !n.read).length} unread)`
+              : 'Notifications'
+          }
+          onClick={() => dispatch(toggleNotificationDrawer())}
+        >
+          <Bell
+            size={15}
+            strokeWidth={2}
+            color={isNotificationDrawerOpen ? '#000000' : 'var(--text-secondary)'}
+          />
+          {(notifications || []).filter((n) => !n.read).length > 0 && (
+            <span
+              style={{
+                position: 'absolute',
+                top: '-3px',
+                right: '-3px',
+                minWidth: '16px',
+                height: '16px',
+                borderRadius: '999px',
+                background: 'var(--accent-primary)',
+                color: '#000000',
+                fontSize: '9.5px',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 3px',
+                boxShadow: '0 0 8px rgba(245, 158, 11, 0.6)',
+                border: '1.5px solid var(--surface-1)',
+              }}
+            >
+              {(notifications || []).filter((n) => !n.read).length > 9
+                ? '9+'
+                : (notifications || []).filter((n) => !n.read).length}
+            </span>
+          )}
+        </button>
 
         {/* Theme Toggle Button */}
         <button

@@ -24,6 +24,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { CandidateWizardPage } from './pages/onboarding/CandidateWizardPage';
 
 // Modals & Slide-over Drawers
+import { NotificationDrawer } from './components/NotificationDrawer';
 import { IssueDrawer } from './views/work/IssueDrawer';
 import { CreateIssueModal } from './components/CreateIssueModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
@@ -247,6 +248,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Modals & Slide-over Panels */}
+      <NotificationDrawer />
       <IssueDrawer />
       <CreateIssueModal />
       <CreateProjectModal />

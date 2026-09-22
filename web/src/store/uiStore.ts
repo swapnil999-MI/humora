@@ -41,6 +41,16 @@ export interface ToastMessage {
   message: string;
 }
 
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  type: 'punch' | 'approval' | 'work' | 'system' | 'leave';
+  read: boolean;
+  actionLink?: PageId;
+}
+
 export interface UiState {
   activePage: PageId;
   workspace: WorkspaceType;
@@ -52,6 +62,8 @@ export interface UiState {
   isCreateProjectOpen: boolean;
   isApplyLeaveOpen: boolean;
   isRegularizationOpen: boolean;
+  isNotificationDrawerOpen: boolean;
+  notifications: AppNotification[];
   toasts: ToastMessage[];
 
   navigateToPage: (page: PageId) => void;
@@ -64,6 +76,11 @@ export interface UiState {
   setCreateProjectOpen: (open: boolean) => void;
   setApplyLeaveOpen: (open: boolean) => void;
   setRegularizationOpen: (open: boolean) => void;
+  toggleNotificationDrawer: () => void;
+  setNotificationDrawerOpen: (open: boolean) => void;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  clearNotifications: () => void;
   addToast: (toast: Omit<ToastMessage, 'id'>) => void;
   removeToast: (id: string) => void;
 }
@@ -85,6 +102,45 @@ export const useUiStore = create<UiState>((set) => ({
   isCreateProjectOpen: false,
   isApplyLeaveOpen: false,
   isRegularizationOpen: false,
+  isNotificationDrawerOpen: false,
+  notifications: [
+    {
+      id: 'notif-1',
+      title: 'Timesheet Auto-Sync Completed',
+      message: '8.0h session was automatically logged and reconciled with Project sprint cycle.',
+      timestamp: '15m ago',
+      type: 'work',
+      read: false,
+      actionLink: 'kanban',
+    },
+    {
+      id: 'notif-2',
+      title: 'Regularization Approved',
+      message: 'Your punch regularization request for yesterday was approved by Lead.',
+      timestamp: '1h ago',
+      type: 'approval',
+      read: false,
+      actionLink: 'attendance',
+    },
+    {
+      id: 'notif-3',
+      title: 'Sprint Scope Updated',
+      message: 'New critical security task assigned to your active queue with high priority.',
+      timestamp: '3h ago',
+      type: 'work',
+      read: true,
+      actionLink: 'kanban',
+    },
+    {
+      id: 'notif-4',
+      title: 'Monthly Leave Accrual',
+      message: '+1.75 days earned leave balance added for the current cycle.',
+      timestamp: 'Yesterday',
+      type: 'leave',
+      read: true,
+      actionLink: 'leaves',
+    },
+  ],
   toasts: [],
 
   navigateToPage: (page) => {
@@ -223,6 +279,17 @@ export const useUiStore = create<UiState>((set) => ({
   setCreateProjectOpen: (open) => set({ isCreateProjectOpen: open }),
   setApplyLeaveOpen: (open) => set({ isApplyLeaveOpen: open }),
   setRegularizationOpen: (open) => set({ isRegularizationOpen: open }),
+  toggleNotificationDrawer: () => set((state) => ({ isNotificationDrawerOpen: !state.isNotificationDrawerOpen })),
+  setNotificationDrawerOpen: (open) => set({ isNotificationDrawerOpen: open }),
+  markNotificationAsRead: (id) =>
+    set((state) => ({
+      notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    })),
+  markAllNotificationsAsRead: () =>
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, read: true })),
+    })),
+  clearNotifications: () => set({ notifications: [] }),
 
   addToast: (toast) => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -245,6 +312,11 @@ export const setCreateIssueOpen = (o: boolean) => () => useUiStore.getState().se
 export const setCreateProjectOpen = (o: boolean) => () => useUiStore.getState().setCreateProjectOpen(o);
 export const setApplyLeaveOpen = (o: boolean) => () => useUiStore.getState().setApplyLeaveOpen(o);
 export const setRegularizationOpen = (o: boolean) => () => useUiStore.getState().setRegularizationOpen(o);
+export const toggleNotificationDrawer = () => () => useUiStore.getState().toggleNotificationDrawer();
+export const setNotificationDrawerOpen = (o: boolean) => () => useUiStore.getState().setNotificationDrawerOpen(o);
+export const markNotificationAsRead = (id: string) => () => useUiStore.getState().markNotificationAsRead(id);
+export const markAllNotificationsAsRead = () => () => useUiStore.getState().markAllNotificationsAsRead();
+export const clearNotifications = () => () => useUiStore.getState().clearNotifications();
 export const addToast = (t: Omit<ToastMessage, 'id'>) => () => useUiStore.getState().addToast(t);
 export const removeToast = (id: string) => () => useUiStore.getState().removeToast(id);
 
