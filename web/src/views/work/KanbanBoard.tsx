@@ -4,7 +4,9 @@ import {
   fetchKanbanBoard,
   transitionIssue,
   setActiveIssue,
+  createIssue,
 } from '../../store/workSlice';
+import { addToast } from '../../store/uiSlice';
 import { KanbanColumn, Issue } from '../../types';
 import { StatusGlyph, PriorityGlyph } from '../../components/StatusGlyph';
 import {
@@ -190,6 +192,7 @@ export const KanbanBoard: React.FC = () => {
                 key={column.status_id}
                 column={{ ...column, issues: filteredIssues }}
                 isOnline={!!attendanceSummary?.punched_in}
+                projectId={activeProject.id}
               />
             );
           })}
@@ -202,15 +205,44 @@ export const KanbanBoard: React.FC = () => {
 interface ColumnProps {
   column: KanbanColumn;
   isOnline: boolean;
+  projectId: string;
 }
 
-const KanbanColumnComponent: React.FC<ColumnProps> = ({ column, isOnline }) => {
+const KanbanColumnComponent: React.FC<ColumnProps> = ({ column, isOnline, projectId }) => {
+  const dispatch = useAppDispatch();
   const { setNodeRef, isOver } = useDroppable({
     id: column.status_id,
   });
 
+  const [isAdding, setIsAdding] = useState(false);
+  const [inlineTitle, setInlineTitle] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleInlineCreate = async () => {
+    if (!inlineTitle.trim() || !projectId) return;
+    setIsCreating(true);
+    try {
+      await dispatch(
+        createIssue({
+          projectId,
+          title: inlineTitle.trim(),
+          issue_type: 'task',
+          priority: 'medium',
+        })
+      );
+      dispatch(fetchKanbanBoard(projectId));
+      dispatch(addToast({ type: 'success', message: 'Task created successfully' }));
+      setInlineTitle('');
+      setIsAdding(false);
+    } catch (err: any) {
+      dispatch(addToast({ type: 'error', message: err || 'Failed to create task' }));
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   const totalPoints = column.issues.reduce((sum, iss) => sum + (iss.story_points || 0), 0);
-  const wipLimit = 6; // Example default WIP Limit
+  const wipLimit = 6; // Default WIP limit guideline
   const isOverWip = column.category === 'in_progress' && column.issues.length > wipLimit;
 
   return (
@@ -219,7 +251,7 @@ const KanbanColumnComponent: React.FC<ColumnProps> = ({ column, isOnline }) => {
       className="kanban-column"
       style={{
         borderColor: isOver
-          ? 'var(--text-primary)'
+          ? 'var(--accent-primary)'
           : isOverWip
           ? 'var(--border-strong)'
           : 'var(--border-hairline)',
@@ -257,11 +289,92 @@ const KanbanColumnComponent: React.FC<ColumnProps> = ({ column, isOnline }) => {
         </div>
       </div>
 
-      {/* Column Cards */}
-      <div className="kanban-cards-container" style={{ padding: '8px', gap: '8px' }}>
+      {/* Column Cards & Inline Quick Task Creator */}
+      <div className="kanban-cards-container" style={{ padding: '8px', gap: '8px', display: 'flex', flexDirection: 'column' }}>
         {column.issues.map((issue) => (
           <KanbanCardComponent key={issue.id} issue={issue} isOnline={isOnline} />
         ))}
+
+        {isAdding ? (
+          <div
+            style={{
+              background: 'var(--surface-3)',
+              border: '1px solid var(--accent-primary)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              boxShadow: 'var(--shadow-sm)',
+            }}
+          >
+            <textarea
+              autoFocus
+              className="textarea-field"
+              placeholder="What needs to be done? (Enter to add)"
+              value={inlineTitle}
+              onChange={(e) => setInlineTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleInlineCreate();
+                } else if (e.key === 'Escape') {
+                  setIsAdding(false);
+                }
+              }}
+              style={{
+                height: '46px',
+                padding: '6px 8px',
+                fontSize: '12px',
+                resize: 'none',
+                background: 'var(--surface-1)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                <kbd className="cmd-k-kbd">↵</kbd> save • <kbd className="cmd-k-kbd">Esc</kbd>
+              </span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ height: '24px', padding: '0 8px', fontSize: '11px' }}
+                  onClick={() => setIsAdding(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  style={{ height: '24px', padding: '0 10px', fontSize: '11px' }}
+                  onClick={handleInlineCreate}
+                  disabled={isCreating || !inlineTitle.trim()}
+                >
+                  {isCreating ? '...' : 'Add'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="btn-ghost"
+            style={{
+              width: '100%',
+              justifyContent: 'flex-start',
+              padding: '6px 8px',
+              fontSize: '11.5px',
+              color: 'var(--text-muted)',
+              borderRadius: 'var(--radius-sm)',
+              gap: '6px',
+            }}
+            onClick={() => setIsAdding(true)}
+          >
+            <Plus size={13} strokeWidth={2} />
+            Add task
+          </button>
+        )}
       </div>
     </div>
   );

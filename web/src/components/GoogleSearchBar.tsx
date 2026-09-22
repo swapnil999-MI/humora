@@ -4,6 +4,7 @@ import {
   navigateToPage,
   setCreateIssueOpen,
   setCreateProjectOpen,
+  addToast,
   PageId,
 } from '../store/uiSlice';
 import { setActiveIssue } from '../store/workSlice';
@@ -27,6 +28,8 @@ import {
   User,
   ListFilter,
   CheckCircle2,
+  History,
+  Sparkles,
 } from 'lucide-react';
 
 export type SearchCategory = 'all' | 'people' | 'tickets' | 'pages';
@@ -41,15 +44,66 @@ interface SearchResultItem {
   action: () => void;
 }
 
+// Substring match highlighter for senior UX feedback
+const highlightMatch = (text: string, q: string) => {
+  if (!q.trim()) return text;
+  const escaped = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escaped})`, 'gi');
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === q.trim().toLowerCase() ? (
+          <mark key={i} className="search-highlight">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+};
+
 export const GoogleSearchBar: React.FC = () => {
   const dispatch = useAppDispatch();
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [category, setCategory] = useState<SearchCategory>('all');
   const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Stored recent searches memory
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('humora_recent_searches');
+      return saved ? JSON.parse(saved) : ['Attendance', 'Sprints', 'Directory'];
+    } catch {
+      return ['Attendance', 'Sprints', 'Directory'];
+    }
+  });
+
+  const addRecentSearch = (term: string) => {
+    if (!term || term.trim().length < 2) return;
+    setRecentSearches((prev) => {
+      const updated = [term.trim(), ...prev.filter((t) => t.toLowerCase() !== term.trim().toLowerCase())].slice(0, 5);
+      try {
+        localStorage.setItem('humora_recent_searches', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const clearRecentSearches = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRecentSearches([]);
+    try {
+      localStorage.removeItem('humora_recent_searches');
+    } catch {}
+  };
 
   const { employees, attendanceSummary } = useAppSelector((state) => state.hrms);
   const { kanbanBoard, backlog, projects } = useAppSelector((state) => state.work);
@@ -406,6 +460,25 @@ export const GoogleSearchBar: React.FC = () => {
     setSelectedIndex(0);
   }, [filteredResults]);
 
+  // Auto-scroll selected item into view on keyboard navigation
+  useEffect(() => {
+    if (listRef.current) {
+      const activeElem = listRef.current.querySelector('.google-dropdown-item.selected') as HTMLElement;
+      if (activeElem) {
+        activeElem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [selectedIndex]);
+
+  const handleItemSelect = (item: SearchResultItem) => {
+    if (query.trim()) {
+      addRecentSearch(query.trim());
+    } else {
+      addRecentSearch(item.title);
+    }
+    item.action();
+  };
+
   // Keyboard navigation inside dropdown
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) {
@@ -424,7 +497,7 @@ export const GoogleSearchBar: React.FC = () => {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (filteredResults[selectedIndex]) {
-        filteredResults[selectedIndex].action();
+        handleItemSelect(filteredResults[selectedIndex]);
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -549,8 +622,41 @@ export const GoogleSearchBar: React.FC = () => {
             </button>
           </div>
 
+          {/* Recent Searches Pill Row (Shown when query is empty) */}
+          {!query && recentSearches.length > 0 && (
+            <div className="google-recent-searches-bar">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                <History size={11} color="var(--accent-primary)" />
+                <span style={{ fontWeight: 600 }}>Recent:</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', flex: 1 }}>
+                {recentSearches.map((term, ti) => (
+                  <button
+                    key={ti}
+                    type="button"
+                    className="google-recent-chip"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setQuery(term);
+                      inputRef.current?.focus();
+                    }}
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="google-recent-clear-link"
+                onClick={clearRecentSearches}
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
           {/* Autocomplete Results List */}
-          <div className="google-dropdown-list">
+          <div ref={listRef} className="google-dropdown-list">
             {filteredResults.length === 0 ? (
               <div className="google-dropdown-empty">
                 <Search size={22} strokeWidth={1.5} color="var(--text-dim)" />
@@ -569,22 +675,26 @@ export const GoogleSearchBar: React.FC = () => {
                     key={item.id}
                     className={`google-dropdown-item ${isSelected ? 'selected' : ''}`}
                     onMouseEnter={() => setSelectedIndex(index)}
-                    onClick={() => item.action()}
+                    onClick={() => handleItemSelect(item)}
                   >
                     {/* Leading Icon / Avatar */}
                     <div className="google-item-icon-box">
                       {item.icon}
                     </div>
 
-                    {/* Content text */}
+                    {/* Content text with Substring Highlighting */}
                     <div className="google-item-content">
                       <div className="google-item-title-row">
-                        <span className="google-item-title">{item.title}</span>
+                        <span className="google-item-title">
+                          {highlightMatch(item.title, query)}
+                        </span>
                         {item.badge && (
                           <span className="google-item-badge">{item.badge}</span>
                         )}
                       </div>
-                      <span className="google-item-subtitle">{item.subtitle}</span>
+                      <span className="google-item-subtitle">
+                        {highlightMatch(item.subtitle, query)}
+                      </span>
                     </div>
 
                     {/* Trailing Jump Indicator */}

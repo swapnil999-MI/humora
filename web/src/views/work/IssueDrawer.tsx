@@ -62,6 +62,17 @@ export const IssueDrawer: React.FC = () => {
     };
   }, [isTimerRunning]);
 
+  // Close slide-over on Escape key
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        dispatch(setActiveIssue(null));
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [dispatch]);
+
   if (!activeIssue) return null;
 
   const handleLogWork = async (secondsToLog: number, descriptionText: string) => {
@@ -359,7 +370,7 @@ export const IssueDrawer: React.FC = () => {
           style={{
             padding: '20px',
             borderRadius: 'var(--radius-md)',
-            background: 'rgba(17, 20, 32, 0.85)',
+            background: 'var(--surface-2)',
             border: '1px solid var(--border-subtle)',
             marginBottom: '24px',
           }}
@@ -381,6 +392,19 @@ export const IssueDrawer: React.FC = () => {
                   onChange={(e) => setHoursSpent(e.target.value)}
                   required
                 />
+                <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                  {[0.25, 0.5, 1, 2].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '1px 6px', fontSize: '10px', height: '20px' }}
+                      onClick={() => setHoursSpent(val.toString())}
+                    >
+                      +{val >= 1 ? `${val}h` : `${val * 60}m`}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="input-group">

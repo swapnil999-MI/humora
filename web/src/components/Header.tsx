@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/store';
-import { setCreateIssueOpen } from '../store/uiSlice';
+import { setCreateIssueOpen, navigateToPage } from '../store/uiSlice';
 import { recordPunch } from '../store/hrmsSlice';
 import { GoogleSearchBar } from './GoogleSearchBar';
+import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import {
   Kanban,
   Search,
@@ -14,6 +15,7 @@ import {
   Compass,
   Sun,
   Moon,
+  HelpCircle,
 } from 'lucide-react';
 
 export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
@@ -22,9 +24,49 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
   const { attendanceSummary, isPunching } = useAppSelector((state) => state.hrms);
   const { activeProject } = useAppSelector((state) => state.work);
 
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('humora_theme') as 'dark' | 'light') || 'dark';
   });
+
+  // Real-time ticking work stopwatch for senior UX feedback
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!attendanceSummary?.punched_in) {
+      setElapsedSeconds(0);
+      return;
+    }
+
+    const baseSecs = Math.max(0, Math.floor((attendanceSummary.today_hours || 0) * 3600));
+    setElapsedSeconds(baseSecs);
+
+    const interval = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [attendanceSummary?.punched_in, attendanceSummary?.today_hours]);
+
+  const formatStopwatch = (totalSecs: number) => {
+    const h = Math.floor(totalSecs / 3600);
+    const m = Math.floor((totalSecs % 3600) / 60);
+    const s = totalSecs % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Listen for ? key to open shortcuts modal
+  useEffect(() => {
+    const handleGlobalShortcuts = (e: KeyboardEvent) => {
+      if (e.key === '?' && !['input', 'textarea', 'select'].includes((e.target as HTMLElement).tagName.toLowerCase())) {
+        e.preventDefault();
+        setIsShortcutsOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalShortcuts);
+    return () => window.removeEventListener('keydown', handleGlobalShortcuts);
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -83,10 +125,15 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
         {workspace === 'employee' ? (
           <>
-            <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              className="breadcrumb-btn"
+              onClick={() => dispatch(navigateToPage('hub'))}
+              title="Jump to Employee Space Hub (Alt+0)"
+            >
               <Compass size={14} strokeWidth={1.8} />
               Employee Space
-            </span>
+            </button>
             <ChevronRight size={12} color="var(--text-dim)" />
             <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
               {activePage === 'attendance'
@@ -102,10 +149,15 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
           </>
         ) : workspace === 'management' ? (
           <>
-            <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              className="breadcrumb-btn"
+              onClick={() => dispatch(navigateToPage('directory'))}
+              title="Jump to Organization Directory (Alt+1)"
+            >
               <ShieldCheck size={14} strokeWidth={1.8} color="var(--accent-primary)" />
               Management Console
-            </span>
+            </button>
             <ChevronRight size={12} color="var(--text-dim)" />
             <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
               {activePage === 'shifts'
@@ -127,10 +179,15 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
           </>
         ) : (
           <>
-            <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              className="breadcrumb-btn"
+              onClick={() => dispatch(navigateToPage('kanban'))}
+              title="Jump to Kanban Board (Alt+2)"
+            >
               <Kanban size={14} strokeWidth={1.8} />
               Agile Work
-            </span>
+            </button>
             <ChevronRight size={12} color="var(--text-dim)" />
             <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
               [{activeProject?.key || 'ACME'}] {activeProject?.name || 'Main Project'}
@@ -152,7 +209,7 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
 
       {/* Right: Workforce Clock Widget & Action Trigger */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {/* Attendance Punch Mini Desk */}
+        {/* Attendance Punch Mini Desk with Live Stopwatch */}
         <div
           style={{
             display: 'flex',
@@ -185,11 +242,26 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-              {attendanceSummary?.punched_in ? 'Clocked In' : 'Clocked Out'}
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {attendanceSummary?.punched_in ? (
+                <>
+                  <span className="live-pulse-dot" />
+                  Active Session
+                </>
+              ) : (
+                'Clocked Out'
+              )}
             </span>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-              {todayHours.toFixed(1)}h
+            <span
+              style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: attendanceSummary?.punched_in ? 'var(--accent-primary)' : 'var(--text-primary)',
+                fontFamily: 'var(--font-mono)',
+              }}
+              title={attendanceSummary?.punched_in ? `Active Session: ${formatStopwatch(elapsedSeconds)}` : `Today: ${todayHours.toFixed(1)}h`}
+            >
+              {attendanceSummary?.punched_in ? formatStopwatch(elapsedSeconds) : `${todayHours.toFixed(1)}h`}
             </span>
           </div>
 
@@ -227,6 +299,17 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
           {theme === 'dark' ? <Sun size={15} color="#fbbf24" strokeWidth={2} /> : <Moon size={15} color="var(--text-secondary)" strokeWidth={2} />}
         </button>
 
+        {/* Keyboard Shortcuts Help Button */}
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          style={{ width: '32px', height: '32px', padding: 0 }}
+          title="Keyboard Shortcuts Guide (?)"
+          onClick={() => setIsShortcutsOpen(true)}
+        >
+          <HelpCircle size={15} color="var(--text-secondary)" strokeWidth={2} />
+        </button>
+
         {/* New Issue Button in Work Mode */}
         {workspace === 'work' && (
           <button
@@ -239,6 +322,9 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
           </button>
         )}
       </div>
+
+      {/* Global Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
     </header>
   );
 };

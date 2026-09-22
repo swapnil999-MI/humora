@@ -50,6 +50,31 @@ export const MyWorkdayHub: React.FC = () => {
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState<boolean>(false);
   const [submissionNotes, setSubmissionNotes] = useState<string>('');
 
+  // Live stopwatch for real-time feedback
+  const [hubElapsedSeconds, setHubElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!myWorkday?.punched_in) {
+      setHubElapsedSeconds(0);
+      return;
+    }
+    const baseSecs = Math.max(0, Math.floor((myWorkday.today_hours || 0) * 3600));
+    setHubElapsedSeconds(baseSecs);
+
+    const interval = setInterval(() => {
+      setHubElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [myWorkday?.punched_in, myWorkday?.today_hours]);
+
+  const formatHubStopwatch = (totalSecs: number) => {
+    const h = Math.floor(totalSecs / 3600);
+    const m = Math.floor((totalSecs % 3600) / 60);
+    const s = totalSecs % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
   useEffect(() => {
     dispatch(fetchMyWorkday());
     dispatch(fetchWeeklyTimesheet());
@@ -190,20 +215,31 @@ export const MyWorkdayHub: React.FC = () => {
               Attendance Shift Clock
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+              {isPunchedIn ? (
+                <span className="live-pulse-dot" />
+              ) : (
+                <span
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: 'var(--text-muted)',
+                  }}
+                />
+              )}
+              <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                {isPunchedIn ? 'Active Workday' : 'Clocked Out'}
+              </span>
               <span
                 style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: isPunchedIn ? 'var(--accent-emerald)' : 'var(--text-muted)',
-                  boxShadow: isPunchedIn ? '0 0 8px rgba(16, 185, 129, 0.4)' : 'none',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: isPunchedIn ? 'var(--accent-primary)' : 'var(--text-muted)',
+                  fontFamily: 'var(--font-mono)',
+                  marginLeft: '4px',
                 }}
-              />
-              <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                {isPunchedIn ? 'Clocked In' : 'Clocked Out'}
-              </span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '4px' }}>
-                ({(myWorkday?.today_hours || 0).toFixed(1)}h office)
+              >
+                {isPunchedIn ? formatHubStopwatch(hubElapsedSeconds) : `(${(myWorkday?.today_hours || 0).toFixed(1)}h logged)`}
               </span>
             </div>
           </div>
