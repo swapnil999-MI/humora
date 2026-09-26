@@ -13,6 +13,7 @@ type PayrollPreviewItem struct {
 	EmployeeID         string  `json:"employee_id"`
 	EmployeeName       string  `json:"employee_name"`
 	EmployeeCode       string  `json:"employee_code"`
+	WorkEmail          string  `json:"work_email"`
 	DepartmentName     string  `json:"department_name"`
 	DesignationTitle   string  `json:"designation_title"`
 	TotalDays          int     `json:"total_days"`

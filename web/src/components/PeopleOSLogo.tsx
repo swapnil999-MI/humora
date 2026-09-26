@@ -116,18 +116,7 @@ export const PeopleOSLogo: React.FC<PeopleOSLogoProps> = ({
                 color: 'var(--text-primary)',
               }}
             >
-              People
-            </span>
-            <span
-              style={{
-                fontFamily: 'var(--font-heading)',
-                fontSize: `${brandTextSize}px`,
-                fontWeight: 800,
-                letterSpacing: '-0.03em',
-                color: 'var(--accent-primary)',
-              }}
-            >
-              OS
+              Humora
             </span>
           </div>
           {subText && (

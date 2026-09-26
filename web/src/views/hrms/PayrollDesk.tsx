@@ -224,7 +224,7 @@ export const PayrollDesk: React.FC = () => {
             }}
           >
             <PeopleOSLogo size={14} />
-            <span>PeopleOS &bull; Payroll & Compensation Hub</span>
+            <span>Humora &bull; Payroll & Compensation Hub</span>
           </div>
           <h1
             style={{
@@ -747,7 +747,7 @@ export const PayrollDesk: React.FC = () => {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontWeight: 600, fontSize: '14px' }}>
               <Calculator size={16} color="var(--accent-primary)" />
-              <span>How PeopleOS Calculates Your Salary</span>
+              <span>How Humora Calculates Your Salary</span>
             </div>
 
             <div

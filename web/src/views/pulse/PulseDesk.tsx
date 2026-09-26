@@ -1033,7 +1033,7 @@ export const PulseDesk: React.FC = () => {
                 Chats
               </span>
               <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                PeopleOS Team Pulse
+                Humora Team Pulse
               </span>
             </div>
           </div>

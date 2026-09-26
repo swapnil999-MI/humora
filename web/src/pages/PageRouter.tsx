@@ -1,5 +1,6 @@
-import React from 'react';
-import { useAppSelector } from '../store/store';
+import React, { useEffect } from 'react';
+import { useAppDispatch, useAppSelector } from '../store/store';
+import { navigateToPage, addToast } from '../store/uiSlice';
 import { HubPage } from './hub/HubPage';
 import { AttendancePage } from './hrms/AttendancePage';
 import { LeavesPage } from './hrms/LeavesPage';
@@ -21,8 +22,39 @@ interface PageRouterProps {
   onOpenCandidateWizard?: (token: string) => void;
 }
 
+const MANAGEMENT_PAGES = ['shifts', 'radar', 'approvals', 'capacity', 'directory', 'onboarding', 'company_settings'];
+const ESS_PAGES = ['hub', 'attendance', 'leaves', 'payroll', 'profile'];
+
 export const PageRouter: React.FC<PageRouterProps> = ({ onOpenCandidateWizard }) => {
+  const dispatch = useAppDispatch();
   const { activePage } = useAppSelector((state) => state.ui);
+  const { user } = useAppSelector((state) => state.auth);
+
+  const userRoles = user?.roles || [];
+  const isAdmin = userRoles.some((r) => ['superadmin', 'admin', 'hr_admin'].includes(r.toLowerCase()));
+  const isEmployee = userRoles.some((r) => r.toLowerCase() === 'employee') && !isAdmin;
+
+  useEffect(() => {
+    if (isEmployee && MANAGEMENT_PAGES.includes(activePage)) {
+      dispatch(addToast({
+        type: 'error',
+        message: 'Access Denied: Management Console requires administrative privileges.',
+      }));
+      dispatch(navigateToPage('hub'));
+    } else if (isAdmin && ESS_PAGES.includes(activePage)) {
+      dispatch(navigateToPage('company_settings'));
+    }
+  }, [activePage, isAdmin, isEmployee, dispatch]);
+
+  // If unauthorized employee attempting management page, prevent render
+  if (isEmployee && MANAGEMENT_PAGES.includes(activePage)) {
+    return <HubPage />;
+  }
+
+  // If admin attempting ESS page, redirect to company setup
+  if (isAdmin && ESS_PAGES.includes(activePage)) {
+    return <CompanySettingsPage />;
+  }
 
   switch (activePage) {
     // Employee Self-Service Space
@@ -66,7 +98,7 @@ export const PageRouter: React.FC<PageRouterProps> = ({ onOpenCandidateWizard })
       return <PulsePage />;
 
     default:
-      return <HubPage />;
+      return isAdmin ? <RadarPage /> : <HubPage />;
   }
 };
 

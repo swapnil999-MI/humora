@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"humora-backend/configs"
+	"humora-backend/pkg/mailer"
 	"humora-backend/pkg/middleware"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -25,6 +26,8 @@ type Service interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (*UserSummary, error)
 	UpdatePresence(ctx context.Context, userID uuid.UUID, status string) error
 	RegisterDeviceKey(ctx context.Context, userID uuid.UUID, publicKey string) error
+	RequestPasswordReset(ctx context.Context, req *ForgotPasswordRequest) error
+	ResetPassword(ctx context.Context, req *ResetPasswordRequest) error
 }
 
 type service struct {
@@ -38,6 +41,15 @@ func NewService(repo Repository) Service {
 func (s *service) Register(ctx context.Context, req *RegisterRequest) (*AuthResponse, error) {
 	if validationErr := req.Validate(); validationErr != "" {
 		return nil, errors.New(validationErr)
+	}
+
+	// 0. Check if admin email already exists anywhere across the platform
+	conflict, entity, err := s.repo.CheckEmailConflict(ctx, req.AdminEmail)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate email uniqueness: %w", err)
+	}
+	if conflict {
+		return nil, fmt.Errorf("email %q is already registered across the platform (conflict in %s)", req.AdminEmail, entity)
 	}
 
 	// 1. Check if tenant slug already exists
@@ -85,8 +97,11 @@ func (s *service) Register(ctx context.Context, req *RegisterRequest) (*AuthResp
 		return nil, fmt.Errorf("failed to create admin user: %w", err)
 	}
 
-	// 6. Create HRMS Employee entry linked to user
-	_ = s.repo.CreateDefaultHRMSEmployee(ctx, tenant.ID, user.ID, user.Email, req.FirstName, req.LastName)
+	// 6. Assign Superadmin role to Admin User in user_roles (Admins do NOT have an employee profile)
+	superadminRole, err := s.repo.GetRoleByName(ctx, tenant.ID, "superadmin")
+	if err == nil && superadminRole != nil {
+		_ = s.repo.AssignRoleToUser(ctx, user.ID, superadminRole.ID)
+	}
 
 	// 7. Generate Tokens
 	roles, perms, _ := s.repo.GetRolesForUser(ctx, tenant.ID, user.ID)
@@ -379,4 +394,59 @@ func verifyPassword(password, encodedHash string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func (s *service) RequestPasswordReset(ctx context.Context, req *ForgotPasswordRequest) error {
+	if validationErr := req.Validate(); validationErr != "" {
+		return errors.New(validationErr)
+	}
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	user, tenant, err := s.repo.GetUserByEmail(ctx, email)
+	if err != nil || user == nil || tenant == nil {
+		// Return specific error
+		return errors.New("no active account found with this email address")
+	}
+
+	// Generate 6-digit numeric OTP
+	b := make([]byte, 3)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Errorf("failed to generate secure code: %w", err)
+	}
+	otp := fmt.Sprintf("%06d", (int(b[0])<<16|int(b[1])<<8|int(b[2]))%1000000)
+
+	expiresAt := time.Now().Add(10 * time.Minute)
+	if err := s.repo.SavePasswordResetOTP(ctx, tenant.ID, user.ID, user.Email, otp, expiresAt); err != nil {
+		return fmt.Errorf("failed to save verification code: %w", err)
+	}
+
+	// Send email via tenant SMTP gateway (asynchronously)
+	go func(targetTenantID uuid.UUID, targetEmail, otpCode string) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		smtpCfg, _ := s.repo.GetTenantSMTPConfig(bgCtx, targetTenantID)
+		_ = mailer.SendPasswordResetOTPEmail(smtpCfg, targetEmail, otpCode)
+	}(tenant.ID, user.Email, otp)
+
+	return nil
+}
+
+func (s *service) ResetPassword(ctx context.Context, req *ResetPasswordRequest) error {
+	if validationErr := req.Validate(); validationErr != "" {
+		return errors.New(validationErr)
+	}
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	userID, err := s.repo.VerifyPasswordResetOTP(ctx, email, req.OTP)
+	if err != nil {
+		return err
+	}
+
+	hash, err := hashPassword(req.NewPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash new password: %w", err)
+	}
+
+	return s.repo.UpdateUserPassword(ctx, userID, hash)
 }

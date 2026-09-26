@@ -62,7 +62,7 @@ export interface HrmsState {
   fetchAttendanceSummary: () => Promise<AttendanceSummary | null>;
   recordPunch: (payload: { punch_type: string; latitude?: number; longitude?: number; source?: string }) => Promise<any>;
   fetchAttendanceSession: () => Promise<AttendanceSession | null>;
-  executePunch: (payload: { punch_type: 'in' | 'out' | 'break_start' | 'break_end'; latitude?: number; longitude?: number; source?: string }) => Promise<any>;
+  executePunch: (payload: { punch_type: string; latitude?: number; longitude?: number; source?: string }) => Promise<any>;
   punchWithFace: (payload: { punch_type: 'in' | 'out'; selfie_image: string; latitude?: number; longitude?: number; source?: string }) => Promise<any>;
   enrollBiometricFace: (employeeId: string, images: string[]) => Promise<any>;
   fetchMonthlyAttendance: (payload: { year: number; month: number }) => Promise<MonthlyAttendanceResponse | null>;
@@ -98,8 +98,8 @@ export interface HrmsState {
   updateMyProfile: (payload: any) => Promise<any>;
   uploadProfileMedia: (payload: { file: File; mediaType: 'avatar' | 'banner' }) => Promise<any>;
   fetchOnboardingPipeline: () => Promise<OnboardingCandidate[]>;
-  inviteCandidate: (payload: InviteCandidatePayload) => Promise<OnboardingCandidate>;
-  convertCandidate: (candidateId: string) => Promise<Employee>;
+  inviteCandidate: (payload: any) => Promise<OnboardingCandidate>;
+  convertCandidate: (candidateId: string, payload?: any) => Promise<Employee>;
   fetchCandidateOnboarding: (token: string) => Promise<CandidateOnboardingView | null>;
   saveCandidateDossier: (payload: { token: string; dossier: any }) => Promise<any>;
   fetchCompanyProfile: () => Promise<CompanyProfile | null>;
@@ -113,6 +113,7 @@ export interface HrmsState {
   previewPayrollRun: (month: number, year: number) => Promise<any>;
   executePayrollRun: (month: number, year: number) => Promise<any>;
   fetchPayrollRuns: () => Promise<any[]>;
+  resetHrmsStore: () => void;
 }
 
 // Helper to attach .unwrap() to returned promises for Redux Toolkit dispatch compatibility
@@ -123,28 +124,28 @@ function withUnwrap<T>(promise: Promise<T>): Promise<T> & { unwrap: () => Promis
 }
 
 export const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
-  id: 'cmp_humora_corp',
-  name: 'Humora Technologies',
-  legal_name: 'Humora Technologies Private Limited',
-  brand_tagline: 'Enterprise Workforce Engineering & Human Capital Operating System',
-  logo_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
-  cin: 'U72200KA2024PTC189201',
-  gstin: '29AAACH7409R1ZZ',
-  pan: 'AAACH7409R',
-  tan: 'BLRH08920E',
-  pf_code: 'BGBAN0019283000',
-  esi_code: '31000849200000999',
-  address_line1: 'Tower 4, Level 9, Cyber Park, Electronic City Phase 1',
-  address_line2: 'Hosur Main Road',
-  city: 'Bengaluru',
-  state: 'Karnataka',
-  pincode: '560100',
+  id: '',
+  name: '',
+  legal_name: '',
+  brand_tagline: '',
+  logo_url: '',
+  cin: '',
+  gstin: '',
+  pan: '',
+  tan: '',
+  pf_code: '',
+  esi_code: '',
+  address_line1: '',
+  address_line2: '',
+  city: '',
+  state: '',
+  pincode: '',
   country: 'India',
-  contact_email: 'payroll@humora.io',
-  contact_phone: '+91 80 4912 8800',
-  website: 'https://humora.io',
-  signatory_name: 'Marcus Vance',
-  signatory_title: 'Director of People Operations & HR Compliance',
+  contact_email: '',
+  contact_phone: '',
+  website: '',
+  signatory_name: '',
+  signatory_title: '',
   pay_cycle_start_day: 1,
 };
 
@@ -155,8 +156,7 @@ export const getStoredCompanyProfile = (): CompanyProfile => {
   try {
     const raw = localStorage.getItem(HUMORA_COMPANY_PROFILE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw);
-      return { ...DEFAULT_COMPANY_PROFILE, ...parsed };
+      return JSON.parse(raw);
     }
   } catch (e) {
     console.error('Failed to parse stored company profile from localStorage', e);
@@ -395,7 +395,7 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
   myProfile: null,
   onboardingPipeline: [],
   activeCandidateView: null,
-  companyProfile: getStoredCompanyProfile(),
+  companyProfile: null,
   compensationStructure: DEFAULT_COMPENSATION,
   payslips: INITIAL_PAYSLIPS,
   itDeclaration: DEFAULT_IT_DECLARATION,
@@ -408,6 +408,31 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
   isLoadingOnboarding: false,
   isLoadingPayroll: false,
   error: null,
+
+  resetHrmsStore: () => {
+    set({
+      attendanceSummary: null,
+      attendanceSession: null,
+      monthlyAttendance: null,
+      teamRadar: [],
+      shifts: [],
+      shiftRosters: [],
+      myRegularizations: [],
+      teamRegularizations: [],
+      employees: [],
+      orgTree: [],
+      leaveTypes: [],
+      leaveBalances: [],
+      myLeaves: [],
+      companyLeaves: [],
+      currentPreview: null,
+      myProfile: null,
+      onboardingPipeline: [],
+      activeCandidateView: null,
+      companyProfile: null,
+      error: null,
+    });
+  },
 
   fetchAttendanceSummary: async () => {
     try {
@@ -423,7 +448,11 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
   recordPunch: async (payload) => {
     set({ isPunching: true });
     try {
-      const res = await api.post('/hrms/attendance/punch', payload);
+      const normalizedType = payload.punch_type === 'punch_out' ? 'out' : payload.punch_type === 'punch_in' ? 'in' : payload.punch_type;
+      const res = await api.post('/hrms/attendance/punch', {
+        ...payload,
+        punch_type: normalizedType,
+      });
       set({ isPunching: false });
       get().fetchAttendanceSummary();
       return res;
@@ -448,7 +477,12 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
   executePunch: async (payload) => {
     set({ isPunching: true });
     try {
-      const res = await api.post('/hrms/attendance/punch', payload);
+      const rawType = (payload.punch_type as string).toLowerCase();
+      const normalizedType = rawType === 'punch_out' ? 'out' : rawType === 'punch_in' ? 'in' : rawType;
+      const res = await api.post('/hrms/attendance/punch', {
+        ...payload,
+        punch_type: normalizedType,
+      });
       set({ isPunching: false });
       get().fetchAttendanceSession();
       get().fetchAttendanceSummary();
@@ -803,9 +837,9 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
     }
   },
 
-  convertCandidate: async (candidateId) => {
+  convertCandidate: async (candidateId, payload) => {
     try {
-      const employee = await api.post<Employee>(`/hrms/onboarding/candidates/${candidateId}/convert`, {});
+      const employee = await api.post<Employee>(`/hrms/onboarding/candidates/${candidateId}/convert`, payload || {});
       get().fetchOnboardingPipeline();
       get().fetchEmployees('');
       return employee;
@@ -840,12 +874,17 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
   fetchCompanyProfile: async () => {
     try {
       set({ isLoadingPayroll: true });
-      const current = getStoredCompanyProfile();
-      set({ companyProfile: current, isLoadingPayroll: false });
-      return current;
+      const data = await api.get<CompanyProfile>('/hrms/company/profile');
+      if (data) {
+        saveStoredCompanyProfile(data);
+        set({ companyProfile: data, isLoadingPayroll: false });
+        return data;
+      }
+      set({ companyProfile: null, isLoadingPayroll: false });
+      return null;
     } catch (err: any) {
       set({ error: err.message, isLoadingPayroll: false });
-      return get().companyProfile || getStoredCompanyProfile();
+      return get().companyProfile;
     }
   },
 
@@ -855,20 +894,22 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
       const current = get().companyProfile || getStoredCompanyProfile();
       const updated: CompanyProfile = { ...current, ...payload };
       
-      saveStoredCompanyProfile(updated);
+      const serverRes = await api.put<CompanyProfile>('/hrms/company/profile', updated);
+      const finalProfile = serverRes || updated;
+      saveStoredCompanyProfile(finalProfile);
 
       // Also propagate company branding snapshot to all payslips
       const updatedPayslips = get().payslips.map(ps => ({
         ...ps,
-        company_snapshot: { ...updated }
+        company_snapshot: { ...finalProfile }
       }));
 
       set({
-        companyProfile: updated,
+        companyProfile: finalProfile,
         payslips: updatedPayslips,
         isLoadingPayroll: false
       });
-      return updated;
+      return finalProfile;
     } catch (err: any) {
       set({ error: err.message, isLoadingPayroll: false });
       throw err;
@@ -1015,7 +1056,7 @@ export const updateMyProfile = (p: any) => () => withUnwrap(useHrmsStore.getStat
 export const uploadProfileMedia = (p: any) => () => withUnwrap(useHrmsStore.getState().uploadProfileMedia(p));
 export const fetchOnboardingPipeline = () => () => withUnwrap(useHrmsStore.getState().fetchOnboardingPipeline());
 export const inviteCandidate = (p: any) => () => withUnwrap(useHrmsStore.getState().inviteCandidate(p));
-export const convertCandidate = (id: string) => () => withUnwrap(useHrmsStore.getState().convertCandidate(id));
+export const convertCandidate = (id: string, payload?: any) => () => withUnwrap(useHrmsStore.getState().convertCandidate(id, payload));
 export const fetchCandidateOnboarding = (token: string) => () => withUnwrap(useHrmsStore.getState().fetchCandidateOnboarding(token));
 export const saveCandidateDossier = (p: any) => () => withUnwrap(useHrmsStore.getState().saveCandidateDossier(p));
 
@@ -1031,5 +1072,6 @@ export const submitReimbursementClaim = (p: any) => () => withUnwrap(useHrmsStor
 export const previewPayrollRun = (month: number, year: number) => () => withUnwrap(useHrmsStore.getState().previewPayrollRun(month, year));
 export const executePayrollRun = (month: number, year: number) => () => withUnwrap(useHrmsStore.getState().executePayrollRun(month, year));
 export const fetchPayrollRuns = () => () => withUnwrap(useHrmsStore.getState().fetchPayrollRuns());
+export const resetHrmsStore = () => () => useHrmsStore.getState().resetHrmsStore();
 
 export default useHrmsStore;

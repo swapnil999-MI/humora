@@ -198,7 +198,7 @@ export const MyWorkdayHub: React.FC = () => {
               }}
             >
               <PeopleOSLogo size={14} />
-              <span>PeopleOS &bull; My Workday Hub</span>
+              <span>Humora &bull; My Workday Hub</span>
             </div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
               {new Date().toLocaleDateString('en-US', {

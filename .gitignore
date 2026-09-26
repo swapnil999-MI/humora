@@ -41,3 +41,7 @@ web/dist/
 
 # Logs
 *.log
+
+# Scratch & debug biometric storage
+scratch/
+storage/

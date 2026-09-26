@@ -72,6 +72,13 @@ func DecodeImage(data []byte) (image.Image, string, error) {
 		return nil, "", fmt.Errorf("failed to decode image (supported formats: JPEG, PNG, WebP): %w", err)
 	}
 
+	if format == "jpeg" || format == "jpg" {
+		orient := ReadExifOrientation(reader, int64(len(data)))
+		if orient > 1 {
+			img = AutoRotateByOrientation(img, orient)
+		}
+	}
+
 	return img, format, nil
 }
 
@@ -174,18 +181,120 @@ func CheckQuality(img image.Image) QualityCheckResult {
 	}
 }
 
-// CropCenterSquare extracts the central square of the image where the face is framed.
-func CropCenterSquare(img image.Image) image.Image {
+// FindFaceBBox locates the bounding rectangle of a human face in the image using skin chrominance cluster analysis.
+func FindFaceBBox(img image.Image) (minX, minY, maxX, maxY int, found bool) {
 	bounds := img.Bounds()
 	w, h := bounds.Dx(), bounds.Dy()
 
-	size := w
-	if h < w {
-		size = h
+	minX, minY = bounds.Max.X, bounds.Max.Y
+	maxX, maxY = bounds.Min.X, bounds.Min.Y
+	var count int
+
+	step := 4
+	if w > 1200 || h > 1200 {
+		step = 6
 	}
 
-	startX := bounds.Min.X + (w-size)/2
-	startY := bounds.Min.Y + (h-size)/2
+	for y := bounds.Min.Y; y < bounds.Max.Y; y += step {
+		for x := bounds.Min.X; x < bounds.Max.X; x += step {
+			r, g, b, _ := img.At(x, y).RGBA()
+			r8 := float64(r >> 8)
+			g8 := float64(g >> 8)
+			b8 := float64(b >> 8)
+
+			cb := 128.0 - 0.168736*r8 - 0.331264*g8 + 0.5*b8
+			cr := 128.0 + 0.5*r8 - 0.418688*g8 - 0.081312*b8
+			yLum := 0.299*r8 + 0.587*g8 + 0.114*b8
+
+			if cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173 && yLum >= 35 && yLum <= 235 {
+				if r8 > b8 && r8 >= g8 {
+					count++
+					if x < minX {
+						minX = x
+					}
+					if x > maxX {
+						maxX = x
+					}
+					if y < minY {
+						minY = y
+					}
+					if y > maxY {
+						maxY = y
+					}
+				}
+			}
+		}
+	}
+
+	if count < 40 || maxX <= minX || maxY <= minY {
+		return bounds.Min.X, bounds.Min.Y, bounds.Max.X, bounds.Max.Y, false
+	}
+
+	// If skin runs down to neck/torso, cap face height proportional to face width
+	faceW := maxX - minX
+	faceH := maxY - minY
+	if faceH > int(float64(faceW)*1.4) {
+		maxY = minY + int(float64(faceW)*1.4)
+	}
+
+	return minX, minY, maxX, maxY, true
+}
+
+// CropFaceAdaptive extracts an optimal square crop containing the face.
+// On mobile portrait selfies (9:16 / 3:4), it anchors directly onto the face and forehead, avoiding cropping out the head.
+func CropFaceAdaptive(img image.Image) image.Image {
+	bounds := img.Bounds()
+	w, h := bounds.Dx(), bounds.Dy()
+
+	minX, minY, maxX, maxY, found := FindFaceBBox(img)
+
+	var cx, cy, size int
+	if found {
+		cx = (minX + maxX) / 2
+		cy = (minY + maxY) / 2
+		faceW := maxX - minX
+		faceH := maxY - minY
+		baseSize := faceW
+		if faceH > baseSize {
+			baseSize = faceH
+		}
+		// Expand by 45% margin to capture chin, forehead, and hair
+		size = int(float64(baseSize) * 1.45)
+		if size > w {
+			size = w
+		}
+		if size > h {
+			size = h
+		}
+	} else {
+		size = w
+		if h < w {
+			size = h
+		}
+		cx = bounds.Min.X + w/2
+		if h > w {
+			// Portrait: head is in the upper ~38% of the frame
+			cy = bounds.Min.Y + int(float64(h)*0.38)
+		} else {
+			cy = bounds.Min.Y + h/2
+		}
+	}
+
+	startX := cx - size/2
+	startY := cy - size/2
+
+	if startX < bounds.Min.X {
+		startX = bounds.Min.X
+	}
+	if startX+size > bounds.Max.X {
+		startX = bounds.Max.X - size
+	}
+	if startY < bounds.Min.Y {
+		startY = bounds.Min.Y
+	}
+	if startY+size > bounds.Max.Y {
+		startY = bounds.Max.Y - size
+	}
 
 	rect := image.Rect(startX, startY, startX+size, startY+size)
 	type subImager interface {
@@ -196,7 +305,6 @@ func CropCenterSquare(img image.Image) image.Image {
 		return si.SubImage(rect)
 	}
 
-	// Fallback manual crop
 	cropped := image.NewRGBA(image.Rect(0, 0, size, size))
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
@@ -204,6 +312,11 @@ func CropCenterSquare(img image.Image) image.Image {
 		}
 	}
 	return cropped
+}
+
+// CropCenterSquare extracts an optimal square crop containing the face.
+func CropCenterSquare(img image.Image) image.Image {
+	return CropFaceAdaptive(img)
 }
 
 // ResizeTo112x112 resamples an image into a 112x112 RGBA frame using high-quality CatmullRom/BiLinear interpolation.
@@ -420,35 +533,40 @@ func GetDefaultDetector() FaceDetector {
 	return defaultDetector
 }
 
-// PreprocessForMobileFaceNet executes the full preprocessing pipeline:
-// 1. Quality Check (Resolution, Brightness, Laplacian Sharpness)
-// 2. Deep Face Detection (SCRFD/YuNet: rejects non-human objects, chairs, pets, graphics with 100% accuracy)
-// 3. Aspect-preserving Center Crop
-// 4. Bicubic Resample to 112x112
-// 5. Facial Landmarks Structural Validation (eyes, nose, mouth)
-// 6. Adaptive Contrast Normalization
-// 7. Planar CHW Tensor generation normalized to [-1.0, 1.0]
-func PreprocessForMobileFaceNet(img image.Image) ([]float32, QualityCheckResult, error) {
+// PreprocessForMobileFaceNetWithImage executes the full preprocessing pipeline and also returns the processed 112x112 model input image.
+func PreprocessForMobileFaceNetWithImage(img image.Image) ([]float32, *image.RGBA, QualityCheckResult, error) {
 	quality := CheckQuality(img)
 	if !quality.Passed {
-		return nil, quality, errors.New(quality.RejectionReason)
+		return nil, nil, quality, errors.New(quality.RejectionReason)
 	}
 
+	var cropped image.Image
 	isNeuralDetector := false
 	if os.Getenv("SKIP_FACE_PRESENCE_CHECK") != "true" {
 		det := GetDefaultDetector()
 		if det != nil {
-			if hasFace, _, reason := det.DetectFace(img); !hasFace {
+			var hasFace bool
+			var reason string
+			cropped, hasFace, reason = det.CropFaceLandmarks(img)
+			if !hasFace {
 				quality.Passed = false
 				quality.RejectionReason = reason
-				return nil, quality, errors.New(reason)
+				return nil, nil, quality, errors.New(reason)
 			}
 			isNeuralDetector = true
 		} else if hasFace, reason := ValidateFacePresence(img); !hasFace {
 			quality.Passed = false
 			quality.RejectionReason = reason
-			return nil, quality, errors.New(reason)
+			return nil, nil, quality, errors.New(reason)
+		} else {
+			cropped = CropFaceAdaptive(img)
 		}
+	} else {
+		cropped = CropFaceAdaptive(img)
+	}
+
+	if cropped == nil {
+		cropped = CropFaceAdaptive(img)
 	}
 
 	// 3. Presentation Attack Detection (Anti-Spoofing / Liveness)
@@ -459,14 +577,13 @@ func PreprocessForMobileFaceNet(img image.Image) ([]float32, QualityCheckResult,
 		if !liveness.IsLive {
 			quality.Passed = false
 			quality.RejectionReason = liveness.RejectionReason
-			return nil, quality, errors.New(liveness.RejectionReason)
+			return nil, nil, quality, errors.New(liveness.RejectionReason)
 		}
 	} else {
 		quality.IsLive = true
 		quality.LivenessScore = 1.0
 	}
 
-	cropped := CropCenterSquare(img)
 	resized := ResizeTo112x112(cropped)
 
 	// In fallback mode (no ONNX detector), use heuristic facial landmarks check
@@ -474,12 +591,25 @@ func PreprocessForMobileFaceNet(img image.Image) ([]float32, QualityCheckResult,
 		if hasFeatures, reason := ValidateFacialLandmarks(resized); !hasFeatures {
 			quality.Passed = false
 			quality.RejectionReason = reason
-			return nil, quality, errors.New(reason)
+			return nil, nil, quality, errors.New(reason)
 		}
 	}
 
 	ApplyContrastEqualization(resized)
 	tensor := ToPlanarCHW(resized)
 
-	return tensor, quality, nil
+	return tensor, resized, quality, nil
+}
+
+// PreprocessForMobileFaceNet executes the full preprocessing pipeline:
+// 1. Quality Check (Resolution, Brightness, Laplacian Sharpness)
+// 2. Deep Face Detection (SCRFD/YuNet: rejects non-human objects, chairs, pets, graphics with 100% accuracy)
+// 3. Aspect-preserving Adaptive Crop
+// 4. Bicubic Resample to 112x112
+// 5. Facial Landmarks Structural Validation (eyes, nose, mouth)
+// 6. Adaptive Contrast Normalization
+// 7. Planar CHW Tensor generation normalized to [-1.0, 1.0]
+func PreprocessForMobileFaceNet(img image.Image) ([]float32, QualityCheckResult, error) {
+	tensor, _, quality, err := PreprocessForMobileFaceNetWithImage(img)
+	return tensor, quality, err
 }

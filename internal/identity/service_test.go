@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"humora-backend/configs"
+	"humora-backend/pkg/mailer"
 
 	"github.com/google/uuid"
 )
@@ -111,6 +112,55 @@ func (m *mockRepository) CreateDefaultHRMSEmployee(ctx context.Context, tenantID
 	return nil
 }
 
+func (m *mockRepository) CheckEmailConflict(ctx context.Context, email string) (bool, string, error) {
+	for _, u := range m.users {
+		if u.Email == email {
+			return true, "users", nil
+		}
+	}
+	return false, "", nil
+}
+
+func (m *mockRepository) AssignRoleToUser(ctx context.Context, userID, roleID uuid.UUID) error {
+	return nil
+}
+
+func (m *mockRepository) GetRoleByName(ctx context.Context, tenantID uuid.UUID, name string) (*Role, error) {
+	return &Role{
+		ID:          uuid.New(),
+		TenantID:    tenantID,
+		Name:        name,
+		Permissions: "[\"*\"]",
+	}, nil
+}
+
+func (m *mockRepository) SavePasswordResetOTP(ctx context.Context, tenantID, userID uuid.UUID, email, otp string, expiresAt time.Time) error {
+	return nil
+}
+
+func (m *mockRepository) VerifyPasswordResetOTP(ctx context.Context, email, otp string) (uuid.UUID, error) {
+	for _, u := range m.users {
+		if u.Email == email {
+			return u.ID, nil
+		}
+	}
+	return uuid.New(), nil
+}
+
+func (m *mockRepository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
+	for _, u := range m.users {
+		if u.ID == userID {
+			u.PasswordHash = passwordHash
+			return nil
+		}
+	}
+	return nil
+}
+
+func (m *mockRepository) GetTenantSMTPConfig(ctx context.Context, tenantID uuid.UUID) (*mailer.SMTPConfig, error) {
+	return nil, nil
+}
+
 func TestIdentityService_RegisterAndLoginFlow(t *testing.T) {
 	// Initialize minimal config
 	configs.AppConfig = &configs.Config{
@@ -180,5 +230,19 @@ func TestIdentityService_RegisterAndLoginFlow(t *testing.T) {
 	}
 	if refreshRes.AccessToken == "" {
 		t.Fatalf("expected renewed access token")
+	}
+
+	// 5. Test duplicate email registration conflict
+	dupReq := &RegisterRequest{
+		OrganizationName: "Conflict Org",
+		Slug:             "conflict-org",
+		AdminEmail:       "lead@test.org", // already registered
+		AdminPassword:    "Password123!",
+		FirstName:        "Another",
+		LastName:         "User",
+	}
+	_, err = svc.Register(ctx, dupReq)
+	if err == nil {
+		t.Fatalf("expected conflict error when registering with duplicate email, got nil")
 	}
 }

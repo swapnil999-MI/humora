@@ -242,6 +242,51 @@ export const CandidateOnboardingWizard: React.FC<{
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
             Please complete your pre-onboarding profile to prepare your official workforce records.
           </p>
+
+          {cand && (cand.monthly_gross || cand.annual_ctc) ? (
+            <div
+              style={{
+                marginTop: '14px',
+                padding: '10px 14px',
+                background: 'rgba(56, 189, 248, 0.08)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                borderRadius: 'var(--radius-sm)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                  Approved Offer Package:
+                </span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {cand.currency || '$'} {((cand.monthly_gross || 0)).toLocaleString()}/mo
+                </span>
+                {cand.annual_ctc ? (
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    ({cand.currency || '$'}{(cand.annual_ctc).toLocaleString()} Annual CTC)
+                  </span>
+                ) : null}
+              </div>
+              <div
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'var(--accent-emerald)',
+                  background: 'var(--accent-emerald-subtle)',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                }}
+              >
+                Est. Net Payable: {cand.currency || '$'} {((cand.net_payable || (cand.monthly_gross ? cand.monthly_gross * 0.92 : 0))).toLocaleString()}/mo
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                Disbursement: {(cand.payment_method || 'bank_transfer').replace('_', ' ')}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {onExit && (
@@ -473,9 +518,37 @@ export const CandidateOnboardingWizard: React.FC<{
         {/* Step 3: Bank */}
         {step === 3 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-              Banking & Direct Deposit Setup
-            </h2>
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                Banking & Direct Deposit Setup
+              </h2>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                Please provide your verified banking coordinates for payroll disbursement and statutory tax reporting.
+              </p>
+            </div>
+
+            {cand && (cand.net_payable || cand.monthly_gross) ? (
+              <div
+                style={{
+                  background: 'rgba(34, 197, 94, 0.08)',
+                  border: '1px solid rgba(34, 197, 94, 0.25)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                }}
+              >
+                <div style={{ color: '#22c55e', fontSize: '18px' }}>💳</div>
+                <div style={{ fontSize: '12px', color: '#bbf7d0', lineHeight: 1.4 }}>
+                  <strong>Official Salary Disbursement:</strong> Your approved monthly net take-home of{' '}
+                  <span style={{ color: '#ffffff', fontWeight: 600 }}>
+                    {cand.currency || '$'} {((cand.net_payable || (cand.monthly_gross ? cand.monthly_gross * 0.92 : 0))).toLocaleString()}
+                  </span>{' '}
+                  will be electronically deposited to this account on each payroll cycle.
+                </div>
+              </div>
+            ) : null}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>

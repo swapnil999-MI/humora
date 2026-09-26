@@ -75,3 +75,40 @@ type AuthResponse struct {
 	ExpiresIn    int64       `json:"expires_in"` // seconds
 	User         UserSummary `json:"user"`
 }
+
+// ForgotPasswordRequest parameters for requesting an OTP code.
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+func (r *ForgotPasswordRequest) Validate() string {
+	if strings.TrimSpace(r.Email) == "" || !strings.Contains(r.Email, "@") {
+		return "valid email is required"
+	}
+	return ""
+}
+
+// ResetPasswordRequest parameters for verifying OTP and changing password.
+type ResetPasswordRequest struct {
+	Email       string `json:"email"`
+	OTP         string `json:"otp"`
+	OTPCode     string `json:"otp_code"`
+	NewPassword string `json:"new_password"`
+}
+
+func (r *ResetPasswordRequest) Validate() string {
+	if strings.TrimSpace(r.Email) == "" || !strings.Contains(r.Email, "@") {
+		return "valid email is required"
+	}
+	if r.OTP == "" && r.OTPCode != "" {
+		r.OTP = r.OTPCode
+	}
+	if len(strings.TrimSpace(r.OTP)) < 4 {
+		return "valid OTP verification code is required"
+	}
+	if len(r.NewPassword) < 3 {
+		return "new_password must be at least 3 characters"
+	}
+	return ""
+}
+

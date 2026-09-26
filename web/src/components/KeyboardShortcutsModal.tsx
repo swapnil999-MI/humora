@@ -108,7 +108,7 @@ export const KeyboardShortcutsModal: React.FC<{ isOpen: boolean; onClose: () => 
             <div>
               <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>Keyboard Shortcuts</h3>
               <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                Master navigation and instant productivity across PeopleOS
+                Master navigation and instant productivity across Humora
               </span>
             </div>
           </div>

@@ -93,3 +93,26 @@ func RequirePermission(requiredPerm string) fiber.Handler {
 		return response.Error(c, fiber.StatusForbidden, fmt.Sprintf("Forbidden: missing permission %q", requiredPerm))
 	}
 }
+
+// RequireRole checks if the authenticated user has at least one of the specified roles.
+func RequireRole(allowedRoles ...string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		roleVal := c.Locals("role")
+		if roleVal == nil {
+			return response.Error(c, fiber.StatusForbidden, "Forbidden: role not defined")
+		}
+
+		userRole, _ := roleVal.(string)
+		if userRole == "superadmin" {
+			return c.Next()
+		}
+
+		for _, allowed := range allowedRoles {
+			if strings.EqualFold(userRole, allowed) {
+				return c.Next()
+			}
+		}
+
+		return response.Error(c, fiber.StatusForbidden, fmt.Sprintf("Forbidden: action requires one of the following roles: %v", allowedRoles))
+	}
+}

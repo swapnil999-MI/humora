@@ -67,6 +67,27 @@ func (h *OnboardingHandler) ListOnboardingCandidates(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, "Onboarding candidates retrieved", candidates)
 }
 
+// GetCandidateByID HR inspects full candidate details, dossier, and payable compensation package.
+// GET /api/v1/hrms/onboarding/candidates/:id
+func (h *OnboardingHandler) GetCandidateByID(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+
+	candidateID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid candidate ID")
+	}
+
+	view, err := h.service.GetCandidateByID(c.UserContext(), tenantID, candidateID)
+	if err != nil {
+		return response.Error(c, fiber.StatusNotFound, err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, "Candidate details retrieved", view)
+}
+
 // InviteCandidate HR invites a new hire to the candidate onboarding portal.
 // POST /api/v1/hrms/onboarding/invite
 func (h *OnboardingHandler) InviteCandidate(c *fiber.Ctx) error {

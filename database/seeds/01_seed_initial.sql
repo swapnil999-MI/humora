@@ -45,7 +45,7 @@ VALUES (
     'c0000000-0000-0000-0000-000000000001',
     'a0000000-0000-0000-0000-000000000001',
     'admin@humora.internal',
-    '$argon2id$v=19$m=65536,t=3,p=2$2rJq22bZ34vYk93Kk0l7nA$OaZ9R11WvT2sTqPzV8K7LqO0m9U7Yx4BvW5E2R1T4Y',
+    '$argon2id$v=19$m=65536,t=3,p=2$o1I2uijVR9ephN5gIt8vbg$s0PHbA4ELghfKAvCwuvWWl8Tk8yZLFeLD0QgNiuDSFQ',
     'active',
     'in_office_active'
 ) ON CONFLICT (tenant_id, email) DO NOTHING;
@@ -117,3 +117,22 @@ VALUES
     ('40000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000001', 'In Review', 'in_progress', 2),
     ('40000000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000001', 'Done', 'done', 3)
 ON CONFLICT DO NOTHING;
+
+-- 10. Default Admin Employee Profile
+INSERT INTO hrms_employees (
+    id, tenant_id, user_id, employee_code, first_name, last_name, work_email,
+    department_id, designation_id, date_of_joining, employment_type, status
+) VALUES (
+    'e1000000-0000-0000-0000-000000000001',
+    'a0000000-0000-0000-0000-000000000001',
+    'c0000000-0000-0000-0000-000000000001',
+    'EMP-001',
+    'Swapnil',
+    'Admin',
+    'admin@humora.internal',
+    'd0000000-0000-0000-0000-000000000001',
+    'e0000000-0000-0000-0000-000000000002',
+    '2024-01-01',
+    'full_time',
+    'active'
+) ON CONFLICT (id) DO NOTHING;

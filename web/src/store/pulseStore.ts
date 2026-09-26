@@ -209,7 +209,7 @@ const initialMessages: Record<string, PulseMessage[]> = {
       senderId: 'user-alex',
       senderName: 'Alex Rivera',
       senderRole: 'Staff Lead Engineer',
-      content: 'Morning team! We have finalized the architecture restructuring for PeopleOS. Go backend is isolated, and frontend is running with zero bundle warnings.',
+      content: 'Morning team! We have finalized the architecture restructuring for Humora. Go backend is isolated, and frontend is running with zero bundle warnings.',
       timestamp: '09:15 AM',
       createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
       reactions: [
@@ -252,7 +252,7 @@ const initialMessages: Record<string, PulseMessage[]> = {
       attachments: [
         {
           id: 'att-arch-1',
-          name: 'PeopleOS_System_Architecture_2026.pdf',
+          name: 'Humora_System_Architecture_2026.pdf',
           size: '2.4 MB',
           type: 'pdf',
           url: '#',
@@ -324,13 +324,13 @@ const initialMessages: Record<string, PulseMessage[]> = {
       senderId: 'user-priya',
       senderName: 'Priya Sharma',
       senderRole: 'Principal Product Designer',
-      content: 'Here is the refined PeopleOS vector brand emblem preview in Champagne Amber Gold (#f59e0b) with negative space transparency. Thoughts on the subtle gradient curve?',
+      content: 'Here is the refined Humora vector brand emblem preview in Champagne Amber Gold (#f59e0b) with negative space transparency. Thoughts on the subtle gradient curve?',
       timestamp: '11:20 AM',
       createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
       attachments: [
         {
           id: 'att-img-1',
-          name: 'PeopleOS_Emblem_Gold_Preview.png',
+          name: 'Humora_Emblem_Gold_Preview.png',
           size: '840 KB',
           type: 'image',
           url: '/logo.svg',
@@ -348,7 +348,7 @@ const initialMessages: Record<string, PulseMessage[]> = {
       senderId: 'user-sarah',
       senderName: 'Sarah Jenkins',
       senderRole: 'VP of Engineering',
-      content: 'Welcome to the PeopleOS Team Pulse collaboration space! You can now participate in team channels, direct message colleagues, share project files, and tag manager-assigned sprint tasks in any discussion.',
+      content: 'Welcome to the Humora Team Pulse collaboration space! You can now participate in team channels, direct message colleagues, share project files, and tag manager-assigned sprint tasks in any discussion.',
       timestamp: 'Yesterday at 5:30 PM',
       createdAt: new Date(Date.now() - 86400000).toISOString(),
       reactions: [{ emoji: '🎉', count: 8, users: ['user-alex', 'user-priya', 'user-rohan'] }],

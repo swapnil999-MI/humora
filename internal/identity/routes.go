@@ -14,6 +14,8 @@ func RegisterRoutes(router fiber.Router, handler *Handler) {
 	authGroup.Post("/register", handler.Register)
 	authGroup.Post("/login", handler.Login)
 	authGroup.Post("/refresh", handler.RefreshToken)
+	authGroup.Post("/forgot-password", handler.ForgotPassword)
+	authGroup.Post("/reset-password", handler.ResetPassword)
 
 	// Protected Routes (Require Valid Session Token)
 	protected := authGroup.Group("/", middleware.AuthMiddleware())

@@ -167,7 +167,14 @@ func (r *repository) ListEmployees(ctx context.Context, tenantID uuid.UUID, sear
 	}
 
 	query := fmt.Sprintf(`
-		SELECT e.*, d.name AS department_name, ds.title AS designation_title
+		SELECT 
+			e.id, e.tenant_id, e.user_id, e.employee_code, e.first_name, e.last_name, 
+			e.work_email, e.personal_email, e.phone, e.department_id, e.designation_id, 
+			e.manager_id, e.secondary_manager_id, e.date_of_joining, e.date_of_exit, 
+			e.employment_type, e.status, e.hourly_cost_rate, e.custom_profile_fields, 
+			e.avatar_url, e.banner_url, e.biometric_sample_count,
+			e.created_at, e.updated_at,
+			d.name AS department_name, ds.title AS designation_title
 		FROM hrms_employees e
 		LEFT JOIN hrms_departments d ON e.department_id = d.id
 		LEFT JOIN hrms_designations ds ON e.designation_id = ds.id
@@ -262,14 +269,22 @@ func (r *repository) UpdateEmployeeBiometricFace(ctx context.Context, tenantID, 
 	return err
 }
 
+const punchSelectColumns = `
+	id, tenant_id, employee_id, punch_type, punched_at, 
+	latitude, longitude, accuracy_meters, location_id, 
+	is_geofence_verified, is_offline_signed, offline_signature, 
+	device_info, source, is_face_verified, face_confidence, 
+	face_distance, created_at
+`
+
 func (r *repository) GetLastPunch(ctx context.Context, tenantID, employeeID uuid.UUID) (*AttendancePunch, error) {
 	var punch AttendancePunch
-	query := `
-		SELECT * FROM hrms_attendance_punches
+	query := fmt.Sprintf(`
+		SELECT %s FROM hrms_attendance_punches
 		WHERE tenant_id = $1 AND employee_id = $2
 		ORDER BY punched_at DESC
 		LIMIT 1
-	`
+	`, punchSelectColumns)
 	err := r.db.GetContext(ctx, &punch, query, tenantID, employeeID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -282,11 +297,11 @@ func (r *repository) GetLastPunch(ctx context.Context, tenantID, employeeID uuid
 
 func (r *repository) GetTodayPunches(ctx context.Context, tenantID, employeeID uuid.UUID) ([]AttendancePunch, error) {
 	var punches []AttendancePunch
-	query := `
-		SELECT * FROM hrms_attendance_punches
+	query := fmt.Sprintf(`
+		SELECT %s FROM hrms_attendance_punches
 		WHERE tenant_id = $1 AND employee_id = $2 AND punched_at >= CURRENT_DATE
 		ORDER BY punched_at ASC
-	`
+	`, punchSelectColumns)
 	err := r.db.SelectContext(ctx, &punches, query, tenantID, employeeID)
 	return punches, err
 }
@@ -588,23 +603,23 @@ func (r *repository) ListEmployeeRosters(ctx context.Context, tenantID uuid.UUID
 }
 
 func (r *repository) GetPunchesByDateRange(ctx context.Context, tenantID, employeeID uuid.UUID, start, end time.Time) ([]AttendancePunch, error) {
-	query := `
-		SELECT * FROM hrms_attendance_punches
+	query := fmt.Sprintf(`
+		SELECT %s FROM hrms_attendance_punches
 		WHERE tenant_id = $1 AND employee_id = $2
 		  AND punched_at >= $3 AND punched_at <= $4
 		ORDER BY punched_at ASC
-	`
+	`, punchSelectColumns)
 	var punches []AttendancePunch
 	err := r.db.SelectContext(ctx, &punches, query, tenantID, employeeID, start, end)
 	return punches, err
 }
 
 func (r *repository) GetTodayTeamPunches(ctx context.Context, tenantID uuid.UUID) ([]AttendancePunch, error) {
-	query := `
-		SELECT * FROM hrms_attendance_punches
+	query := fmt.Sprintf(`
+		SELECT %s FROM hrms_attendance_punches
 		WHERE tenant_id = $1 AND punched_at >= CURRENT_DATE
 		ORDER BY punched_at ASC
-	`
+	`, punchSelectColumns)
 	var punches []AttendancePunch
 	err := r.db.SelectContext(ctx, &punches, query, tenantID)
 	return punches, err

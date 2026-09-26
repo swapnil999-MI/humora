@@ -112,14 +112,16 @@ func main() {
 
 	// Mount HRMS Domain
 	hrmsRepo := hrms.NewRepository(configs.DB)
+	companyService := hrms.NewCompanyService(configs.DB)
+	companyHandler := hrms.NewCompanyHandler(companyService)
 	hrmsService := hrms.NewService(hrmsRepo)
 	hrmsHandler := hrms.NewHandler(hrmsService)
-	onboardingService := hrms.NewOnboardingService(configs.DB, hrmsRepo)
+	onboardingService := hrms.NewOnboardingService(configs.DB, hrmsRepo, companyService)
 	onboardingHandler := hrms.NewOnboardingHandler(onboardingService)
 	payrollRepo := hrms.NewPayrollRepository(configs.DB)
-	payrollService := hrms.NewPayrollService(payrollRepo, hrmsRepo)
+	payrollService := hrms.NewPayrollService(payrollRepo, hrmsRepo, companyService)
 	payrollHandler := hrms.NewPayrollHandler(payrollService, hrmsRepo)
-	hrms.RegisterRoutes(apiV1, hrmsHandler, onboardingHandler, payrollHandler)
+	hrms.RegisterRoutes(apiV1, hrmsHandler, onboardingHandler, payrollHandler, companyHandler)
 
 	// Mount Agile Work Management Domain
 	workRepo := work.NewRepository(configs.DB)

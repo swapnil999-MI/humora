@@ -138,7 +138,7 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
             borderRadius: 'var(--radius-sm)',
             transition: 'opacity var(--transition-fast)',
           }}
-          title="PeopleOS Platform Home (My Workday Hub)"
+          title="Humora Platform Home (My Workday Hub)"
         >
           <PeopleOSLogo size={26} showBrandName brandTextSize={15} subText="Enterprise" />
         </button>

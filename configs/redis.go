@@ -37,6 +37,8 @@ func InitRedis() error {
 	defer cancel()
 
 	if err := RedisClient.Ping(ctx).Err(); err != nil {
+		_ = RedisClient.Close()
+		RedisClient = nil
 		return fmt.Errorf("failed to ping Redis: %w", err)
 	}
 

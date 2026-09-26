@@ -30,14 +30,85 @@ import { CreateIssueModal } from './components/CreateIssueModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { RegularizationModal } from './views/hrms/RegularizationModal';
 
+const extractCandidateToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+
+  // 1. Pathname format: /onboard/:token
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  const onboardPathIdx = pathParts.indexOf('onboard');
+  if (onboardPathIdx !== -1 && pathParts[onboardPathIdx + 1]) {
+    return pathParts[onboardPathIdx + 1];
+  }
+
+  // 2. Hash path format: #/onboard/:token or #onboard/:token
+  const cleanHash = window.location.hash.replace(/^#\/?/, '');
+  const hashPathOnly = cleanHash.split('?')[0];
+  const hashParts = hashPathOnly.split('/').filter(Boolean);
+  const onboardHashIdx = hashParts.indexOf('onboard');
+  if (onboardHashIdx !== -1 && hashParts[onboardHashIdx + 1]) {
+    return hashParts[onboardHashIdx + 1];
+  }
+
+  // 3. Search query params (?onboarding_token=... or ?token=...)
+  const urlParams = new URLSearchParams(window.location.search);
+  const qToken = urlParams.get('onboarding_token') || urlParams.get('token');
+  if (qToken) return qToken;
+
+  // 4. Hash query params (#/...?token=...)
+  if (window.location.hash.includes('?')) {
+    const hashParams = new URLSearchParams(window.location.hash.split('?')[1]);
+    const hToken = hashParams.get('onboarding_token') || hashParams.get('token');
+    if (hToken) return hToken;
+  }
+
+  return null;
+};
+
 export const App: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const userRoles = user?.roles || [];
+  const isAdmin = userRoles.some((r) => ['superadmin', 'admin', 'hr_admin'].includes(r.toLowerCase()));
+  const isEmployee = userRoles.some((r) => r.toLowerCase() === 'employee') && !isAdmin;
 
-  // Candidate self-service onboarding token from URL params
-  const urlParams = new URLSearchParams(window.location.search);
-  const urlOnboardingToken = urlParams.get('onboarding_token') || urlParams.get('token');
-  const [candidateWizardToken, setCandidateWizardToken] = useState<string | null>(urlOnboardingToken);
+  // Candidate self-service onboarding token from URL pathname, hash, or params
+  const [candidateWizardToken, setCandidateWizardToken] = useState<string | null>(extractCandidateToken);
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const tok = extractCandidateToken();
+      setCandidateWizardToken(tok);
+    };
+
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
+
+  // Initial landing page setup based on role
+  useEffect(() => {
+    if (isAuthenticated) {
+      const curHash = window.location.hash.replace(/^#\/?/, '').trim();
+      if (isAdmin) {
+        const essPages = ['hub', 'attendance', 'leaves', 'payroll', 'profile', '', 'login'];
+        if (essPages.includes(curHash)) {
+          dispatch(setWorkspace('management'));
+          dispatch(navigateToPage('company_settings'));
+          window.location.hash = '#/company_settings';
+        }
+      } else if (isEmployee) {
+        const mgmtPages = ['shifts', 'radar', 'approvals', 'capacity', 'directory', 'onboarding', 'company_settings', '', 'login'];
+        if (mgmtPages.includes(curHash)) {
+          dispatch(setWorkspace('employee'));
+          dispatch(navigateToPage('hub'));
+          window.location.hash = '#/hub';
+        }
+      }
+    }
+  }, [isAuthenticated, isAdmin, isEmployee, dispatch]);
 
   // Listen to browser URL hash changes to keep Redux page state synchronized
   useEffect(() => {
@@ -74,12 +145,14 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated) {
       dispatch(fetchMe());
-      dispatch(fetchAttendanceSummary());
       dispatch(fetchEmployees(''));
       dispatch(fetchProjects());
-      dispatch(fetchMyWorkday());
+      if (!isAdmin) {
+        dispatch(fetchAttendanceSummary());
+        dispatch(fetchMyWorkday());
+      }
     }
-  }, [dispatch, isAuthenticated]);
+  }, [dispatch, isAuthenticated, isAdmin]);
 
   // Global Keyboard Navigation (Cmd+K, Cmd+\, Alt+0, Alt+1, Alt+2, Alt+3, C)
   useEffect(() => {
@@ -106,10 +179,14 @@ export const App: React.FC = () => {
 
       if (e.altKey && e.key === '0') {
         e.preventDefault();
-        dispatch(setWorkspace('employee'));
+        if (!isAdmin) {
+          dispatch(setWorkspace('employee'));
+        }
       } else if (e.altKey && e.key === '1') {
         e.preventDefault();
-        dispatch(setWorkspace('management'));
+        if (!isEmployee) {
+          dispatch(setWorkspace('management'));
+        }
       } else if (e.altKey && e.key === '2') {
         e.preventDefault();
         dispatch(setWorkspace('work'));
@@ -124,17 +201,31 @@ export const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch]);
+  }, [dispatch, isAdmin, isEmployee]);
 
+  // Priority 1: Candidate self-service onboarding portal
+  // Candidates accessing via their invite token do NOT need to authenticate
+  if (candidateWizardToken) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--surface-0)' }}>
+        <CandidateWizardPage
+          token={candidateWizardToken}
+          onExit={() => {
+            setCandidateWizardToken(null);
+            if (window.location.pathname.includes('/onboard')) {
+              window.history.pushState({}, '', '/');
+            } else if (window.location.hash.includes('onboard')) {
+              window.location.hash = '';
+            }
+          }}
+        />
+        <ToastContainer />
+      </div>
+    );
+  }
+
+  // Priority 2: Unauthenticated users -> LoginPage
   if (!isAuthenticated) {
-    if (urlOnboardingToken) {
-      return (
-        <div style={{ minHeight: '100vh', background: 'var(--surface-0)' }}>
-          <CandidateWizardPage token={urlOnboardingToken} />
-          <ToastContainer />
-        </div>
-      );
-    }
     return (
       <>
         <LoginPage />

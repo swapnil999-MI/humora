@@ -1,7 +1,9 @@
 package hrms
 
 import (
+	"image"
 	"math"
+	"os"
 	"testing"
 	"time"
 )
@@ -115,4 +117,18 @@ func TestCalculateSandwichDays(t *testing.T) {
 	if sandwichDays != 1 {
 		t.Errorf("expected 1 sandwich day added for Wednesday holiday, got %f", sandwichDays)
 	}
+}
+
+func TestBiometricDebugLoggingAndMatching(t *testing.T) {
+	// 1. Test saveBiometricDebugImage
+	testImg := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	savedPath := saveBiometricDebugImage("test_punch", "emp-unit-test", testImg)
+	if savedPath == "" {
+		t.Fatalf("expected non-empty savedPath from saveBiometricDebugImage")
+	}
+	info, err := os.Stat(savedPath)
+	if err != nil || info.Size() == 0 {
+		t.Fatalf("expected saved debug image file to exist on disk, got err=%v", err)
+	}
+	defer os.Remove(savedPath)
 }

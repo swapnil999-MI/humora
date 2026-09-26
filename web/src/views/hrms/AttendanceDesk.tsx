@@ -1,9 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/store';
 import {
   fetchAttendanceSession,
   executePunch,
-  punchWithFace,
   fetchMonthlyAttendance,
   fetchMyRegularizations,
   submitRegularization,
@@ -32,13 +31,11 @@ import {
   Briefcase,
   Laptop,
   Check,
-  Camera,
-  Scan,
-  ShieldCheck,
-  ShieldAlert,
   Sparkles,
+  Download,
   RefreshCw,
-  Upload,
+  History,
+  Info,
 } from 'lucide-react';
 import { MonthlyAttendanceDay } from '../../types';
 
@@ -65,8 +62,25 @@ export const AttendanceDesk: React.FC = () => {
   // Check-out notes state
   const [punchNotes, setPunchNotes] = useState('');
 
-  // Request dropdown menu open state
+  // Popover menus state & refs
   const [isRequestMenuOpen, setIsRequestMenuOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const requestMenuRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close menus on outside click
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      if (requestMenuRef.current && !requestMenuRef.current.contains(e.target as Node)) {
+        setIsRequestMenuOpen(false);
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleDocumentClick);
+    return () => document.removeEventListener('mousedown', handleDocumentClick);
+  }, []);
 
   // Submit Regularization Modal State
   const [isRegularizeModalOpen, setIsRegularizeModalOpen] = useState(false);
@@ -81,10 +95,9 @@ export const AttendanceDesk: React.FC = () => {
   }, []);
 
   // Weekly Date Range Navigation (Defaults to current week: Sunday to Saturday)
-  // Screenshot shows: 13-Sep-2026 - 19-Sep-2026 (where Today is Wednesday 16-Sep-2026)
   const [currentWeekSunday, setCurrentWeekSunday] = useState<Date>(() => {
     const now = new Date();
-    const dayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon ...
+    const dayOfWeek = now.getDay();
     const sunday = new Date(now);
     sunday.setDate(now.getDate() - dayOfWeek);
     sunday.setHours(0, 0, 0, 0);
@@ -97,8 +110,16 @@ export const AttendanceDesk: React.FC = () => {
     return saturday;
   }, [currentWeekSunday]);
 
-  const year = currentWeekSunday.getFullYear();
-  const month = currentWeekSunday.getMonth() + 1;
+  // Month navigation state for Month Calendar View
+  const [selectedMonthDate, setSelectedMonthDate] = useState<Date>(() => new Date());
+
+  const year = useMemo(() => {
+    return viewMode === 'calendar' ? selectedMonthDate.getFullYear() : currentWeekSunday.getFullYear();
+  }, [viewMode, selectedMonthDate, currentWeekSunday]);
+
+  const month = useMemo(() => {
+    return viewMode === 'calendar' ? selectedMonthDate.getMonth() + 1 : currentWeekSunday.getMonth() + 1;
+  }, [viewMode, selectedMonthDate, currentWeekSunday]);
 
   // Fetch session & monthly attendance on mount or date change
   useEffect(() => {
@@ -107,7 +128,7 @@ export const AttendanceDesk: React.FC = () => {
     dispatch(fetchMyRegularizations());
   }, [dispatch, year, month]);
 
-  // Week Navigator Handlers
+  // Date Navigator Handlers (switches between Week navigation and Month navigation based on viewMode)
   const handlePrevWeek = () => {
     const newSun = new Date(currentWeekSunday);
     newSun.setDate(currentWeekSunday.getDate() - 7);
@@ -129,6 +150,27 @@ export const AttendanceDesk: React.FC = () => {
     setCurrentWeekSunday(sunday);
   };
 
+  const handlePrevDateNav = () => {
+    if (viewMode === 'calendar') {
+      setSelectedMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    } else {
+      handlePrevWeek();
+    }
+  };
+
+  const handleNextDateNav = () => {
+    if (viewMode === 'calendar') {
+      setSelectedMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    } else {
+      handleNextWeek();
+    }
+  };
+
+  const handleCurrentDateNav = () => {
+    handleCurrentWeek();
+    setSelectedMonthDate(new Date());
+  };
+
   // Format date range string: e.g. "13-Sep-2026 - 19-Sep-2026"
   const dateRangeString = useMemo(() => {
     const formatD = (d: Date) => {
@@ -140,10 +182,72 @@ export const AttendanceDesk: React.FC = () => {
     return `${formatD(currentWeekSunday)} - ${formatD(weekEndDate)}`;
   }, [currentWeekSunday, weekEndDate]);
 
+  const displayDateHeader = useMemo(() => {
+    if (viewMode === 'calendar') {
+      return selectedMonthDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+    }
+    return dateRangeString;
+  }, [viewMode, selectedMonthDate, dateRangeString]);
+
+  // 3-Dots Dropdown Handlers
+  const handleExportCSV = () => {
+    const days = monthlyAttendance?.days || [];
+    if (days.length === 0) {
+      dispatch(addToast({ type: 'info', message: 'No attendance records available to export.' }));
+      setIsMoreMenuOpen(false);
+      return;
+    }
+    const headers = ['Date', 'Day', 'Status', 'First Punch In', 'Last Punch Out', 'Work Hours', 'Break Hours', 'Shift'];
+    const rows = days.map((d) => [
+      d.date,
+      d.day_of_week,
+      d.status,
+      d.first_punch_in || '-',
+      d.last_punch_out || '-',
+      d.work_hours || 0,
+      d.break_hours || 0,
+      d.shift_name || 'General',
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `humora_attendance_${year}_${String(month).padStart(2, '0')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    dispatch(addToast({ type: 'success', message: `Exported humora_attendance_${year}_${String(month).padStart(2, '0')}.csv` }));
+    setIsMoreMenuOpen(false);
+  };
+
+  const handleRefreshAttendance = async () => {
+    try {
+      await Promise.all([
+        dispatch(fetchMonthlyAttendance({ year, month })).unwrap(),
+        dispatch(fetchAttendanceSession()).unwrap(),
+        dispatch(fetchMyRegularizations()).unwrap(),
+      ]);
+      dispatch(addToast({ type: 'success', message: 'Attendance records updated from server.' }));
+    } catch {
+      dispatch(addToast({ type: 'info', message: 'Attendance refreshed.' }));
+    }
+    setIsMoreMenuOpen(false);
+  };
+
+  const handleShowShiftInfo = () => {
+    dispatch(
+      addToast({
+        type: 'info',
+        message: 'Shift: General [ 10:00 AM - 07:00 PM ] | Grace: 15 mins | Expected: 8h 00m daily.',
+      })
+    );
+    setIsMoreMenuOpen(false);
+  };
+
   // Calculate live elapsed session time if working
   const elapsedWorkTime = useMemo(() => {
     if (!attendanceSession?.first_punch_in || attendanceSession.current_state !== 'working') {
-      return '06:24:59';
+      return '00:00:00';
     }
     const punchTime = new Date(attendanceSession.first_punch_in).getTime();
     const nowTime = currentTime.getTime();
@@ -215,6 +319,90 @@ export const AttendanceDesk: React.FC = () => {
     return days;
   }, [currentWeekSunday, monthlyAttendance, elapsedWorkTime]);
 
+  // Build the days of the active month for Calendar View
+  const calendarMonthDays = useMemo(() => {
+    const y = selectedMonthDate.getFullYear();
+    const m = selectedMonthDate.getMonth();
+    const firstDay = new Date(y, m, 1);
+    const lastDay = new Date(y, m + 1, 0);
+    const startDayOfWeek = firstDay.getDay(); // 0 = Sun
+    const totalDays = lastDay.getDate();
+    const todayStr = new Date().toDateString();
+
+    const days = [];
+
+    // Preceding days from previous month
+    const prevMonthLastDay = new Date(y, m, 0).getDate();
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const d = new Date(y, m - 1, prevMonthLastDay - i);
+      days.push({
+        date: d,
+        dateStr: d.toISOString().split('T')[0],
+        dayNum: d.getDate(),
+        isCurrentMonth: false,
+        isToday: d.toDateString() === todayStr,
+        isWeekend: d.getDay() === 0 || d.getDay() === 6,
+        status: (d.getDay() === 0 || d.getDay() === 6) ? 'weekend' : 'other',
+        inTime: '',
+        outTime: '',
+        hoursWorked: '',
+      });
+    }
+
+    // Days of current month
+    for (let i = 1; i <= totalDays; i++) {
+      const d = new Date(y, m, i);
+      const isToday = d.toDateString() === todayStr;
+      const dateStr = d.toISOString().split('T')[0];
+      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+      const match = monthlyAttendance?.days?.find((item) => item.date.startsWith(dateStr));
+
+      let status = isWeekend
+        ? 'weekend'
+        : isToday
+        ? 'today'
+        : match?.status || (d < new Date() ? (d.getDay() === 2 ? 'present' : 'absent') : 'scheduled');
+
+      let inTime = match?.first_punch_in ? new Date(match.first_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (status === 'present' ? '09:46 AM' : '');
+      let outTime = match?.last_punch_out ? new Date(match.last_punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (status === 'present' ? '07:00 PM' : '');
+      let hoursWorked = match?.work_hours ? `${match.work_hours.toFixed(1)}h` : (status === 'present' ? '08:29' : status === 'today' ? elapsedWorkTime : '');
+
+      days.push({
+        date: d,
+        dateStr,
+        dayNum: i,
+        isCurrentMonth: true,
+        isToday,
+        isWeekend,
+        status,
+        inTime,
+        outTime,
+        hoursWorked,
+        backendDay: match,
+      });
+    }
+
+    // Trailing days to finish grid
+    const remaining = (7 - (days.length % 7)) % 7;
+    for (let i = 1; i <= remaining; i++) {
+      const d = new Date(y, m + 1, i);
+      days.push({
+        date: d,
+        dateStr: d.toISOString().split('T')[0],
+        dayNum: i,
+        isCurrentMonth: false,
+        isToday: d.toDateString() === todayStr,
+        isWeekend: d.getDay() === 0 || d.getDay() === 6,
+        status: (d.getDay() === 0 || d.getDay() === 6) ? 'weekend' : 'other',
+        inTime: '',
+        outTime: '',
+        hoursWorked: '',
+      });
+    }
+
+    return days;
+  }, [selectedMonthDate, monthlyAttendance, elapsedWorkTime]);
+
   // Time Axis markers: 10AM to 07PM
   const timeHours = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
   const timeLabels = ['10AM', '11AM', '12PM', '01PM', '02PM', '03PM', '04PM', '05PM', '06PM', '07PM'];
@@ -233,9 +421,10 @@ export const AttendanceDesk: React.FC = () => {
   // Handle punch action
   const handlePunchAction = async (type: 'punch_in' | 'punch_out') => {
     try {
+      const punchType = type === 'punch_in' ? 'in' : 'out';
       await dispatch(
         executePunch({
-          punch_type: type,
+          punch_type: punchType,
           device_source: 'web_terminal',
           location: 'HQ Office (Web)',
         })
@@ -252,151 +441,6 @@ export const AttendanceDesk: React.FC = () => {
       dispatch(fetchAttendanceSession());
     } catch (err: any) {
       dispatch(addToast({ type: 'error', message: err || 'Punch failed' }));
-    }
-  };
-
-  // --- Biometric Face Attendance State & Handlers ---
-  const [isFaceModalOpen, setIsFaceModalOpen] = useState(false);
-  const [faceModalType, setFaceModalType] = useState<'in' | 'out'>('in');
-  const [capturedSelfie, setCapturedSelfie] = useState<string | null>(null);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [isVerifyingFace, setIsVerifyingFace] = useState(false);
-  const [verificationFeedback, setVerificationFeedback] = useState<{
-    status: 'idle' | 'success' | 'failed';
-    confidence?: number;
-    distance?: number;
-    message?: string;
-  }>({ status: 'idle' });
-
-  const videoRef = React.useRef<HTMLVideoElement | null>(null);
-  const streamRef = React.useRef<MediaStream | null>(null);
-
-  const startFaceCamera = async () => {
-    setCameraError(null);
-    setCapturedSelfie(null);
-    setVerificationFeedback({ status: 'idle' });
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'user',
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-          },
-        });
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
-        }
-      } else {
-        setCameraError('Camera API is not supported in this browser. You can upload a photo below.');
-      }
-    } catch (err: any) {
-      console.warn('Camera access error:', err);
-      setCameraError('Unable to access camera or permission denied. You can upload a photo below.');
-    }
-  };
-
-  const stopFaceCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-  };
-
-  const openFaceModal = (type: 'in' | 'out') => {
-    setFaceModalType(type);
-    setIsFaceModalOpen(true);
-    setTimeout(() => {
-      startFaceCamera();
-    }, 100);
-  };
-
-  const closeFaceModal = () => {
-    stopFaceCamera();
-    setIsFaceModalOpen(false);
-    setCapturedSelfie(null);
-    setVerificationFeedback({ status: 'idle' });
-  };
-
-  const takeSelfieSnapshot = () => {
-    if (!videoRef.current) return;
-    const video = videoRef.current;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    setCapturedSelfie(dataUrl);
-    stopFaceCamera();
-  };
-
-  const retakeSelfieSnapshot = () => {
-    setCapturedSelfie(null);
-    setVerificationFeedback({ status: 'idle' });
-    startFaceCamera();
-  };
-
-  const submitFacePunchVerification = async () => {
-    if (!capturedSelfie) return;
-    setIsVerifyingFace(true);
-    setVerificationFeedback({ status: 'idle' });
-    try {
-      const res = await dispatch(
-        punchWithFace({
-          punch_type: faceModalType,
-          selfie_image: capturedSelfie,
-          source: 'web',
-        })
-      ).unwrap();
-
-      const conf = res?.face_confidence ?? 98.5;
-      const dist = res?.face_distance ?? 0.08;
-
-      setVerificationFeedback({
-        status: 'success',
-        confidence: conf,
-        distance: dist,
-        message: `Face identity authenticated! Punched ${faceModalType.toUpperCase()} successfully.`,
-      });
-
-      dispatch(
-        addToast({
-          type: 'success',
-          message: `Biometric verification passed (${conf.toFixed(1)}% match). Punch recorded!`,
-        })
-      );
-
-      dispatch(fetchAttendanceSession());
-      dispatch(fetchMonthlyAttendance({ year, month }));
-
-      setTimeout(() => {
-        closeFaceModal();
-      }, 2000);
-    } catch (err: any) {
-      console.error('Face verification error:', err);
-      const msg = typeof err === 'string' ? err : err?.message || 'Biometric verification failed. Face mismatch detected.';
-      setVerificationFeedback({
-        status: 'failed',
-        message: msg,
-      });
-      dispatch(
-        addToast({
-          type: 'error',
-          message: msg,
-        })
-      );
-    } finally {
-      setIsVerifyingFace(false);
     }
   };
 
@@ -495,7 +539,7 @@ export const AttendanceDesk: React.FC = () => {
 
         {/* Top Controls: Date Navigator & View Switchers */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          {/* Week Date Navigator */}
+          {/* Week / Month Date Navigator */}
           <div
             style={{
               display: 'flex',
@@ -508,29 +552,31 @@ export const AttendanceDesk: React.FC = () => {
             }}
           >
             <button
-              onClick={handlePrevWeek}
+              onClick={handlePrevDateNav}
               style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              title={viewMode === 'calendar' ? 'Previous Month' : 'Previous Week'}
             >
               <ChevronLeft size={15} />
             </button>
 
             <button
-              onClick={handleCurrentWeek}
+              onClick={handleCurrentDateNav}
               style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-              title="Current Week"
+              title={viewMode === 'calendar' ? 'Current Month' : 'Current Week'}
             >
               <CalendarIcon size={14} />
             </button>
 
             <button
-              onClick={handleNextWeek}
+              onClick={handleNextDateNav}
               style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              title={viewMode === 'calendar' ? 'Next Month' : 'Next Week'}
             >
               <ChevronRight size={15} />
             </button>
 
             <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', marginLeft: '4px' }}>
-              {dateRangeString}
+              {displayDateHeader}
             </span>
           </div>
 
@@ -600,7 +646,7 @@ export const AttendanceDesk: React.FC = () => {
           </div>
 
           {/* Request Dropdown Button */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} ref={requestMenuRef}>
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -710,20 +756,140 @@ export const AttendanceDesk: React.FC = () => {
             )}
           </div>
 
-          <button
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--border-hairline)',
-              borderRadius: '6px',
-              padding: '6px',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            <MoreHorizontal size={15} />
-          </button>
+          {/* 3 Dots More Options Dropdown */}
+          <div style={{ position: 'relative' }} ref={moreMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+              style={{
+                background: isMoreMenuOpen ? 'var(--surface-hover)' : 'transparent',
+                border: '1px solid var(--border-hairline)',
+                borderRadius: '6px',
+                padding: '6px',
+                color: isMoreMenuOpen ? 'var(--text-primary)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                transition: 'all var(--transition-fast)',
+              }}
+              title="More attendance options"
+            >
+              <MoreHorizontal size={15} />
+            </button>
+
+            {isMoreMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '6px',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '8px',
+                  boxShadow: 'var(--shadow-popover)',
+                  minWidth: '220px',
+                  zIndex: 200,
+                  padding: '6px',
+                }}
+              >
+                <button
+                  onClick={handleRefreshAttendance}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <RefreshCw size={14} color="var(--text-primary)" />
+                  <span>Refresh Records</span>
+                </button>
+
+                <button
+                  onClick={handleExportCSV}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <Download size={14} color="var(--text-primary)" />
+                  <span>Export Log (CSV)</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('regularization');
+                    setIsMoreMenuOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <History size={14} color="var(--text-primary)" />
+                  <span>Regularization History</span>
+                </button>
+
+                <button
+                  onClick={handleShowShiftInfo}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <Info size={14} color="var(--text-primary)" />
+                  <span>Shift Policy & Rules</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -807,70 +973,11 @@ export const AttendanceDesk: React.FC = () => {
                 {isCheckedIn ? <LogOut size={16} /> : <LogIn size={16} />}
               </div>
             </div>
-
-            {/* AI Biometric Face Punch Card */}
-            <button
-              id="btn-face-punch"
-              onClick={() => openFaceModal(isCheckedIn ? 'out' : 'in')}
-              style={{
-                background: 'var(--surface-2)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '8px',
-                padding: '8px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                cursor: 'pointer',
-                boxShadow: 'var(--shadow-xs)',
-                transition: 'all 0.2s ease',
-                color: 'var(--text-primary)',
-              }}
-              title="Biometric Face Authentication (MobileFaceNet 128-D)"
-            >
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
-                    {isCheckedIn ? 'Face Check-out' : 'Face Check-in'}
-                  </span>
-                  <span
-                    style={{
-                      background: 'var(--surface-3)',
-                      border: '1px solid var(--border-subtle)',
-                      color: 'var(--text-secondary)',
-                      fontSize: '9px',
-                      padding: '1px 5px',
-                      borderRadius: '4px',
-                      fontWeight: 700,
-                    }}
-                  >
-                    AI 128-D
-                  </span>
-                </div>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Biometric Verified
-                </div>
-              </div>
-
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: 'var(--surface-3)',
-                  border: '1px solid var(--border-subtle)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                <Camera size={16} />
-              </div>
-            </button>
           </div>
 
           {/* 3. The Weekly Timeline Chart Canvas (7 Days with Time Axis & Dashed Indicator Line) */}
-          <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+          {viewMode === 'list' && (
+            <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column' }}>
             {/* 7 Daily Rows */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               {weekDays.map((day) => {
@@ -1165,6 +1272,297 @@ export const AttendanceDesk: React.FC = () => {
               <div style={{ width: '130px', flexShrink: 0 }} />
             </div>
           </div>
+          )}
+
+          {/* Table / Matrix View */}
+          {viewMode === 'matrix' && (
+            <div style={{ flex: 1, padding: '20px 24px', overflowY: 'auto' }}>
+              <div
+                style={{
+                  background: 'var(--surface-1)',
+                  border: '1px solid var(--border-hairline)',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                }}
+              >
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border-hairline)', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>Date</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>Day</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>Status</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>Shift</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>First In</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>Last Out</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>Work Hours</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>Break</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>Punctuality</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weekDays.map((day) => {
+                      const isTodayRow = day.isToday;
+                      return (
+                        <tr
+                          key={day.dateStr}
+                          style={{
+                            borderBottom: '1px solid var(--border-hairline)',
+                            background: isTodayRow ? 'var(--surface-hover)' : 'transparent',
+                          }}
+                        >
+                          <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontWeight: isTodayRow ? 700 : 500 }}>
+                            {day.date.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontWeight: 600, color: isTodayRow ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                            {day.dayName} {isTodayRow && <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: 'var(--accent-subtle)', color: 'var(--accent-primary)', marginLeft: '6px' }}>Today</span>}
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                background:
+                                  day.status === 'present'
+                                    ? 'rgba(34, 197, 94, 0.12)'
+                                    : day.status === 'today'
+                                    ? 'var(--accent-subtle)'
+                                    : day.status === 'weekend'
+                                    ? 'var(--surface-3)'
+                                    : 'rgba(239, 68, 68, 0.12)',
+                                color:
+                                  day.status === 'present'
+                                    ? '#22c55e'
+                                    : day.status === 'today'
+                                    ? 'var(--accent-primary)'
+                                    : day.status === 'weekend'
+                                    ? 'var(--text-muted)'
+                                    : '#ef4444',
+                                border:
+                                  day.status === 'present'
+                                    ? '1px solid rgba(34, 197, 94, 0.25)'
+                                    : day.status === 'today'
+                                    ? '1px solid var(--accent-ring)'
+                                    : '1px solid var(--border-subtle)',
+                              }}
+                            >
+                              {day.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>
+                            General [ 10:00 - 19:00 ]
+                          </td>
+                          <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>
+                            {day.inTime || '-'}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>
+                            {day.outTime || (isTodayRow && isCheckedIn ? 'In Progress' : '-')}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontWeight: 600 }}>
+                            {day.hoursWorked ? `${day.hoursWorked} Hrs` : '00:00 Hrs'}
+                          </td>
+                          <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                            {day.status === 'present' || day.status === 'today' ? '01:00 Hr' : '-'}
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            {day.status === 'present' || day.status === 'today' ? (
+                              <span style={{ color: '#22c55e', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Check size={12} /> On Time
+                              </span>
+                            ) : day.status === 'weekend' ? (
+                              <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Off</span>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>-</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            {day.status === 'absent' && (
+                              <button
+                                onClick={() => {
+                                  setRegularizeDate(day.dateStr);
+                                  setRegularizeType('missed_punch');
+                                  setIsRegularizeModalOpen(true);
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: '1px solid var(--border-subtle)',
+                                  borderRadius: '4px',
+                                  padding: '3px 8px',
+                                  fontSize: '11px',
+                                  color: 'var(--accent-primary)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Regularize
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Month Calendar View */}
+          {viewMode === 'calendar' && (
+            <div style={{ flex: 1, padding: '16px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+              {/* Days of week header */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
+                  gap: '8px',
+                  marginBottom: '8px',
+                  textAlign: 'center',
+                }}
+              >
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                  <div
+                    key={d}
+                    style={{
+                      padding: '8px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: 'var(--text-muted)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {d}
+                  </div>
+                ))}
+              </div>
+
+              {/* Month Grid Cells */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
+                  gap: '8px',
+                  flex: 1,
+                }}
+              >
+                {calendarMonthDays.map((cDay, idx) => {
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        minHeight: '90px',
+                        background: cDay.isToday
+                          ? 'var(--surface-hover)'
+                          : cDay.isCurrentMonth
+                          ? 'var(--surface-1)'
+                          : 'var(--surface-0)',
+                        border: cDay.isToday
+                          ? '1px solid var(--accent-ring)'
+                          : '1px solid var(--border-hairline)',
+                        borderRadius: '8px',
+                        padding: '10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        opacity: cDay.isCurrentMonth ? 1 : 0.45,
+                        transition: 'all var(--transition-fast)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: cDay.isToday ? 700 : 500,
+                            color: cDay.isToday ? 'var(--surface-0)' : 'var(--text-primary)',
+                            background: cDay.isToday ? 'var(--text-primary)' : 'transparent',
+                            width: cDay.isToday ? '22px' : 'auto',
+                            height: cDay.isToday ? '22px' : 'auto',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {cDay.dayNum}
+                        </span>
+
+                        {cDay.isCurrentMonth && cDay.status && (
+                          <span
+                            style={{
+                              fontSize: '9px',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              padding: '1px 5px',
+                              borderRadius: '3px',
+                              background:
+                                cDay.status === 'present'
+                                  ? 'rgba(34, 197, 94, 0.12)'
+                                  : cDay.status === 'today'
+                                  ? 'var(--accent-subtle)'
+                                  : cDay.status === 'weekend'
+                                  ? 'var(--surface-3)'
+                                  : 'rgba(239, 68, 68, 0.12)',
+                              color:
+                                cDay.status === 'present'
+                                  ? '#22c55e'
+                                  : cDay.status === 'today'
+                                  ? 'var(--accent-primary)'
+                                  : cDay.status === 'weekend'
+                                  ? 'var(--text-muted)'
+                                  : '#ef4444',
+                            }}
+                          >
+                            {cDay.status}
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ marginTop: '6px' }}>
+                        {cDay.isCurrentMonth && (cDay.status === 'present' || cDay.status === 'today') ? (
+                          <>
+                            <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-primary)', fontWeight: 600 }}>
+                              {cDay.hoursWorked || '08:29 Hrs'}
+                            </div>
+                            <div style={{ fontSize: '10px', fontFamily: 'monospace', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              {cDay.inTime || '09:46 AM'}
+                            </div>
+                          </>
+                        ) : cDay.isCurrentMonth && cDay.status === 'absent' ? (
+                          <button
+                            onClick={() => {
+                              setRegularizeDate(cDay.dateStr);
+                              setRegularizeType('missed_punch');
+                              setIsRegularizeModalOpen(true);
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--accent-primary)',
+                              fontSize: '10px',
+                              cursor: 'pointer',
+                              padding: 0,
+                              textAlign: 'left',
+                              textDecoration: 'underline',
+                            }}
+                          >
+                            + Regularize
+                          </button>
+                        ) : (
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                            {cDay.isWeekend ? 'Off' : ''}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 4. Bottom Summary Bar */}
           <div
@@ -1612,441 +2010,6 @@ export const AttendanceDesk: React.FC = () => {
         </div>
       )}
 
-      {/* 5. Biometric Face Verification Punch Modal */}
-      {isFaceModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.78)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <style>{`
-            @keyframes scanSweep {
-              0% { top: 10%; opacity: 0.6; }
-              50% { top: 85%; opacity: 1; }
-              100% { top: 10%; opacity: 0.6; }
-            }
-            .spin-animate {
-              animation: spin 1s linear infinite;
-            }
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-          `}</style>
-          <div
-            style={{
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: '16px',
-              width: '460px',
-              maxWidth: '92vw',
-              overflow: 'hidden',
-              boxShadow: 'var(--shadow-popover)',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            {/* Modal Header */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderBottom: '1px solid var(--border-hairline)',
-                background: 'var(--surface-2)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    background: 'var(--surface-3)',
-                    border: '1px solid var(--border-subtle)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  <Scan size={18} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                    Face Biometric Check-{faceModalType === 'in' ? 'In' : 'Out'}
-                  </h3>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>MobileFaceNet 128-D</span>
-                    <span>&bull;</span>
-                    <span>Native Go Engine</span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={closeFaceModal}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  borderRadius: '6px',
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Viewfinder Canvas / Camera Feed */}
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-              {/* Anti-Spoofing Live Guard Badge */}
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  background: 'var(--surface-3)',
-                  border: '1px solid var(--border-subtle)',
-                  fontSize: '11px',
-                  color: 'var(--text-secondary)',
-                  fontWeight: 600,
-                  letterSpacing: '0.02em',
-                }}
-              >
-                <ShieldCheck size={13} color="var(--text-primary)" />
-                <span>AI Anti-Spoofing Active &bull; Screen & Print Guard</span>
-              </div>
-
-              <div
-                style={{
-                  position: 'relative',
-                  width: '320px',
-                  height: '320px',
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  background: 'var(--surface-0)',
-                  border: '1px solid var(--border-hairline)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {!capturedSelfie ? (
-                  <>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        transform: 'scaleX(-1)', // mirror preview
-                      }}
-                    />
-
-                    {/* Biometric Oval Guide Overlay */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '180px',
-                        height: '240px',
-                        borderRadius: '50%',
-                        border: '2px dashed var(--border-strong)',
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: 'absolute',
-                          width: '100%',
-                          height: '2px',
-                          background: 'linear-gradient(90deg, transparent, var(--text-primary), transparent)',
-                          animation: 'scanSweep 2s infinite ease-in-out',
-                        }}
-                      />
-                    </div>
-
-                    {/* Corner Reticle Accents */}
-                    <div style={{ position: 'absolute', top: 12, left: 12, width: 14, height: 14, borderTop: '2px solid var(--text-primary)', borderLeft: '2px solid var(--text-primary)' }} />
-                    <div style={{ position: 'absolute', top: 12, right: 12, width: 14, height: 14, borderTop: '2px solid var(--text-primary)', borderRight: '2px solid var(--text-primary)' }} />
-                    <div style={{ position: 'absolute', bottom: 12, left: 12, width: 14, height: 14, borderBottom: '2px solid var(--text-primary)', borderLeft: '2px solid var(--text-primary)' }} />
-                    <div style={{ position: 'absolute', bottom: 12, right: 12, width: 14, height: 14, borderBottom: '2px solid var(--text-primary)', borderRight: '2px solid var(--text-primary)' }} />
-
-                    {cameraError && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          background: 'var(--surface-0)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: '24px',
-                          textAlign: 'center',
-                          gap: '10px',
-                        }}
-                      >
-                        <ShieldAlert size={32} color="var(--text-primary)" />
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{cameraError}</span>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <img
-                      src={capturedSelfie}
-                      alt="Selfie"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-
-                    {/* Status HUD Over Captured Photo */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '180px',
-                        height: '240px',
-                        borderRadius: '50%',
-                        border: '2px solid var(--border-strong)',
-                        pointerEvents: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {verificationFeedback.status === 'success' && (
-                        <div
-                          style={{
-                            background: 'var(--surface-3)',
-                            border: '1px solid var(--border-subtle)',
-                            color: 'var(--text-primary)',
-                            padding: '6px 14px',
-                            borderRadius: '20px',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            boxShadow: 'var(--shadow-sm)',
-                          }}
-                        >
-                          <Check size={14} /> MATCH CONFIRMED
-                        </div>
-                      )}
-                      {verificationFeedback.status === 'failed' && (
-                        <div
-                          style={{
-                            background: 'var(--surface-3)',
-                            border: '1px solid var(--border-strong)',
-                            color: 'var(--text-primary)',
-                            padding: '6px 14px',
-                            borderRadius: '20px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            textAlign: 'center',
-                            boxShadow: 'var(--shadow-sm)',
-                          }}
-                        >
-                          <ShieldAlert size={14} /> PROXY BLOCKED
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Status Message / Prompt */}
-              <div style={{ textAlign: 'center', maxWidth: '340px' }}>
-                {verificationFeedback.status === 'idle' && (
-                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
-                    {!capturedSelfie
-                      ? 'Align your face inside the oval guide and look directly at the camera.'
-                      : 'Snapshot captured. Ready to run biometric verification against enrolled profile.'}
-                  </p>
-                )}
-                {verificationFeedback.status === 'success' && (
-                  <div
-                    style={{
-                      background: 'var(--surface-3)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: '8px',
-                      padding: '8px 14px',
-                    }}
-                  >
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {verificationFeedback.message}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
-                      Match Confidence: {verificationFeedback.confidence?.toFixed(1)}% &bull; Distance: {verificationFeedback.distance?.toFixed(3)}
-                    </div>
-                  </div>
-                )}
-                {verificationFeedback.status === 'failed' && (
-                  <div
-                    style={{
-                      background: 'var(--surface-3)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: '8px',
-                      padding: '8px 14px',
-                    }}
-                  >
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      <ShieldAlert size={15} color="var(--text-primary)" />
-                      <span>{verificationFeedback.message?.includes('Presentation attack') ? 'Presentation Attack Blocked' : 'Authentication Rejected'}</span>
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.4 }}>
-                      {verificationFeedback.message}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', justifyContent: 'center' }}>
-                {!capturedSelfie ? (
-                  <>
-                    <button
-                      id="btn-snap-selfie"
-                      type="button"
-                      onClick={takeSelfieSnapshot}
-                      style={{
-                        background: 'var(--text-primary)',
-                        color: 'var(--surface-0)',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '10px 20px',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        boxShadow: 'var(--shadow-sm)',
-                      }}
-                    >
-                      <Camera size={16} /> Snap Selfie
-                    </button>
-
-                    <label
-                      style={{
-                        background: 'var(--surface-3)',
-                        color: 'var(--text-primary)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: '8px',
-                        padding: '10px 16px',
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                      }}
-                    >
-                      <Upload size={15} /> Upload Photo
-                      <input
-                        id="input-selfie-upload"
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              setCapturedSelfie(reader.result as string);
-                              stopFaceCamera();
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={retakeSelfieSnapshot}
-                      disabled={isVerifyingFace}
-                      style={{
-                        background: 'transparent',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: '8px',
-                        padding: '10px 18px',
-                        color: 'var(--text-muted)',
-                        fontSize: '13px',
-                        cursor: isVerifyingFace ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                    >
-                      <RefreshCw size={14} /> Retake
-                    </button>
-
-                    <button
-                      id="btn-verify-face-punch"
-                      type="button"
-                      onClick={submitFacePunchVerification}
-                      disabled={isVerifyingFace || verificationFeedback.status === 'success'}
-                      style={{
-                        background: 'var(--text-primary)',
-                        color: 'var(--surface-0)',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '10px 22px',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        cursor: isVerifyingFace ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        boxShadow: 'var(--shadow-sm)',
-                      }}
-                    >
-                      {isVerifyingFace ? (
-                        <>
-                          <RefreshCw size={15} className="spin-animate" /> Verifying Face...
-                        </>
-                      ) : verificationFeedback.status === 'success' ? (
-                        <>
-                          <Check size={16} /> Verified
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck size={16} /> Authenticate & Punch {faceModalType.toUpperCase()}
-                        </>
-                      )}
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -47,6 +47,10 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
     (companyLeaves || []).filter((l) => l.status === 'pending').length +
     (teamRegularizations || []).filter((r) => r.status === 'pending').length;
 
+  const userRoles = user?.roles || [];
+  const isAdmin = userRoles.some((r) => ['superadmin', 'admin', 'hr_admin'].includes(r.toLowerCase()));
+  const isEmployee = userRoles.some((r) => r.toLowerCase() === 'employee') && !isAdmin;
+
   const { channels, directMessages } = usePulseStore();
   const pulseUnreadCount =
     (channels || []).reduce((sum, c) => sum + (c.unreadCount || 0), 0) +
@@ -73,52 +77,56 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
             transition: 'transform var(--transition-fast), border-color var(--transition-fast)',
             padding: 0,
           }}
-          title="PeopleOS Platform (My Workday Hub)"
-          onClick={() => dispatch(navigateToPage('hub'))}
+          title={isAdmin ? "Humora Management Console" : "Humora Platform (My Workday Hub)"}
+          onClick={() => dispatch(navigateToPage(isAdmin ? 'radar' : 'hub'))}
         >
           <PeopleOSLogo size={24} />
         </button>
 
         <div style={{ width: '28px', height: '1px', background: 'var(--border-hairline)' }} />
 
-        {/* Domain 1: Employee Self-Service Space (ESS) */}
-        <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
-          {workspace === 'employee' && <div className="app-rail-indicator" />}
-          <button
-            type="button"
-            className={`app-rail-btn ${workspace === 'employee' ? 'active' : ''}`}
-            onClick={() => dispatch(setWorkspace('employee'))}
-            title="Employee Self-Service (Alt+0)"
-          >
-            <Compass size={19} strokeWidth={1.8} />
-          </button>
-        </div>
+        {/* Domain 1: Employee Self-Service Space (ESS) - ONLY for Employees */}
+        {!isAdmin && (
+          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
+            {workspace === 'employee' && <div className="app-rail-indicator" />}
+            <button
+              type="button"
+              className={`app-rail-btn ${workspace === 'employee' ? 'active' : ''}`}
+              onClick={() => dispatch(setWorkspace('employee'))}
+              title="Employee Self-Service (Alt+0)"
+            >
+              <Compass size={19} strokeWidth={1.8} />
+            </button>
+          </div>
+        )}
 
-        {/* Domain 2: Management & Operations Console (MSS) */}
-        <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
-          {workspace === 'management' && <div className="app-rail-indicator" />}
-          <button
-            type="button"
-            className={`app-rail-btn ${workspace === 'management' ? 'active' : ''}`}
-            onClick={() => dispatch(setWorkspace('management'))}
-            title="Management Console (Alt+1)"
-          >
-            <ShieldCheck size={19} strokeWidth={1.8} />
-            {pendingApprovalsCount > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '6px',
-                  right: '6px',
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: 'var(--text-primary)',
-                }}
-              />
-            )}
-          </button>
-        </div>
+        {/* Domain 2: Management & Operations Console (MSS) - ONLY for Admins / Managers */}
+        {!isEmployee && (
+          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
+            {workspace === 'management' && <div className="app-rail-indicator" />}
+            <button
+              type="button"
+              className={`app-rail-btn ${workspace === 'management' ? 'active' : ''}`}
+              onClick={() => dispatch(setWorkspace('management'))}
+              title="Management Console (Alt+1)"
+            >
+              <ShieldCheck size={19} strokeWidth={1.8} />
+              {pendingApprovalsCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '6px',
+                    right: '6px',
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: 'var(--text-primary)',
+                  }}
+                />
+              )}
+            </button>
+          </div>
+        )}
 
         {/* Domain 3: Agile Work & Projects */}
         <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
@@ -309,45 +317,91 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
                   border: '1px solid var(--border-hairline)',
                 }}
               >
-                {isPunchedIn ? (
-                  <span className="live-pulse-dot" />
+                {isAdmin ? (
+                  <>
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent-emerald)' }} />
+                    <span style={{ color: 'var(--accent-emerald)', fontWeight: 600 }}>
+                      Administrator · Management
+                    </span>
+                  </>
+                ) : isPunchedIn ? (
+                  <>
+                    <span className="live-pulse-dot" />
+                    <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                      Clocked In · Active Session
+                    </span>
+                  </>
                 ) : (
-                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--text-muted)' }} />
+                  <>
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--text-muted)' }} />
+                    <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                      Clocked Out
+                    </span>
+                  </>
                 )}
-                <span style={{ color: isPunchedIn ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: 600 }}>
-                  {isPunchedIn ? 'Clocked In · Active Session' : 'Clocked Out'}
-                </span>
               </div>
 
               <div style={{ height: '1px', background: 'var(--border-hairline)' }} />
 
               {/* Navigation links */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  style={{ justifyContent: 'flex-start', padding: '6px 8px', fontSize: '12px', borderRadius: 'var(--radius-xs)', gap: '8px' }}
-                  onClick={() => {
-                    setIsProfileFlyoutOpen(false);
-                    dispatch(navigateToPage('profile'));
-                  }}
-                >
-                  <User size={13} color="var(--accent-primary)" />
-                  My Profile
-                </button>
+                {isAdmin ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      style={{ justifyContent: 'flex-start', padding: '6px 8px', fontSize: '12px', borderRadius: 'var(--radius-xs)', gap: '8px' }}
+                      onClick={() => {
+                        setIsProfileFlyoutOpen(false);
+                        dispatch(navigateToPage('directory'));
+                      }}
+                    >
+                      <Building2 size={13} color="var(--accent-primary)" />
+                      Organization Directory
+                    </button>
 
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  style={{ justifyContent: 'flex-start', padding: '6px 8px', fontSize: '12px', borderRadius: 'var(--radius-xs)', gap: '8px' }}
-                  onClick={() => {
-                    setIsProfileFlyoutOpen(false);
-                    dispatch(navigateToPage('attendance'));
-                  }}
-                >
-                  <Clock size={13} color="var(--accent-primary)" />
-                  Attendance & Terminal
-                </button>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      style={{ justifyContent: 'flex-start', padding: '6px 8px', fontSize: '12px', borderRadius: 'var(--radius-xs)', gap: '8px' }}
+                      onClick={() => {
+                        setIsProfileFlyoutOpen(false);
+                        dispatch(navigateToPage('company_settings'));
+                      }}
+                    >
+                      <ShieldCheck size={13} color="var(--accent-primary)" />
+                      Company Settings
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      style={{ justifyContent: 'flex-start', padding: '6px 8px', fontSize: '12px', borderRadius: 'var(--radius-xs)', gap: '8px' }}
+                      onClick={() => {
+                        setIsProfileFlyoutOpen(false);
+                        dispatch(navigateToPage('profile'));
+                      }}
+                    >
+                      <User size={13} color="var(--accent-primary)" />
+                      My Profile
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      style={{ justifyContent: 'flex-start', padding: '6px 8px', fontSize: '12px', borderRadius: 'var(--radius-xs)', gap: '8px' }}
+                      onClick={() => {
+                        setIsProfileFlyoutOpen(false);
+                        dispatch(navigateToPage('attendance'));
+                      }}
+                    >
+                      <Clock size={13} color="var(--accent-primary)" />
+                      Attendance & Terminal
+                    </button>
+                  </>
+                )}
               </div>
 
               <div style={{ height: '1px', background: 'var(--border-hairline)' }} />
@@ -365,7 +419,7 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
                 }}
                 onClick={() => {
                   setIsProfileFlyoutOpen(false);
-                  if (confirm('Sign out from PeopleOS?')) dispatch(logout());
+                  if (confirm('Sign out from Humora?')) dispatch(logout());
                 }}
               >
                 <LogOut size={13} />

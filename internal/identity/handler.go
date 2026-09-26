@@ -125,3 +125,31 @@ func (h *Handler) RegisterDeviceKey(c *fiber.Ctx) error {
 
 	return response.Success(c, fiber.StatusOK, "Device public key registered successfully", nil)
 }
+
+// ForgotPassword initiates an OTP-based password recovery workflow.
+func (h *Handler) ForgotPassword(c *fiber.Ctx) error {
+	var req ForgotPasswordRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid JSON request payload")
+	}
+
+	if err := h.service.RequestPasswordReset(c.UserContext(), &req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, "Password reset OTP dispatched to your registered email", nil)
+}
+
+// ResetPassword verifies the OTP code and sets a new password.
+func (h *Handler) ResetPassword(c *fiber.Ctx) error {
+	var req ResetPasswordRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid JSON request payload")
+	}
+
+	if err := h.service.ResetPassword(c.UserContext(), &req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, "Password has been reset successfully. You may now log in.", nil)
+}

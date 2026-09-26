@@ -452,11 +452,39 @@ export interface OnboardingCandidate {
   expected_joining_date: string;
   employment_type: string;
   hourly_cost_rate: number;
+  annual_ctc?: number;
+  monthly_gross?: number;
+  basic_salary?: number;
+  hra?: number;
+  special_allowance?: number;
+  provident_fund?: number;
+  professional_tax?: number;
+  net_payable?: number;
+  payment_method?: string;
+  currency?: string;
   invite_token: string;
   status: 'invited' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
   submitted_at?: string;
   approved_at?: string;
   created_at: string;
+}
+
+export interface ConvertCandidatePayload {
+  candidate_id?: string;
+  employee_code?: string;
+  work_email?: string;
+  department_id?: string;
+  designation_id?: string;
+  manager_id?: string;
+  hourly_cost_rate?: number;
+  initial_password?: string;
+  basic_salary?: number;
+  hra?: number;
+  special_allowance?: number;
+  provident_fund?: number;
+  professional_tax?: number;
+  effective_date?: string;
+  payment_method?: string;
 }
 
 export interface CandidateDossier {
@@ -571,6 +599,20 @@ export interface CompanyProfile {
   signatory_name: string;
   signatory_title: string;
   pay_cycle_start_day: number;
+}
+
+// Tenant Corporate SMTP Gateway Configuration
+export interface TenantSMTPConfig {
+  id?: string;
+  host: string;
+  port: number;
+  username: string;
+  password?: string;
+  has_password?: boolean;
+  from_email: string;
+  from_name: string;
+  encryption: 'starttls' | 'ssl' | 'none';
+  is_verified?: boolean;
 }
 
 // Employee Compensation CTC Structure

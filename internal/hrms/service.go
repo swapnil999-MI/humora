@@ -10,6 +10,9 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,6 +21,27 @@ import (
 
 	"github.com/google/uuid"
 )
+
+func saveBiometricDebugImage(prefix, empID string, img image.Image) string {
+	if img == nil {
+		return ""
+	}
+	debugDir := "storage/debug_biometrics"
+	if err := os.MkdirAll(debugDir, 0755); err != nil {
+		return ""
+	}
+	filename := fmt.Sprintf("%s_%s_%d.jpg", prefix, empID, time.Now().UnixNano()/1000000)
+	filePath := filepath.Join(debugDir, filename)
+	f, err := os.Create(filePath)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	if err := jpeg.Encode(f, img, &jpeg.Options{Quality: 90}); err != nil {
+		return ""
+	}
+	return filePath
+}
 
 type Service interface {
 	CreateEmployee(ctx context.Context, tenantID uuid.UUID, req *CreateEmployeeRequest) (*Employee, error)
@@ -1198,14 +1222,26 @@ func (s *service) UpdateEmployeeBiometricFace(ctx context.Context, tenantID, emp
 			return nil, fmt.Errorf("failed to decode enrollment image #%d: %w", i+1, err)
 		}
 
+		rawPath := saveBiometricDebugImage(fmt.Sprintf("enroll_sample%d_raw", i+1), employeeID.String(), img)
+
 		if i == 0 {
 			primaryMasterImg = img
 		}
 
-		tensor, quality, err := biometrics.PreprocessForMobileFaceNet(img)
+		tensor, resized112, quality, err := biometrics.PreprocessForMobileFaceNetWithImage(img)
+		var cropPath string
+		if resized112 != nil {
+			cropPath = saveBiometricDebugImage(fmt.Sprintf("enroll_sample%d_112x112", i+1), employeeID.String(), resized112)
+		}
+
 		if err != nil {
+			log.Printf("[BIOMETRIC DEBUG] Enrollment Sample #%d REJECTED: Employee=%s, RawFile=%s (%dx%d), Reason=%s, Blur=%.2f, Brightness=%.2f",
+				i+1, employeeID, rawPath, img.Bounds().Dx(), img.Bounds().Dy(), quality.RejectionReason, quality.BlurScore, quality.BrightnessScore)
 			return nil, fmt.Errorf("image #%d rejected by quality check: %s", i+1, quality.RejectionReason)
 		}
+
+		log.Printf("[BIOMETRIC DEBUG] Enrollment Sample #%d ACCEPTED: Employee=%s, RawFile=%s (%dx%d), Crop112=%s, Blur=%.2f, Brightness=%.2f",
+			i+1, employeeID, rawPath, img.Bounds().Dx(), img.Bounds().Dy(), cropPath, quality.BlurScore, quality.BrightnessScore)
 
 		vec, err := s.embedder.ExtractEmbeddings(tensor)
 		if err != nil {
@@ -1282,8 +1318,18 @@ func (s *service) PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID,
 		return nil, fmt.Errorf("failed to decode check-in selfie: %w", err)
 	}
 
-	tensor, quality, err := biometrics.PreprocessForMobileFaceNet(selfieImg)
+	rawPath := saveBiometricDebugImage("punch_raw", emp.ID.String(), selfieImg)
+	dims := fmt.Sprintf("%dx%d", selfieImg.Bounds().Dx(), selfieImg.Bounds().Dy())
+
+	tensor, resized112, quality, err := biometrics.PreprocessForMobileFaceNetWithImage(selfieImg)
+	var cropPath string
+	if resized112 != nil {
+		cropPath = saveBiometricDebugImage("punch_112x112", emp.ID.String(), resized112)
+	}
+
 	if err != nil {
+		log.Printf("[BIOMETRIC DEBUG] Punch REJECTED during Preprocessing: Employee=%s (%s), RawFile=%s (%s), Crop112=%s, Reason=%s, Blur=%.2f, Brightness=%.2f, Liveness=%.2f",
+			emp.ID, emp.WorkEmail, rawPath, dims, cropPath, err.Error(), quality.BlurScore, quality.BrightnessScore, quality.LivenessScore)
 		if quality.RejectionReason != "" {
 			return nil, errors.New(quality.RejectionReason)
 		}
@@ -1300,6 +1346,9 @@ func (s *service) PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID,
 		return nil, fmt.Errorf("failed to verify face identity: %w", err)
 	}
 
+	log.Printf("[BIOMETRIC DEBUG] Punch ATTEMPT: Employee=%s (%s), Matched=%v, Score=%.1f%%, Distance=%.4f (Threshold=%.2f), RawFile=%s (%s), Crop112=%s",
+		emp.ID, emp.WorkEmail, isMatched, confidence, distance, biometrics.OptimalL2Threshold, rawPath, dims, cropPath)
+
 	// Upload selfie to MinIO audit bucket
 	var selfieURL string
 	storage := media.GetDefaultStorage()
@@ -1314,8 +1363,10 @@ func (s *service) PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID,
 			}
 		}
 	}
-	if selfieURL == "" {
-		selfieURL = req.SelfieImage
+	// Keep database rows compact: only store valid object storage URL, never raw Base64 blobs
+	var selfieURLPtr *string
+	if selfieURL != "" && !strings.HasPrefix(selfieURL, "data:image") {
+		selfieURLPtr = &selfieURL
 	}
 
 	distFloat := float64(distance)
@@ -1359,7 +1410,7 @@ func (s *service) PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID,
 		IsFaceVerified:     true,
 		FaceConfidence:     &confidence,
 		FaceDistance:       &distFloat,
-		SelfieURL:          &selfieURL,
+		SelfieURL:          selfieURLPtr,
 	}
 
 	if req.LocationID != nil && *req.LocationID != "" {

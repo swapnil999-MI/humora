@@ -21,6 +21,14 @@ export const clearTokens = () => {
   localStorage.removeItem('humora_access_token');
   localStorage.removeItem('humora_refresh_token');
   localStorage.removeItem('humora_user');
+  localStorage.removeItem('humora_company_profile');
+};
+
+type UnauthorizedCallback = (message: string) => void;
+let unauthorizedHandler: UnauthorizedCallback | null = null;
+
+export const setOnUnauthorized = (cb: UnauthorizedCallback) => {
+  unauthorizedHandler = cb;
 };
 
 export async function apiRequest<T = any>(
@@ -46,10 +54,29 @@ export async function apiRequest<T = any>(
   }));
 
   if (!response.ok || !json.success) {
-    if (response.status === 401) {
+    const isLoginEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
+    const isCandidatePublic = endpoint.startsWith('/hrms/onboarding/candidate/') && !endpoint.startsWith('/hrms/onboarding/candidates');
+    const msg = json.message || `Request failed with status ${response.status}`;
+    const isUnauthorized = response.status === 401 ||
+      msg.includes('Missing or invalid authorization token') ||
+      msg.includes('Invalid or expired session token') ||
+      msg.includes('authorization token') ||
+      msg.includes('session token');
+
+    if (isUnauthorized && !isLoginEndpoint && !isCandidatePublic) {
       clearTokens();
+      if (unauthorizedHandler) {
+        unauthorizedHandler(msg);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('humora:unauthorized', { detail: { message: msg } }));
+        if (window.location.hash !== '#/login') {
+          window.location.hash = '#/login';
+        }
+      }
     }
-    throw new Error(json.message || `Request failed with status ${response.status}`);
+
+    throw new Error(msg);
   }
 
   return json.data;

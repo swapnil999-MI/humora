@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { User } from '../types';
-import { api, setTokens, clearTokens, getToken } from '../api/client';
+import { api, setTokens, clearTokens, getToken, setOnUnauthorized } from '../api/client';
+import { useHrmsStore } from './hrmsStore';
+import { useUiStore } from './uiStore';
 
 export interface AuthState {
   user: User | null;
@@ -10,6 +12,14 @@ export interface AuthState {
   error: string | null;
 
   login: (credentials: { email: string; password: string }) => Promise<any>;
+  register: (payload: {
+    organization_name: string;
+    slug: string;
+    admin_email: string;
+    admin_password: string;
+    first_name: string;
+    last_name: string;
+  }) => Promise<any>;
   fetchMe: () => Promise<User | null>;
   updatePresence: (status: string) => Promise<string | null>;
   logout: () => void;
@@ -49,6 +59,33 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
+  register: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      clearTokens();
+      useHrmsStore.getState().resetHrmsStore();
+      const data = await api.post<{
+        access_token: string;
+        refresh_token: string;
+        user: User;
+      }>('/auth/register', payload);
+
+      setTokens(data.access_token, data.refresh_token);
+      localStorage.setItem('humora_user', JSON.stringify(data.user));
+      set({
+        isLoading: false,
+        isAuthenticated: true,
+        user: data.user,
+        accessToken: data.access_token,
+      });
+      return { unwrap: () => Promise.resolve(data) };
+    } catch (err: any) {
+      const msg = err.message || 'Registration failed';
+      set({ isLoading: false, error: msg });
+      throw msg;
+    }
+  },
+
   fetchMe: async () => {
     try {
       const user = await api.get<User>('/auth/me');
@@ -74,6 +111,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     clearTokens();
+    useHrmsStore.getState().resetHrmsStore();
     set({
       user: null,
       accessToken: null,
@@ -92,8 +130,30 @@ function withUnwrap<T>(promise: Promise<T>): Promise<T> & { unwrap: () => Promis
 // Compatibility helpers
 export const login = (creds: { email: string; password: string }) => () =>
   withUnwrap(useAuthStore.getState().login(creds));
+export const register = (payload: any) => () => withUnwrap(useAuthStore.getState().register(payload));
 export const fetchMe = () => () => withUnwrap(useAuthStore.getState().fetchMe());
 export const updatePresence = (status: string) => () => withUnwrap(useAuthStore.getState().updatePresence(status));
 export const logout = () => () => useAuthStore.getState().logout();
+
+// Automatic session expiration & invalid token redirect handler
+let isHandlingUnauthorized = false;
+setOnUnauthorized((_msg: string) => {
+  if (isHandlingUnauthorized) return;
+  isHandlingUnauthorized = true;
+  setTimeout(() => {
+    isHandlingUnauthorized = false;
+  }, 2500);
+
+  useAuthStore.getState().logout();
+  if (typeof window !== 'undefined') {
+    if (window.location.hash !== '#/login') {
+      window.location.hash = '#/login';
+    }
+  }
+  useUiStore.getState().addToast({
+    type: 'error',
+    message: 'Your session has expired. Please sign in again.',
+  });
+});
 
 export default useAuthStore;

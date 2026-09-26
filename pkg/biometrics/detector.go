@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"log"
+	"math"
 	"os"
 	"sync"
 
@@ -14,6 +15,7 @@ import (
 // FaceDetector defines the contract for human facial presence and quality gating.
 type FaceDetector interface {
 	DetectFace(img image.Image) (hasFace bool, confidence float32, reason string)
+	CropFaceLandmarks(img image.Image) (cropped image.Image, hasFace bool, reason string)
 	Close()
 }
 
@@ -47,9 +49,9 @@ func NewONNXFaceDetector(modelPath string) (*ONNXFaceDetector, error) {
 	// We query all 3 strides: 8 (small faces), 16 (medium faces), 32 (large close-up faces)
 	inputNames := []string{"input"}
 	outputNames := []string{
-		"cls_8", "obj_8",
-		"cls_16", "obj_16",
-		"cls_32", "obj_32",
+		"cls_8", "obj_8", "kps_8",
+		"cls_16", "obj_16", "kps_16",
+		"cls_32", "obj_32", "kps_32",
 	}
 
 	session, err := ort.NewDynamicAdvancedSession(modelPath, inputNames, outputNames, options)
@@ -63,16 +65,31 @@ func NewONNXFaceDetector(modelPath string) (*ONNXFaceDetector, error) {
 
 // DetectFace runs deep neural inference to verify if an image contains a genuine human face.
 func (d *ONNXFaceDetector) DetectFace(img image.Image) (bool, float32, string) {
+	_, hasFace, conf, reason := d.detectInternal(img)
+	return hasFace, conf, reason
+}
+
+// CropFaceLandmarks uses neural facial landmark coordinates (eyes) to crop and scale the face identically.
+func (d *ONNXFaceDetector) CropFaceLandmarks(img image.Image) (image.Image, bool, string) {
+	cropped, hasFace, _, reason := d.detectInternal(img)
+	if !hasFace {
+		return img, false, reason
+	}
+	return cropped, true, ""
+}
+
+func (d *ONNXFaceDetector) detectInternal(img image.Image) (image.Image, bool, float32, string) {
 	if img == nil {
-		return false, 0, "Empty image provided"
+		return nil, false, 0, "Empty image provided"
 	}
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	bounds := img.Bounds()
-	if bounds.Dx() < 64 || bounds.Dy() < 64 {
-		return false, 0, "Image resolution is too low for face verification"
+	origW, origH := bounds.Dx(), bounds.Dy()
+	if origW < 64 || origH < 64 {
+		return img, false, 0, "Image resolution is too low for face verification"
 	}
 
 	// Resize to 640x640 for detector model
@@ -80,14 +97,13 @@ func (d *ONNXFaceDetector) DetectFace(img image.Image) (bool, float32, string) {
 	resized := image.NewRGBA(image.Rect(0, 0, targetW, targetH))
 	draw.ApproxBiLinear.Scale(resized, resized.Bounds(), img, bounds, draw.Over, nil)
 
-	// Prepare planar CHW tensor [1, 3, 640, 640] normalized to [-1.0, 1.0] (BGR order for OpenCV models)
+	// Prepare planar CHW tensor [1, 3, 640, 640] in BGR planar order expected by SCRFD
 	planeSize := targetW * targetH // 409,600
 	pixels := make([]float32, 3*planeSize)
 	for y := 0; y < targetH; y++ {
 		for x := 0; x < targetW; x++ {
 			idx := y*targetW + x
 			c := resized.RGBAAt(x, y)
-			// Raw [0, 255] float32 in BGR planar order expected by SCRFD face detector
 			pixels[idx] = float32(c.B)
 			pixels[planeSize+idx] = float32(c.G)
 			pixels[2*planeSize+idx] = float32(c.R)
@@ -97,7 +113,7 @@ func (d *ONNXFaceDetector) DetectFace(img image.Image) (bool, float32, string) {
 	inputShape := ort.NewShape(1, 3, int64(targetH), int64(targetW))
 	inputTensor, err := ort.NewTensor(inputShape, pixels)
 	if err != nil {
-		return false, 0, fmt.Sprintf("failed to create detector input tensor: %v", err)
+		return img, false, 0, fmt.Sprintf("failed to create detector input tensor: %v", err)
 	}
 	defer inputTensor.Destroy()
 
@@ -110,6 +126,10 @@ func (d *ONNXFaceDetector) DetectFace(img image.Image) (bool, float32, string) {
 	outObj8Tensor, _ := ort.NewTensor(ort.NewShape(1, 6400, 1), outObj8Buf)
 	defer outObj8Tensor.Destroy()
 
+	outKps8Buf := make([]float32, 6400*10)
+	outKps8Tensor, _ := ort.NewTensor(ort.NewShape(1, 6400, 10), outKps8Buf)
+	defer outKps8Tensor.Destroy()
+
 	// 2. Stride 16 (1600 anchors for medium faces)
 	outCls16Buf := make([]float32, 1600)
 	outCls16Tensor, _ := ort.NewTensor(ort.NewShape(1, 1600, 1), outCls16Buf)
@@ -118,6 +138,10 @@ func (d *ONNXFaceDetector) DetectFace(img image.Image) (bool, float32, string) {
 	outObj16Buf := make([]float32, 1600)
 	outObj16Tensor, _ := ort.NewTensor(ort.NewShape(1, 1600, 1), outObj16Buf)
 	defer outObj16Tensor.Destroy()
+
+	outKps16Buf := make([]float32, 1600*10)
+	outKps16Tensor, _ := ort.NewTensor(ort.NewShape(1, 1600, 10), outKps16Buf)
+	defer outKps16Tensor.Destroy()
 
 	// 3. Stride 32 (400 anchors for close-up selfie faces)
 	outCls32Buf := make([]float32, 400)
@@ -128,44 +152,125 @@ func (d *ONNXFaceDetector) DetectFace(img image.Image) (bool, float32, string) {
 	outObj32Tensor, _ := ort.NewTensor(ort.NewShape(1, 400, 1), outObj32Buf)
 	defer outObj32Tensor.Destroy()
 
+	outKps32Buf := make([]float32, 400*10)
+	outKps32Tensor, _ := ort.NewTensor(ort.NewShape(1, 400, 10), outKps32Buf)
+	defer outKps32Tensor.Destroy()
+
 	outputs := []ort.Value{
-		outCls8Tensor, outObj8Tensor,
-		outCls16Tensor, outObj16Tensor,
-		outCls32Tensor, outObj32Tensor,
+		outCls8Tensor, outObj8Tensor, outKps8Tensor,
+		outCls16Tensor, outObj16Tensor, outKps16Tensor,
+		outCls32Tensor, outObj32Tensor, outKps32Tensor,
 	}
 
 	err = d.session.Run([]ort.Value{inputTensor}, outputs)
 	if err != nil {
-		return false, 0, fmt.Sprintf("detector inference failed: %v", err)
+		return img, false, 0, fmt.Sprintf("detector inference failed: %v", err)
 	}
 
-	var maxScore float32
-	for i := 0; i < len(outCls8Buf); i++ {
-		if s := outCls8Buf[i] * outObj8Buf[i]; s > maxScore {
-			maxScore = s
-		}
+	type StrideInfo struct {
+		Stride int
+		FeatW  int
+		Cls    []float32
+		Obj    []float32
+		Kps    []float32
 	}
-	for i := 0; i < len(outCls16Buf); i++ {
-		if s := outCls16Buf[i] * outObj16Buf[i]; s > maxScore {
-			maxScore = s
-		}
+	strides := []StrideInfo{
+		{8, 80, outCls8Buf, outObj8Buf, outKps8Buf},
+		{16, 40, outCls16Buf, outObj16Buf, outKps16Buf},
+		{32, 20, outCls32Buf, outObj32Buf, outKps32Buf},
 	}
-	for i := 0; i < len(outCls32Buf); i++ {
-		if s := outCls32Buf[i] * outObj32Buf[i]; s > maxScore {
-			maxScore = s
+
+	var bestScore float32
+	var bestKp [10]float32
+	var bestGx, bestGy float32
+	var bestStride float32
+
+	for _, s := range strides {
+		for i := 0; i < len(s.Cls); i++ {
+			sc := s.Cls[i] * s.Obj[i]
+			if sc > bestScore {
+				bestScore = sc
+				bestStride = float32(s.Stride)
+				bestGx = float32((i % s.FeatW) * s.Stride)
+				bestGy = float32((i / s.FeatW) * s.Stride)
+				for k := 0; k < 10; k++ {
+					bestKp[k] = s.Kps[i*10+k]
+				}
+			}
 		}
 	}
 
-	// Non-human objects (chairs, walls, textures, pets, wood, cartoon drawings) score < 0.10.
-	// Genuine human faces consistently score >= 0.75 (e.g. 0.82 - 0.85+).
-	// Threshold set to 0.35 ensures genuine human faces pass cleanly while strictly
-	// rejecting non-human imagery.
+	// Non-human objects score < 0.10. Genuine faces consistently score >= 0.75.
 	const MinDetectionConfidence float32 = 0.35
-	if maxScore < MinDetectionConfidence {
-		return false, maxScore, "No human face detected in image. Please ensure your face is clearly visible inside the oval camera guide."
+	if bestScore < MinDetectionConfidence {
+		return img, false, bestScore, "No human face detected in image. Please ensure your face is clearly visible inside the oval camera guide."
 	}
 
-	return true, maxScore, ""
+	// Neural Landmark Proportional Scaling
+	scaleX := float32(origW) / 640.0
+	scaleY := float32(origH) / 640.0
+
+	// Landmark 0: Left Eye, Landmark 1: Right Eye
+	eyeLx := (bestGx + bestKp[0]*bestStride) * scaleX
+	eyeLy := (bestGy + bestKp[1]*bestStride) * scaleY
+	eyeRx := (bestGx + bestKp[2]*bestStride) * scaleX
+	eyeRy := (bestGy + bestKp[3]*bestStride) * scaleY
+
+	dx := float64(eyeRx - eyeLx)
+	dy := float64(eyeRy - eyeLy)
+	eyeDist := math.Sqrt(dx*dx + dy*dy)
+
+	if eyeDist < 12.0 {
+		return CropFaceAdaptive(img), true, bestScore, ""
+	}
+
+	eyeCx := float64(eyeLx+eyeRx) / 2.0
+	eyeCy := float64(eyeLy+eyeRy) / 2.0
+
+	// Optimal MobileFaceNet crop: eye distance occupies ~32% of 112px box
+	cropSize := eyeDist * 3.15
+	cy := eyeCy + eyeDist*0.45
+	cx := eyeCx
+
+	startX := int(cx - cropSize/2.0)
+	startY := int(cy - cropSize*0.52)
+	size := int(cropSize)
+
+	if startX < bounds.Min.X {
+		startX = bounds.Min.X
+	}
+	if startX+size > bounds.Max.X {
+		startX = bounds.Max.X - size
+	}
+	if startY < bounds.Min.Y {
+		startY = bounds.Min.Y
+	}
+	if startY+size > bounds.Max.Y {
+		startY = bounds.Max.Y - size
+	}
+	if size > origW {
+		size = origW
+	}
+	if size > origH {
+		size = origH
+	}
+
+	rect := image.Rect(startX, startY, startX+size, startY+size)
+	type subImager interface {
+		SubImage(r image.Rectangle) image.Image
+	}
+	if si, ok := img.(subImager); ok {
+		return si.SubImage(rect), true, bestScore, ""
+	}
+
+	cropped := image.NewRGBA(image.Rect(0, 0, size, size))
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			cropped.Set(x, y, img.At(startX+x, startY+y))
+		}
+	}
+
+	return cropped, true, bestScore, ""
 }
 
 func (d *ONNXFaceDetector) Close() {
@@ -184,6 +289,14 @@ func (f *FallbackFaceDetector) DetectFace(img image.Image) (bool, float32, strin
 		return false, 0.0, reason
 	}
 	return true, 0.85, ""
+}
+
+func (f *FallbackFaceDetector) CropFaceLandmarks(img image.Image) (image.Image, bool, string) {
+	hasFace, reason := ValidateFacePresence(img)
+	if !hasFace {
+		return img, false, reason
+	}
+	return CropFaceAdaptive(img), true, ""
 }
 
 func (f *FallbackFaceDetector) Close() {}

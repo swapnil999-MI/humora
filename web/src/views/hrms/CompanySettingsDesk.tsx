@@ -13,8 +13,18 @@ import {
   Eye,
   UploadCloud,
   Trash2,
+  Mail,
+  Send,
+  Lock,
+  ShieldCheck,
+  AlertCircle,
+  Server,
+  KeyRound,
+  ExternalLink,
+  AlertTriangle,
 } from 'lucide-react';
-import { CompanyProfile } from '../../types';
+import { CompanyProfile, TenantSMTPConfig } from '../../types';
+import { api } from '../../api/client';
 
 export const CompanySettingsDesk: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -23,6 +33,24 @@ export const CompanySettingsDesk: React.FC = () => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFileDetails, setUploadedFileDetails] = useState<{ name: string; size: string } | null>(null);
+
+  const [smtpForm, setSmtpForm] = useState<TenantSMTPConfig>({
+    host: 'smtp.gmail.com',
+    port: 587,
+    username: '',
+    password: '',
+    from_email: '',
+    from_name: '',
+    encryption: 'starttls',
+  });
+  const [hasExistingSmtpPassword, setHasExistingSmtpPassword] = useState(false);
+  const [isSmtpVerified, setIsSmtpVerified] = useState(false);
+  const [isSavingSmtp, setIsSavingSmtp] = useState(false);
+  const [isTestingSmtp, setIsTestingSmtp] = useState(false);
+  const [testEmailRecipient, setTestEmailRecipient] = useState('');
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [smtpSavedSuccess, setSmtpSavedSuccess] = useState(false);
+  const [testSmtpError, setTestSmtpError] = useState<string | null>(null);
 
   const [form, setForm] = useState<CompanyProfile>({
     id: 'cmp_default',
@@ -54,11 +82,36 @@ export const CompanySettingsDesk: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
+    // Always fetch fresh company profile for the current tenant from the backend server
+    dispatch(fetchCompanyProfile() as any);
+
+    // Load active SMTP configuration
+    api.get<TenantSMTPConfig>('/hrms/company/smtp')
+      .then((cfg) => {
+        if (cfg) {
+          setSmtpForm((prev) => ({
+            ...prev,
+            host: cfg.host || 'smtp.gmail.com',
+            port: cfg.port || 587,
+            username: cfg.username || '',
+            from_email: cfg.from_email || '',
+            from_name: cfg.from_name || '',
+            encryption: cfg.encryption || 'starttls',
+          }));
+          setHasExistingSmtpPassword(!!cfg.has_password);
+          setIsSmtpVerified(!!cfg.is_verified);
+        }
+      })
+      .catch(() => {});
+  }, [dispatch]);
+
+  // Synchronize form whenever companyProfile updates from server
+  useEffect(() => {
     if (companyProfile) {
       setForm({
         id: companyProfile.id || 'cmp_default',
         name: companyProfile.name || '',
-        legal_name: companyProfile.legal_name || '',
+        legal_name: companyProfile.legal_name || companyProfile.name || '',
         brand_tagline: companyProfile.brand_tagline || '',
         logo_url: companyProfile.logo_url || '',
         cin: companyProfile.cin || '',
@@ -80,10 +133,8 @@ export const CompanySettingsDesk: React.FC = () => {
         signatory_title: companyProfile.signatory_title || '',
         pay_cycle_start_day: companyProfile.pay_cycle_start_day || 1,
       });
-    } else {
-      dispatch(fetchCompanyProfile() as any);
     }
-  }, [companyProfile, dispatch]);
+  }, [companyProfile]);
 
   const handleChange = (field: keyof CompanyProfile, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -206,6 +257,72 @@ export const CompanySettingsDesk: React.FC = () => {
     }
   };
 
+  const handleSaveSmtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSmtp(true);
+    try {
+      const res = await api.put<TenantSMTPConfig>('/hrms/company/smtp', smtpForm);
+      if (res?.has_password) {
+        setHasExistingSmtpPassword(true);
+      }
+      setIsSmtpVerified(!!res?.is_verified);
+      setSmtpSavedSuccess(true);
+      dispatch(
+        addToast({
+          type: 'success',
+          message: 'Corporate SMTP Gateway configuration saved securely (AES encrypted)!',
+        })
+      );
+      setTimeout(() => setSmtpSavedSuccess(false), 4000);
+    } catch (err: any) {
+      dispatch(
+        addToast({
+          type: 'error',
+          message: err?.message || 'Failed to save SMTP configuration',
+        })
+      );
+    } finally {
+      setIsSavingSmtp(false);
+    }
+  };
+
+  const handleTestSmtp = async () => {
+    setIsTestingSmtp(true);
+    setTestSmtpError(null);
+    try {
+      await api.post('/hrms/company/smtp/test', {
+        recipient_email: testEmailRecipient.trim() || undefined,
+        host: smtpForm.host?.trim(),
+        port: smtpForm.port,
+        username: smtpForm.username?.trim(),
+        password: smtpForm.password || undefined,
+        from_email: smtpForm.from_email?.trim() || undefined,
+        from_name: smtpForm.from_name?.trim() || undefined,
+        encryption: smtpForm.encryption,
+      });
+      setIsSmtpVerified(true);
+      setTestSmtpError(null);
+      dispatch(
+        addToast({
+          type: 'success',
+          message: 'Test email successfully dispatched! Check the recipient inbox.',
+        })
+      );
+      setShowTestModal(false);
+    } catch (err: any) {
+      const errMsg = err?.message || 'SMTP Connection test failed';
+      setTestSmtpError(errMsg);
+      dispatch(
+        addToast({
+          type: 'error',
+          message: errMsg,
+        })
+      );
+    } finally {
+      setIsTestingSmtp(false);
+    }
+  };
+
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '10px 14px',
@@ -246,32 +363,9 @@ export const CompanySettingsDesk: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        padding: '24px 32px',
-        maxWidth: '1400px',
-        margin: '0 auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '24px',
-        color: 'var(--text-primary)',
-      }}
-    >
+    <div className="company-settings-desk" style={{ color: 'var(--text-primary)' }}>
       {/* Header Banner */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #10121a 0%, #171a2b 60%, #0d0f18 100%)',
-          border: '1px solid var(--border-hairline)',
-          borderRadius: '16px',
-          padding: '28px 32px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '20px',
-          boxShadow: 'var(--shadow-md)',
-        }}
-      >
+      <div className="company-settings-banner">
         <div>
           <div
             style={{
@@ -335,20 +429,12 @@ export const CompanySettingsDesk: React.FC = () => {
         </button>
       </div>
 
-      <form
-        onSubmit={handleSave}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 2fr) minmax(320px, 1fr)',
-          gap: '24px',
-          alignItems: 'start',
-        }}
-      >
+      <form onSubmit={handleSave} className="company-settings-layout">
         {/* Left Column: Form Cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="company-settings-cards-col">
           
           {/* Card 1: Branding & Logo */}
-          <div style={cardStyle}>
+          <div className="company-settings-card">
             <div style={cardHeaderStyle}>
               <Sparkles size={18} color="#818cf8" />
               <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
@@ -356,7 +442,7 @@ export const CompanySettingsDesk: React.FC = () => {
               </h2>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="company-settings-grid-2">
               <div>
                 <label style={labelStyle}>Brand Display Name *</label>
                 <input
@@ -381,7 +467,7 @@ export const CompanySettingsDesk: React.FC = () => {
                 />
               </div>
 
-              <div style={{ gridColumn: 'span 2' }}>
+              <div className="company-settings-col-span-2">
                 <label style={labelStyle}>Corporate Tagline / Mission</label>
                 <input
                   type="text"
@@ -393,11 +479,12 @@ export const CompanySettingsDesk: React.FC = () => {
               </div>
 
               {/* Official Logo & File Upload */}
-              <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div className="company-settings-col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <label style={labelStyle}>Company Official Logo (Direct File Upload) *</label>
 
                 {/* Upload & Drag-Drop Card */}
                 <div
+                  className="company-settings-logo-row"
                   onDragOver={(e) => {
                     e.preventDefault();
                     setIsDragging(true);
@@ -409,15 +496,10 @@ export const CompanySettingsDesk: React.FC = () => {
                     border: isDragging ? '2px dashed #818cf8' : '1px dashed var(--border-subtle)',
                     borderRadius: '12px',
                     padding: '18px 20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '16px',
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                     <div
                       style={{
                         width: '64px',
@@ -457,7 +539,7 @@ export const CompanySettingsDesk: React.FC = () => {
                   </div>
 
                   {/* Hidden File Input & Upload Trigger Buttons */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className="company-settings-logo-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <input
                       type="file"
                       ref={fileInputRef}
@@ -514,7 +596,7 @@ export const CompanySettingsDesk: React.FC = () => {
           </div>
 
           {/* Card 2: Statutory Identifiers */}
-          <div style={cardStyle}>
+          <div className="company-settings-card">
             <div style={cardHeaderStyle}>
               <FileCheck size={18} color="#34d399" />
               <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
@@ -522,7 +604,7 @@ export const CompanySettingsDesk: React.FC = () => {
               </h2>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="company-settings-grid-2">
               <div>
                 <label style={labelStyle}>Corporate Identity Number (CIN) *</label>
                 <input
@@ -596,7 +678,7 @@ export const CompanySettingsDesk: React.FC = () => {
           </div>
 
           {/* Card 3: Registered Office Address */}
-          <div style={cardStyle}>
+          <div className="company-settings-card">
             <div style={cardHeaderStyle}>
               <MapPin size={18} color="#22d3ee" />
               <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
@@ -604,8 +686,8 @@ export const CompanySettingsDesk: React.FC = () => {
               </h2>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div style={{ gridColumn: 'span 2' }}>
+            <div className="company-settings-grid-2">
+              <div className="company-settings-col-span-2">
                 <label style={labelStyle}>Address Line 1 *</label>
                 <input
                   type="text"
@@ -617,7 +699,7 @@ export const CompanySettingsDesk: React.FC = () => {
                 />
               </div>
 
-              <div style={{ gridColumn: 'span 2' }}>
+              <div className="company-settings-col-span-2">
                 <label style={labelStyle}>Address Line 2 (Optional)</label>
                 <input
                   type="text"
@@ -699,7 +781,7 @@ export const CompanySettingsDesk: React.FC = () => {
                 />
               </div>
 
-              <div style={{ gridColumn: 'span 2' }}>
+              <div className="company-settings-col-span-2">
                 <label style={labelStyle}>Company Website</label>
                 <input
                   type="url"
@@ -713,7 +795,7 @@ export const CompanySettingsDesk: React.FC = () => {
           </div>
 
           {/* Card 4: Authorized Signatory */}
-          <div style={cardStyle}>
+          <div className="company-settings-card">
             <div style={cardHeaderStyle}>
               <PenTool size={18} color="#fbbf24" />
               <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
@@ -721,7 +803,7 @@ export const CompanySettingsDesk: React.FC = () => {
               </h2>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="company-settings-grid-2">
               <div>
                 <label style={labelStyle}>Signatory Full Name *</label>
                 <input
@@ -748,10 +830,465 @@ export const CompanySettingsDesk: React.FC = () => {
             </div>
           </div>
 
+          {/* Card 5: Corporate SMTP Gateway & Email Automation */}
+          <div className="company-settings-card">
+            <div style={{ ...cardHeaderStyle, justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Server size={18} color="#10b981" />
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
+                    Corporate SMTP Gateway & Outgoing Mail Service
+                  </h2>
+                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Enterprise mail server for automated onboarding invites, monthly payslips, and password resets
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    padding: '3px 10px',
+                    borderRadius: '12px',
+                    background: hasExistingSmtpPassword ? 'rgba(16, 185, 129, 0.12)' : 'rgba(234, 179, 8, 0.12)',
+                    color: hasExistingSmtpPassword ? '#34d399' : '#facc15',
+                    border: `1px solid ${hasExistingSmtpPassword ? 'rgba(16, 185, 129, 0.3)' : 'rgba(234, 179, 8, 0.3)'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <ShieldCheck size={12} />
+                  {hasExistingSmtpPassword ? (isSmtpVerified ? 'Gateway Active & Verified' : 'Gateway Configured') : 'Not Configured'}
+                </span>
+              </div>
+            </div>
+
+            {/* Email Automation Feature Summary Banner */}
+            <div
+              style={{
+                background: 'rgba(99, 102, 241, 0.06)',
+                border: '1px solid rgba(99, 102, 241, 0.18)',
+                borderRadius: '10px',
+                padding: '14px 16px',
+                fontSize: '12px',
+                lineHeight: 1.6,
+                color: '#cbd5e1',
+              }}
+            >
+              <div style={{ fontWeight: 600, color: '#a5b4fc', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Mail size={14} />
+                <span>Automated Email Delivery Pipelines Enabled by this Gateway:</span>
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '18px', color: '#94a3b8' }}>
+                <li><strong style={{ color: '#e2e8f0' }}>Employee Onboarding Invitations:</strong> Welcome email with secure 1-click token to complete dossier.</li>
+                <li><strong style={{ color: '#e2e8f0' }}>Monthly Salary Slips:</strong> Instant notification with net pay summary when payroll runs are finalized.</li>
+                <li><strong style={{ color: '#e2e8f0' }}>Employee Self-Service Security:</strong> 6-digit OTP delivery for instant password resets.</li>
+              </ul>
+            </div>
+
+            {/* Quick Provider Presets */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Quick Presets:</span>
+              <button
+                type="button"
+                onClick={() => setSmtpForm((p) => ({ ...p, host: 'smtp.gmail.com', port: 587, encryption: 'starttls' }))}
+                style={{
+                  background: smtpForm.host === 'smtp.gmail.com' ? 'rgba(99, 102, 241, 0.2)' : 'var(--surface-0)',
+                  border: `1px solid ${smtpForm.host === 'smtp.gmail.com' ? 'rgba(99, 102, 241, 0.4)' : 'var(--border-subtle)'}`,
+                  color: smtpForm.host === 'smtp.gmail.com' ? '#a5b4fc' : 'var(--text-secondary)',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                Gmail / Google Workspace
+              </button>
+              <button
+                type="button"
+                onClick={() => setSmtpForm((p) => ({ ...p, host: 'smtp.office365.com', port: 587, encryption: 'starttls' }))}
+                style={{
+                  background: smtpForm.host === 'smtp.office365.com' ? 'rgba(99, 102, 241, 0.2)' : 'var(--surface-0)',
+                  border: `1px solid ${smtpForm.host === 'smtp.office365.com' ? 'rgba(99, 102, 241, 0.4)' : 'var(--border-subtle)'}`,
+                  color: smtpForm.host === 'smtp.office365.com' ? '#a5b4fc' : 'var(--text-secondary)',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                Microsoft 365 / Outlook
+              </button>
+              <button
+                type="button"
+                onClick={() => setSmtpForm((p) => ({ ...p, host: 'email-smtp.us-east-1.amazonaws.com', port: 587, encryption: 'starttls' }))}
+                style={{
+                  background: smtpForm.host?.includes('amazonaws.com') ? 'rgba(99, 102, 241, 0.2)' : 'var(--surface-0)',
+                  border: `1px solid ${smtpForm.host?.includes('amazonaws.com') ? 'rgba(99, 102, 241, 0.4)' : 'var(--border-subtle)'}`,
+                  color: smtpForm.host?.includes('amazonaws.com') ? '#a5b4fc' : 'var(--text-secondary)',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                Amazon SES
+              </button>
+            </div>
+
+            <div className="company-settings-grid-3">
+              <div>
+                <label style={labelStyle}>SMTP Server Host *</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={smtpForm.host || ''}
+                  onChange={(e) => setSmtpForm((p) => ({ ...p, host: e.target.value }))}
+                  placeholder="smtp.gmail.com or mail.yourcompany.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Port *</label>
+                <input
+                  type="number"
+                  style={inputStyle}
+                  value={smtpForm.port || 587}
+                  onChange={(e) => setSmtpForm((p) => ({ ...p, port: parseInt(e.target.value) || 587 }))}
+                  placeholder="587"
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Encryption *</label>
+                <select
+                  style={{ ...inputStyle, background: 'var(--surface-0)', cursor: 'pointer' }}
+                  value={smtpForm.encryption || 'starttls'}
+                  onChange={(e) => setSmtpForm((p) => ({ ...p, encryption: e.target.value as any }))}
+                >
+                  <option value="starttls">STARTTLS (Port 587)</option>
+                  <option value="ssl">SSL / TLS (Port 465)</option>
+                  <option value="none">None (Plain)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="company-settings-grid-2">
+              <div>
+                <label style={labelStyle}>SMTP Username / Account Email *</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={smtpForm.username || ''}
+                  onChange={(e) => setSmtpForm((p) => ({ ...p, username: e.target.value }))}
+                  placeholder="notifications@yourcompany.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>
+                  Password / App Password {hasExistingSmtpPassword ? '(Leave blank to retain)' : '*'}
+                </label>
+                <input
+                  type="password"
+                  style={inputStyle}
+                  value={smtpForm.password || ''}
+                  onChange={(e) => setSmtpForm((p) => ({ ...p, password: e.target.value }))}
+                  placeholder={hasExistingSmtpPassword ? '•••••••• (Encrypted in DB)' : 'App-specific password'}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>From Email (Sender Address) *</label>
+                <input
+                  type="email"
+                  style={inputStyle}
+                  value={smtpForm.from_email || ''}
+                  onChange={(e) => setSmtpForm((p) => ({ ...p, from_email: e.target.value }))}
+                  placeholder="hr@yourcompany.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>From Name (Display Name) *</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={smtpForm.from_name || ''}
+                  onChange={(e) => setSmtpForm((p) => ({ ...p, from_name: e.target.value }))}
+                  placeholder="Acme HR & People Operations"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Google / Gmail App Password Guidance Banner */}
+            <div
+              style={{
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                borderRadius: '10px',
+                padding: '12px 16px',
+                fontSize: '12px',
+                lineHeight: 1.5,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#93c5fd', fontWeight: 600 }}>
+                  <KeyRound size={15} />
+                  <span>Using Gmail or Google Workspace? (Requires 16-character App Password)</span>
+                </div>
+                <a
+                  href="https://myaccount.google.com/apppasswords"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: '#60a5fa',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    padding: '3px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                  }}
+                >
+                  <span>Open Google App Passwords</span>
+                  <ExternalLink size={12} />
+                </a>
+              </div>
+              <p style={{ margin: 0, color: '#94a3b8', fontSize: '11.5px' }}>
+                Google blocks personal account passwords for SMTP with error <code style={{ color: '#fca5a5' }}>535 BadCredentials</code>. Turn ON <strong style={{ color: '#e2e8f0' }}>2-Step Verification</strong> on your Google Account, generate a 16-character <strong style={{ color: '#e2e8f0' }}>App Password</strong> at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'underline' }}>myaccount.google.com/apppasswords</a>, and paste it here. Spaces like <code>abcd efgh ijkl mnop</code> are automatically stripped.
+              </p>
+            </div>
+
+            {/* Action Buttons for SMTP */}
+            <div className="company-settings-smtp-test-row" style={{ marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setTestSmtpError(null);
+                  setShowTestModal(true);
+                }}
+                disabled={isTestingSmtp}
+                className="btn btn-secondary"
+                style={{
+                  padding: '8px 18px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '8px',
+                  background: 'transparent',
+                  color: '#e2e8f0',
+                }}
+              >
+                <Send size={14} color="#60a5fa" />
+                <span>Test SMTP Connection</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveSmtp}
+                disabled={isSavingSmtp}
+                className="btn btn-primary"
+                style={{
+                  padding: '8px 18px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  background: 'var(--brand-primary, #6366f1)',
+                  color: '#ffffff',
+                  borderRadius: '8px',
+                  border: 'none',
+                }}
+              >
+                {smtpSavedSuccess ? <CheckCircle2 size={14} /> : <Save size={14} />}
+                <span>{smtpSavedSuccess ? 'SMTP Saved!' : 'Save SMTP Settings'}</span>
+              </button>
+            </div>
+          </div>
+
         </div>
 
+        {/* Test Email Modal */}
+        {showTestModal && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+            }}
+          >
+            <div
+              style={{
+                background: 'var(--surface-1, #131722)',
+                border: '1px solid var(--border-hairline, #1e293b)',
+                borderRadius: '14px',
+                padding: '24px',
+                maxWidth: '480px',
+                width: '90%',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: 'rgba(99, 102, 241, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#818cf8',
+                  }}
+                >
+                  <Send size={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#ffffff' }}>
+                    Send Live Test Email
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    Verify handshake with your SMTP mail server
+                  </p>
+                </div>
+              </div>
+
+              {testSmtpError && (
+                <div
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    fontSize: '12px',
+                    color: '#fca5a5',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: '#f87171', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertTriangle size={15} />
+                    <span>SMTP Test Failed</span>
+                  </div>
+                  <div style={{ wordBreak: 'break-word', marginBottom: '8px', fontSize: '11.5px', color: '#e2e8f0' }}>
+                    {testSmtpError}
+                  </div>
+                  {(testSmtpError.includes('535') || testSmtpError.includes('BadCredentials') || testSmtpError.includes('Google')) && (
+                    <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                      <p style={{ margin: '0 0 6px', fontWeight: 600, color: '#fef08a' }}>
+                        💡 How to resolve Google 535 BadCredentials:
+                      </p>
+                      <ol style={{ margin: 0, paddingLeft: '16px', color: '#f1f5f9', fontSize: '11px', lineHeight: 1.6 }}>
+                        <li>Do NOT use your personal Google account password.</li>
+                        <li>Turn ON <strong>2-Step Verification</strong> on your Google Account.</li>
+                        <li>
+                          Visit{' '}
+                          <a
+                            href="https://myaccount.google.com/apppasswords"
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: '#93c5fd', textDecoration: 'underline', fontWeight: 600 }}
+                          >
+                            myaccount.google.com/apppasswords
+                          </a>
+                        </li>
+                        <li>Generate a 16-character App Password (name it "Humora").</li>
+                        <li>Close this modal, paste the 16 characters into the Password field, and click <strong>Save SMTP Settings</strong>.</li>
+                      </ol>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label style={labelStyle}>Recipient Email Address</label>
+                <input
+                  type="email"
+                  style={inputStyle}
+                  value={testEmailRecipient}
+                  onChange={(e) => setTestEmailRecipient(e.target.value)}
+                  placeholder="admin@yourcompany.com"
+                  autoFocus
+                />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  Leave blank to send to your logged-in administrator account.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowTestModal(false)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-subtle)',
+                    background: 'transparent',
+                    color: '#94a3b8',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTestSmtp}
+                  disabled={isTestingSmtp}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#6366f1',
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  {isTestingSmtp ? 'Transmitting...' : 'Send Test Email'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Right Column: Live Payslip Header Preview */}
-        <div style={{ position: 'sticky', top: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="company-settings-preview-col">
           
           <div
             style={{

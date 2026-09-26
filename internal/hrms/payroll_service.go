@@ -5,7 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"strings"
 	"time"
+
+	"humora-backend/pkg/logger"
+	"humora-backend/pkg/mailer"
 
 	"github.com/google/uuid"
 )
@@ -24,14 +29,16 @@ type PayrollService interface {
 }
 
 type payrollService struct {
-	repo        PayrollRepository
-	empRepo     Repository
+	repo           PayrollRepository
+	empRepo        Repository
+	companyService CompanyService
 }
 
-func NewPayrollService(repo PayrollRepository, empRepo Repository) PayrollService {
+func NewPayrollService(repo PayrollRepository, empRepo Repository, companyService CompanyService) PayrollService {
 	return &payrollService{
-		repo:    repo,
-		empRepo: empRepo,
+		repo:           repo,
+		empRepo:        empRepo,
+		companyService: companyService,
 	}
 }
 
@@ -141,6 +148,7 @@ func (s *payrollService) PreviewPayrollRun(ctx context.Context, tenantID uuid.UU
 			EmployeeID:         emp.ID.String(),
 			EmployeeName:       emp.FirstName + " " + emp.LastName,
 			EmployeeCode:       emp.EmployeeCode,
+			WorkEmail:          emp.WorkEmail,
 			DepartmentName:     depName,
 			DesignationTitle:   jobTitle,
 			TotalDays:          totalDays,
@@ -253,6 +261,43 @@ func (s *payrollService) ExecutePayrollRun(ctx context.Context, tenantID, adminU
 		} else {
 			fmt.Printf("[Payroll] CreatePayslip error for %s: %v\n", item.EmployeeName, err)
 		}
+	}
+
+	// Send payslip notification emails asynchronously to employees via Tenant SMTP
+	if s.companyService != nil && len(preview.Employees) > 0 {
+		go func(items []PayrollPreviewItem, tid uuid.UUID, period string) {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			mailerConfig, err := s.companyService.GetActiveMailerConfig(bgCtx, tid)
+			if err != nil {
+				logger.Warn(fmt.Sprintf("Failed to get SMTP config for payslip notification: %v", err))
+				return
+			}
+			companyProfile, _ := s.companyService.GetCompanyProfile(bgCtx, tid)
+			companyName := "Humora Enterprise"
+			if companyProfile != nil && companyProfile.LegalName != "" {
+				companyName = companyProfile.LegalName
+			}
+
+			frontendBase := os.Getenv("FRONTEND_URL")
+			if frontendBase == "" {
+				frontendBase = "http://localhost:3000"
+			}
+			payslipsURL := fmt.Sprintf("%s/hrms/payroll", strings.TrimRight(frontendBase, "/"))
+
+			for _, itm := range items {
+				if itm.WorkEmail == "" || itm.NetPay <= 0 {
+					continue
+				}
+				netFormatted := fmt.Sprintf("₹%.2f", itm.NetPay)
+				if err := mailer.SendPayslipNotificationEmail(mailerConfig, itm.WorkEmail, itm.EmployeeName, companyName, period, netFormatted, payslipsURL); err != nil {
+					logger.Warn(fmt.Sprintf("Failed to send payslip email to %s: %v", itm.WorkEmail, err))
+				} else {
+					logger.Info(fmt.Sprintf("Sent payslip email to %s for period %s", itm.WorkEmail, period))
+				}
+			}
+		}(preview.Employees, tenantID, preview.PayPeriod)
 	}
 
 	return &ExecutePayrollResponse{

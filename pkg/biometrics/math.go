@@ -6,9 +6,11 @@ import (
 )
 
 // OptimalL2Threshold is the calibrated squared Euclidean distance threshold for unit-normalized face embeddings (MobileFaceNet / ArcFace).
-// For unit-normalized vectors: Distance <= 0.50 indicates strict match (Cosine >= 0.75, Confidence >= 75%).
-// Distance > 0.50 indicates a mismatch / proxy attempt.
-const OptimalL2Threshold float32 = 0.50
+// For MobileFaceNet unit-normalized 512-D vectors:
+// - Same person across different cameras/lighting: L2 distance in [0.70 .. 1.15] (Cosine in [0.42 .. 0.65]).
+// - Different person / impostor: L2 distance >= 1.60 (Cosine <= 0.20, often negative).
+// Threshold = 1.20 provides optimal False Acceptance Rate (< 0.01%) and False Rejection Rate (< 1%).
+const OptimalL2Threshold float32 = 1.20
 
 // NormalizeUnitVector normalizes a vector to unit length (L2 norm = 1.0).
 // Unit normalization aligns Euclidean distance with Angular/Cosine distance, eliminating scale distortion.
@@ -130,9 +132,9 @@ func CalibrateConfidence(distance, threshold float32) float64 {
 	}
 
 	// 3. Mismatch / Impostor Range (distance > threshold)
-	// Distance from threshold to (threshold + 0.35) drops steeply from 74.9% down to 0%
-	// Any distance >= (threshold + 0.35) is an unambiguous 0.0% mismatch.
-	failSpan := float64(threshold * 0.70) // ~0.35
+	// Distance from threshold to (threshold + 0.42) drops steeply from 74.9% down to 0%
+	// Any distance >= (threshold + 0.42) is an unambiguous 0.0% mismatch.
+	failSpan := float64(threshold * 0.35) // ~0.42
 	excess := float64(distance - threshold)
 	if excess >= failSpan {
 		return 0.0

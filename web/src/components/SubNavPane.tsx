@@ -1,6 +1,8 @@
+import React from 'react';
 import { useAppDispatch, useAppSelector, usePulseStore } from '../store/store';
 import {
   navigateToPage,
+  setWorkspace,
   setCreateIssueOpen,
   setCreateProjectOpen,
 } from '../store/uiSlice';
@@ -31,6 +33,22 @@ export const SubNavPane: React.FC = () => {
   const { workspace, activePage, isSidebarCollapsed } = useAppSelector(
     (state) => state.ui
   );
+  const { user } = useAppSelector((state) => state.auth);
+  const userRoles = user?.roles || [];
+  const isAdmin = userRoles.some((r) => ['superadmin', 'admin', 'hr_admin'].includes(r.toLowerCase()));
+  const isEmployee = userRoles.some((r) => r.toLowerCase() === 'employee') && !isAdmin;
+
+  // Enforce workspace domain partition
+  React.useEffect(() => {
+    if (isAdmin && workspace === 'employee') {
+      dispatch(setWorkspace('management'));
+      dispatch(navigateToPage('radar'));
+    } else if (isEmployee && workspace === 'management') {
+      dispatch(setWorkspace('employee'));
+      dispatch(navigateToPage('hub'));
+    }
+  }, [isAdmin, isEmployee, workspace, dispatch]);
+
   const { projects, activeProject, kanbanBoard } = useAppSelector((state) => state.work);
   const { companyLeaves, teamRegularizations, myLeaves } = useAppSelector((state) => state.hrms);
   const {
@@ -58,7 +76,7 @@ export const SubNavPane: React.FC = () => {
         {/* ========================================================================= */}
         {/* DOMAIN 1: EMPLOYEE SELF-SERVICE (ESS)                                    */}
         {/* ========================================================================= */}
-        {workspace === 'employee' && (
+        {workspace === 'employee' && !isAdmin && (
           <div>
             <div className="sub-nav-header">
               Employee Self-Service
@@ -124,7 +142,7 @@ export const SubNavPane: React.FC = () => {
         {/* ========================================================================= */}
         {/* DOMAIN 2: MANAGEMENT & OPERATIONS CONSOLE (MSS)                          */}
         {/* ========================================================================= */}
-        {workspace === 'management' && (
+        {workspace === 'management' && !isEmployee && (
           <div>
             <div className="sub-nav-header">
               Management Console

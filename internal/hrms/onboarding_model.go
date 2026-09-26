@@ -24,6 +24,16 @@ type OnboardingCandidate struct {
 	ExpectedJoiningDate time.Time  `db:"expected_joining_date" json:"expected_joining_date"`
 	EmploymentType      string     `db:"employment_type" json:"employment_type"`
 	HourlyCostRate      float64    `db:"hourly_cost_rate" json:"hourly_cost_rate"`
+	AnnualCTC           float64    `db:"annual_ctc" json:"annual_ctc"`
+	MonthlyGross        float64    `db:"monthly_gross" json:"monthly_gross"`
+	BasicSalary         float64    `db:"basic_salary" json:"basic_salary"`
+	HRA                 float64    `db:"hra" json:"hra"`
+	SpecialAllowance    float64    `db:"special_allowance" json:"special_allowance"`
+	ProvidentFund       float64    `db:"provident_fund" json:"provident_fund"`
+	ProfessionalTax     float64    `db:"professional_tax" json:"professional_tax"`
+	NetPayable          float64    `db:"net_payable" json:"net_payable"`
+	PaymentMethod       string     `db:"payment_method" json:"payment_method"`
+	Currency            string     `db:"currency" json:"currency"`
 	InviteToken         string     `db:"invite_token" json:"invite_token"`
 	Status              string     `db:"status" json:"status"` // 'invited', 'in_progress', 'submitted', 'approved', 'rejected'
 	SubmittedAt         *time.Time `db:"submitted_at" json:"submitted_at,omitempty"`
@@ -74,6 +84,16 @@ type InviteCandidateRequest struct {
 	ExpectedJoiningDate string     `json:"expected_joining_date" validate:"required"`
 	EmploymentType      string     `json:"employment_type"`
 	HourlyCostRate      float64    `json:"hourly_cost_rate"`
+	AnnualCTC           float64    `json:"annual_ctc"`
+	MonthlyGross        float64    `json:"monthly_gross"`
+	BasicSalary         float64    `json:"basic_salary"`
+	HRA                 float64    `json:"hra"`
+	SpecialAllowance    float64    `json:"special_allowance"`
+	ProvidentFund       float64    `json:"provident_fund"`
+	ProfessionalTax     float64    `json:"professional_tax"`
+	NetPayable          float64    `json:"net_payable"`
+	PaymentMethod       string     `json:"payment_method"`
+	Currency            string     `json:"currency"`
 }
 
 // SaveDossierRequest payload from candidate filling onboarding forms.
@@ -90,13 +110,22 @@ type SaveDossierRequest struct {
 
 // ConvertCandidateRequest HR confirmation payload.
 type ConvertCandidateRequest struct {
-	CandidateID    uuid.UUID  `json:"candidate_id" validate:"required"`
-	EmployeeCode   *string    `json:"employee_code,omitempty"`
-	WorkEmail      *string    `json:"work_email,omitempty"`
-	DepartmentID   *uuid.UUID `json:"department_id,omitempty"`
-	DesignationID  *uuid.UUID `json:"designation_id,omitempty"`
-	ManagerID      *uuid.UUID `json:"manager_id,omitempty"`
-	HourlyCostRate *float64   `json:"hourly_cost_rate,omitempty"`
+	CandidateID      uuid.UUID  `json:"candidate_id" validate:"required"`
+	EmployeeCode     *string    `json:"employee_code,omitempty"`
+	WorkEmail        *string    `json:"work_email,omitempty"`
+	DepartmentID     *uuid.UUID `json:"department_id,omitempty"`
+	DesignationID    *uuid.UUID `json:"designation_id,omitempty"`
+	ManagerID        *uuid.UUID `json:"manager_id,omitempty"`
+	HourlyCostRate   *float64   `json:"hourly_cost_rate,omitempty"`
+	InitialPassword  *string    `json:"initial_password,omitempty"`
+	// Finalized payable & compensation breakdown
+	BasicSalary      *float64   `json:"basic_salary,omitempty"`
+	HRA              *float64   `json:"hra,omitempty"`
+	SpecialAllowance *float64   `json:"special_allowance,omitempty"`
+	ProvidentFund    *float64   `json:"provident_fund,omitempty"`
+	ProfessionalTax  *float64   `json:"professional_tax,omitempty"`
+	EffectiveDate    *string    `json:"effective_date,omitempty"`
+	PaymentMethod    *string    `json:"payment_method,omitempty"`
 }
 
 // UpdateMyProfileRequest payload for employee self-service profile updates.

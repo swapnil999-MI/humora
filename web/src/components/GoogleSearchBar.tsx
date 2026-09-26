@@ -717,7 +717,7 @@ export const GoogleSearchBar: React.FC = () => {
           <div className="google-dropdown-footer">
             <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <Building2 size={12} color="var(--accent-primary)" />
-              PeopleOS Universal Search
+              Humora Universal Search
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span>
