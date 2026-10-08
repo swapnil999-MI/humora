@@ -9,7 +9,7 @@ import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import * as pb from './gen/pulse_pb';
 import { b64decode, b64encode, bytesToUuid, concat, toHex, uuidToBytes, uuidv7 } from './ids';
 import { PulseSocket, PulseSocketError } from './socket';
-import { pendingOrder, type LocalMessage, type PulseStorage } from './storage';
+import { cached, pendingOrder, type LocalMessage, type PulseStorage } from './storage';
 import { PulseDevice } from './wasm/pulse_crypto.js';
 
 export interface PulseHttp {
@@ -144,7 +144,7 @@ export class PulseClient {
   constructor(opts: PulseClientOptions) {
     this.opts = opts;
     this.userId = opts.userId;
-    this.storage = opts.storage;
+    this.storage = cached(opts.storage);
     this.http = opts.http;
   }
 
@@ -457,11 +457,12 @@ export class PulseClient {
         }),
       ),
     });
-    // Shown immediately; the outbox delivers it as soon as there is a connection and a key.
+    // Shown at once (from memory); then saved to the outbox, which delivers it as soon as there
+    // is a connection and a key.
     await this.run(async () => {
-      await this.storage.putOutbox({ id, conversationId, content: toBinary(pb.ContentSchema, content), createdAt: now });
       await this.applyContent({ id, conversationId, senderId: this.userId, senderDeviceId: this.deviceId, ts: now, status: 'pending' }, content);
       this.emit({ type: 'messages', conversationId });
+      await this.storage.putOutbox({ id, conversationId, content: toBinary(pb.ContentSchema, content), createdAt: now });
     });
     void this.run(() => this.flushOutbox());
     return id;

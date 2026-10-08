@@ -39,8 +39,9 @@ const (
 
 const sessionLocalKey = "pulse_session"
 
-// client is one live WebSocket. The read loop owns all request handling; the
-// write loop is the only goroutine that writes to the socket.
+// client is one live WebSocket. The read loop handles requests, except receipts,
+// which the receipt worker (markLoop) records; the write loop is the only
+// goroutine that writes to the socket.
 type client struct {
 	hub  *Hub
 	conn *websocket.Conn
@@ -51,7 +52,22 @@ type client struct {
 	closeOnce sync.Once
 
 	limiter bucket
+
+	// Receipts wait here for the receipt worker, so a message send never queues behind a
+	// receipt's database write. Newer receipts for the same conversation replace older ones.
+	marksMu sync.Mutex
+	marks   map[string]*pendingMarks
+	marksIn chan struct{}
 }
+
+type pendingMarks struct {
+	conversationID []byte
+	delivered      uint64
+	read           uint64
+}
+
+// maxPendingMarks bounds the receipts one connection can have waiting.
+const maxPendingMarks = 1024
 
 // bucket is a token bucket used only from the read loop.
 type bucket struct {
@@ -121,13 +137,16 @@ func (h *Hub) Serve(conn *websocket.Conn) {
 		return
 	}
 	c := &client{
-		hub:  h,
-		conn: conn,
-		sess: sess,
-		send: make(chan []byte, sendQueueSize),
-		done: make(chan struct{}),
+		hub:     h,
+		conn:    conn,
+		sess:    sess,
+		send:    make(chan []byte, sendQueueSize),
+		done:    make(chan struct{}),
+		marks:   make(map[string]*pendingMarks),
+		marksIn: make(chan struct{}, 1),
 	}
 	h.register(c)
+	go c.markLoop()
 
 	writerDone := make(chan struct{})
 	go func() {
@@ -209,9 +228,9 @@ func (c *client) dispatch(f *pulsepb.ClientFrame) {
 	case *pulsepb.ClientFrame_Send:
 		c.handleSend(ctx, f.ReqId, body.Send)
 	case *pulsepb.ClientFrame_Delivered:
-		c.handleWatermark(ctx, f.ReqId, body.Delivered, false)
+		c.queueWatermark(ctx, f.ReqId, body.Delivered, false)
 	case *pulsepb.ClientFrame_Read:
-		c.handleWatermark(ctx, f.ReqId, body.Read, true)
+		c.queueWatermark(ctx, f.ReqId, body.Read, true)
 	case *pulsepb.ClientFrame_Typing:
 		c.handleTyping(ctx, body.Typing)
 	case *pulsepb.ClientFrame_Sync:
@@ -341,6 +360,62 @@ func (c *client) handleSend(ctx context.Context, reqID uint64, s *pulsepb.Send) 
 	c.hub.fanout(route.members, frame, c)
 	if pulsepb.MessageKind(s.GetKind()) == pulsepb.MessageKind_MESSAGE_KIND_APPLICATION {
 		c.hub.pusher.MessageStored(convID, route.members, c.sess.DeviceID)
+	}
+}
+
+// queueWatermark hands a receipt to the receipt worker. A receipt sent as a request (with a
+// req_id) is answered inline instead, so its reply keeps its meaning.
+func (c *client) queueWatermark(ctx context.Context, reqID uint64, w *pulsepb.Watermark, read bool) {
+	if reqID != 0 {
+		c.handleWatermark(ctx, reqID, w, read)
+		return
+	}
+	key := string(w.GetConversationId())
+	c.marksMu.Lock()
+	m := c.marks[key]
+	if m == nil {
+		if len(c.marks) >= maxPendingMarks {
+			c.marksMu.Unlock()
+			return // the client repeats its position with its next receipt
+		}
+		m = &pendingMarks{conversationID: w.GetConversationId()}
+		c.marks[key] = m
+	}
+	if read {
+		m.read = max(m.read, w.GetSeq())
+	} else {
+		m.delivered = max(m.delivered, w.GetSeq())
+	}
+	c.marksMu.Unlock()
+	select {
+	case c.marksIn <- struct{}{}:
+	default: // the worker is already due to run
+	}
+}
+
+// markLoop records queued receipts until the connection closes.
+func (c *client) markLoop() {
+	for {
+		select {
+		case <-c.done:
+			return
+		case <-c.marksIn:
+		}
+		c.marksMu.Lock()
+		batch := c.marks
+		c.marks = make(map[string]*pendingMarks, len(batch))
+		c.marksMu.Unlock()
+		for _, m := range batch {
+			ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+			// A read position is also a delivered position, so one write covers both when it can.
+			if m.read > 0 {
+				c.handleWatermark(ctx, 0, &pulsepb.Watermark{ConversationId: m.conversationID, Seq: m.read}, true)
+			}
+			if m.delivered > m.read {
+				c.handleWatermark(ctx, 0, &pulsepb.Watermark{ConversationId: m.conversationID, Seq: m.delivered}, false)
+			}
+			cancel()
+		}
 	}
 }
 

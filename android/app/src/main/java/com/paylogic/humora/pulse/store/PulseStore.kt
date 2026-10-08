@@ -16,6 +16,9 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import androidx.room.Upsert
+import androidx.sqlite.db.SupportSQLiteDatabase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -157,6 +160,18 @@ class PulseStore private constructor(private val db: PulseDatabase) {
     suspend fun getLong(key: String): Long? = getString(key)?.toLongOrNull()
     suspend fun setLong(key: String, value: Long) = setString(key, value.toString())
 
+    /**
+     * Like [set], but on disk before it returns. Commits normally skip the flush (they survive the
+     * app being killed, and anything lost to a power cut is fetched again from the server); key
+     * material cannot be fetched again, so it is flushed before the server is told it was applied.
+     */
+    suspend fun setDurable(key: String, value: ByteArray?) {
+        set(key, value)
+        withContext(Dispatchers.IO) {
+            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { it.moveToFirst() }
+        }
+    }
+
     suspend fun putMessage(m: LocalMessage) = dao.putMessage(m)
     suspend fun getMessage(conversationId: String, id: String) = dao.getMessage(conversationId, id)
     suspend fun deleteMessage(conversationId: String, id: String) = dao.deleteMessage(conversationId, id)
@@ -195,6 +210,13 @@ class PulseStore private constructor(private val db: PulseDatabase) {
             }
             val db = Room.databaseBuilder(context.applicationContext, PulseDatabase::class.java, fileName(userId))
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
+                .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+                // No flush per commit: a received or sent message costs microseconds, not a flash write.
+                .addCallback(object : RoomDatabase.Callback() {
+                    override fun onOpen(db: SupportSQLiteDatabase) {
+                        db.query("PRAGMA synchronous = NORMAL").use { it.moveToFirst() }
+                    }
+                })
                 // Deliberately no destructive migration: this database holds the device's keys.
                 .build()
             return PulseStore(db)

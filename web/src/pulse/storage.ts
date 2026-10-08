@@ -193,7 +193,8 @@ export class IndexedDbStorage implements PulseStorage {
   }
 
   async putMessage(message: LocalMessage) {
-    await req(this.store('messages', 'readwrite').put(message));
+    // Messages can always be fetched again from the server, so they skip the disk flush.
+    await req(this.db.transaction('messages', 'readwrite', { durability: 'relaxed' }).objectStore('messages').put(message));
   }
   async getMessage(conversationId: string, id: string) {
     return (await req(this.store('messages').get([conversationId, id]))) as LocalMessage | undefined;
@@ -227,5 +228,161 @@ export class IndexedDbStorage implements PulseStorage {
   }
   async listOutbox() {
     return (await req(this.store('outbox').index('createdAt').getAll())) as OutboxItem[];
+  }
+}
+
+/** Newest messages held in memory per conversation, and how many conversations keep them. */
+const CACHE_WINDOW = 200;
+const CACHE_CONVERSATIONS = 24;
+
+interface CachedWindow {
+  byId: Map<string, LocalMessage>;
+  /** Every stored message with order >= floor is in byId (-Infinity: the whole conversation is). */
+  floor: number;
+}
+
+const BACKGROUND_KEYS = ['cursor:', 'conversations'];
+
+const copy = (m: LocalMessage): LocalMessage => ({ ...m, reactions: { ...m.reactions } });
+
+/**
+ * Keeps the hot path off the disk. Reads of recent messages, the outbox and settings are served
+ * from memory; writes update memory at once and reach the underlying store in the background,
+ * strictly in the order they were made. A crash can therefore lose only the newest writes, never
+ * leave a later one (such as an advanced sync cursor) without an earlier one (the message it
+ * covers): whatever is lost is fetched again from the server on the next sync.
+ *
+ * Device secrets are the exception: setSecret resolves only once they are on disk, because the
+ * client tells the server it has processed a key change right after saving it.
+ */
+const caches = new WeakMap<PulseStorage, CachedStorage>();
+
+/** The cache for a store; one per store, so a restarted client never reads around writes still in flight. */
+export function cached(storage: PulseStorage): CachedStorage {
+  if (storage instanceof CachedStorage) return storage;
+  let c = caches.get(storage);
+  if (!c) caches.set(storage, (c = new CachedStorage(storage)));
+  return c;
+}
+
+export class CachedStorage implements PulseStorage {
+  private windows = new Map<string, CachedWindow>();
+  private loading = new Map<string, Promise<CachedWindow>>();
+  private kv = new Map<string, unknown>();
+  private outbox: Map<string, OutboxItem> | undefined;
+  private writes: Promise<void> = Promise.resolve();
+
+  constructor(private readonly inner: PulseStorage) {}
+
+  /** Resolves once every write made so far is on disk. */
+  flush(): Promise<void> {
+    return this.writes;
+  }
+
+  private write(op: () => Promise<void>): Promise<void> {
+    const done = this.writes.then(op);
+    this.writes = done.catch((e) => console.error('[pulse] local write failed', e));
+    return done;
+  }
+
+  private window(conversationId: string): Promise<CachedWindow> {
+    const hit = this.windows.get(conversationId);
+    if (hit) {
+      // Most recently used last, so the oldest entry is the one evicted.
+      this.windows.delete(conversationId);
+      this.windows.set(conversationId, hit);
+      return Promise.resolve(hit);
+    }
+    let pending = this.loading.get(conversationId);
+    if (!pending) {
+      pending = (async () => {
+        await this.writes;
+        const list = await this.inner.listMessages(conversationId, { limit: CACHE_WINDOW });
+        const w: CachedWindow = {
+          byId: new Map(list.map((m) => [m.id, m])),
+          floor: list.length < CACHE_WINDOW ? -Infinity : list[0].order,
+        };
+        this.windows.set(conversationId, w);
+        this.loading.delete(conversationId);
+        while (this.windows.size > CACHE_CONVERSATIONS) this.windows.delete(this.windows.keys().next().value!);
+        return w;
+      })();
+      this.loading.set(conversationId, pending);
+    }
+    return pending;
+  }
+
+  async get<T>(key: string) {
+    if (this.kv.has(key)) return structuredClone(this.kv.get(key)) as T | undefined;
+    await this.writes;
+    const value = await this.inner.get<T>(key);
+    if (!this.kv.has(key)) this.kv.set(key, value);
+    return structuredClone(this.kv.get(key)) as T | undefined;
+  }
+  async set(key: string, value: unknown) {
+    const saved = structuredClone(value);
+    this.kv.set(key, saved);
+    const done = this.write(() => this.inner.set(key, saved));
+    // Sync positions and the conversation list are re-fetched from the server if lost;
+    // everything else (such as a pending key change) is on disk before this resolves.
+    if (!BACKGROUND_KEYS.some((k) => key.startsWith(k))) await done;
+  }
+  async getSecret(key: string) {
+    await this.writes;
+    return this.inner.getSecret(key);
+  }
+  setSecret(key: string, value: Uint8Array) {
+    return this.write(() => this.inner.setSecret(key, value));
+  }
+
+  async putMessage(message: LocalMessage) {
+    const saved = copy(message);
+    const w = await this.window(message.conversationId);
+    if (saved.order >= w.floor) w.byId.set(saved.id, saved);
+    else w.byId.delete(saved.id);
+    void this.write(() => this.inner.putMessage(saved));
+  }
+  async getMessage(conversationId: string, id: string) {
+    const w = await this.window(conversationId);
+    const hit = w.byId.get(id);
+    if (hit) return copy(hit);
+    await this.writes;
+    return this.inner.getMessage(conversationId, id);
+  }
+  async deleteMessage(conversationId: string, id: string) {
+    (await this.window(conversationId)).byId.delete(id);
+    void this.write(() => this.inner.deleteMessage(conversationId, id));
+  }
+  async listMessages(conversationId: string, opts: { beforeOrder?: number; limit?: number } = {}) {
+    const w = await this.window(conversationId);
+    const below = [...w.byId.values()]
+      .filter((m) => opts.beforeOrder === undefined || m.order < opts.beforeOrder)
+      .sort((a, b) => a.order - b.order);
+    // Answerable from memory when the window holds enough, or holds everything there is.
+    const fromMemory = w.floor === -Infinity || (opts.limit !== undefined && below.length >= opts.limit);
+    if (fromMemory) return (opts.limit ? below.slice(-opts.limit) : below).map(copy);
+    await this.writes;
+    return this.inner.listMessages(conversationId, opts);
+  }
+
+  private async loadOutbox(): Promise<Map<string, OutboxItem>> {
+    if (!this.outbox) {
+      await this.writes;
+      const items = await this.inner.listOutbox();
+      this.outbox ??= new Map(items.map((i) => [i.id, i]));
+    }
+    return this.outbox;
+  }
+  async putOutbox(item: OutboxItem) {
+    (await this.loadOutbox()).set(item.id, item);
+    // On disk before it is sent, so an unsent message survives a crash.
+    await this.write(() => this.inner.putOutbox(item));
+  }
+  async deleteOutbox(id: string) {
+    (await this.loadOutbox()).delete(id);
+    void this.write(() => this.inner.deleteOutbox(id));
+  }
+  async listOutbox() {
+    return [...(await this.loadOutbox()).values()].sort((a, b) => a.createdAt - b.createdAt);
   }
 }

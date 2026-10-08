@@ -379,7 +379,31 @@ export const usePulseStore = create<PulseState>((set, get) => {
     });
   };
 
-  const loadMessages = async (conversationId: string) => {
+  // A burst of events (message, receipt, conversation update) reloads a chat once, plus at most
+  // one more pass for whatever changed while that reload ran.
+  const loads = new Map<string, { again: boolean; done: Promise<void> }>();
+  const loadMessages = (conversationId: string): Promise<void> => {
+    const running = loads.get(conversationId);
+    if (running) {
+      running.again = true;
+      return running.done;
+    }
+    const entry = { again: false, done: Promise.resolve() };
+    entry.done = (async () => {
+      try {
+        do {
+          entry.again = false;
+          await loadMessagesNow(conversationId);
+        } while (entry.again);
+      } finally {
+        loads.delete(conversationId);
+      }
+    })();
+    loads.set(conversationId, entry);
+    return entry.done;
+  };
+
+  const loadMessagesNow = async (conversationId: string) => {
     if (!client) return;
     const me = client.userId;
     const list = await client.messages(conversationId, { limit: MESSAGE_WINDOW });

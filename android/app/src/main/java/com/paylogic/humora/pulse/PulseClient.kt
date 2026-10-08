@@ -281,7 +281,7 @@ class PulseClient internal constructor(
     private fun newKeyPackages(n: Int): List<String> = List(n) { Ids.b64(device.keyPackage()) }
 
     /** Writes the device's key material to the encrypted store. Called after every change to it. */
-    private suspend fun persist() = store.set(K_DEVICE, device.exportState())
+    private suspend fun persist() = store.setDurable(K_DEVICE, device.exportState())
 
     /** Unregisters this device on the server (sign-out). Best effort. */
     suspend fun revokeDevice() {
@@ -830,7 +830,7 @@ class PulseClient internal constructor(
         store.getString(key)?.let { json.decodeFromString(PendingCommit.serializer(), it) }
 
     private suspend fun saveCommit(key: String, rec: PendingCommit?) =
-        store.setString(key, rec?.let { json.encodeToString(PendingCommit.serializer(), it) })
+        store.setDurable(key, rec?.let { json.encodeToString(PendingCommit.serializer(), it) }?.encodeToByteArray())
 
     private suspend fun stage(conv: PulseConversation, build: () -> PulseDevice.Commit, welcomeTo: List<String>): String {
         val gid = Ids.uuidToBytes(conv.id)
