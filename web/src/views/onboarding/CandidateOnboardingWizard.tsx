@@ -30,34 +30,35 @@ export const CandidateOnboardingWizard: React.FC<{
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
   // Step 1: Personal
-  const [dob, setDob] = useState('1998-05-14');
-  const [gender, setGender] = useState('Female');
-  const [bloodGroup, setBloodGroup] = useState('B+');
-  const [maritalStatus, setMaritalStatus] = useState('Single');
-  const [currentAddress, setCurrentAddress] = useState('100 Main Street, Suite 400, Seattle, WA');
-  const [permanentAddress, setPermanentAddress] = useState('100 Main Street, Suite 400, Seattle, WA');
+  const [dob, setDob] = useState('');
+  const [gender, setGender] = useState('');
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [maritalStatus, setMaritalStatus] = useState('');
+  const [currentAddress, setCurrentAddress] = useState('');
+  const [permanentAddress, setPermanentAddress] = useState('');
 
   // Step 2: Emergency
-  const [emergencyName, setEmergencyName] = useState('Robert Smith');
-  const [emergencyRelation, setEmergencyRelation] = useState('Parent');
-  const [emergencyPhone, setEmergencyPhone] = useState('+1 (555) 887-2233');
+  const [emergencyName, setEmergencyName] = useState('');
+  const [emergencyRelation, setEmergencyRelation] = useState('');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
 
   // Step 3: Bank
-  const [bankName, setBankName] = useState('Silicon Valley Bank');
-  const [accountNumber, setAccountNumber] = useState('•••• •••• •••• 5612');
-  const [routingNumber, setRoutingNumber] = useState('121000358');
-  const [taxId, setTaxId] = useState('•••-••-9941');
+  const [bankName, setBankName] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [routingNumber, setRoutingNumber] = useState('');
+  const [taxId, setTaxId] = useState('');
 
   // Step 4: Education & Experience
-  const [degree, setDegree] = useState('B.S. Computer Science');
-  const [institution, setInstitution] = useState('University of Washington');
-  const [eduYear, setEduYear] = useState('2020');
-  const [prevCompany, setPrevCompany] = useState('Amazon AWS');
-  const [prevRole, setPrevRole] = useState('Software Development Engineer');
-  const [prevYears, setPrevYears] = useState('2020 - 2024');
+  const [degree, setDegree] = useState('');
+  const [institution, setInstitution] = useState('');
+  const [eduYear, setEduYear] = useState('');
+  const [prevCompany, setPrevCompany] = useState('');
+  const [prevRole, setPrevRole] = useState('');
+  const [prevYears, setPrevYears] = useState('');
 
   // Step 5: Policy
-  const [policyAgreed, setPolicyAgreed] = useState<boolean>(true);
+  // Consent must be given actively by the candidate, never pre-ticked.
+  const [policyAgreed, setPolicyAgreed] = useState<boolean>(false);
 
   useEffect(() => {
     if (token) {
@@ -67,7 +68,37 @@ export const CandidateOnboardingWizard: React.FC<{
 
   const cand = activeCandidateView?.candidate;
 
+  // A candidate returning to the link continues from what they saved before.
+  const saved = activeCandidateView?.dossier;
+  useEffect(() => {
+    if (!saved) return;
+    const p = saved.personal_details || {};
+    const e = saved.emergency_contacts?.[0] || {};
+    const b = saved.bank_details || {};
+    const ed = saved.education_history?.[0] || {};
+    const ex = saved.experience_history?.[0] || {};
+    setDob(p.dob || ''); setGender(p.gender || ''); setBloodGroup(p.blood_group || ''); setMaritalStatus(p.marital_status || '');
+    setCurrentAddress(p.current_address || ''); setPermanentAddress(p.permanent_address || '');
+    setEmergencyName(e.name || ''); setEmergencyRelation(e.relationship || ''); setEmergencyPhone(e.phone || '');
+    setBankName(b.bank_name || ''); setAccountNumber(b.account_number_masked || ''); setRoutingNumber(b.routing_number || ''); setTaxId(b.tax_id_masked || '');
+    setDegree(ed.degree || ''); setInstitution(ed.institution || ''); setEduYear(ed.year || '');
+    setPrevCompany(ex.company || ''); setPrevRole(ex.role || ''); setPrevYears(ex.period || '');
+  }, [saved]);
+
   const handleFinalSubmit = async () => {
+    const missing = [
+      [dob, 'date of birth'],
+      [gender, 'gender'],
+      [currentAddress.trim(), 'current address'],
+      [emergencyName.trim(), 'emergency contact name'],
+      [emergencyPhone.trim(), 'emergency contact phone'],
+      [bankName.trim(), 'bank name'],
+      [accountNumber.trim(), 'account number'],
+    ].filter(([v]) => !v).map(([, label]) => label);
+    if (missing.length) {
+      dispatch(addToast({ type: 'error', message: `Please fill in: ${missing.join(', ')}.` }));
+      return;
+    }
     if (!policyAgreed) {
       dispatch(
         addToast({
@@ -101,23 +132,10 @@ export const CandidateOnboardingWizard: React.FC<{
         tax_id_masked: taxId,
         direct_deposit: true,
       },
-      education_history: [
-        {
-          degree,
-          institution,
-          year: eduYear,
-          grade: '3.8 GPA',
-        },
-      ],
-      experience_history: [
-        {
-          company: prevCompany,
-          role: prevRole,
-          period: prevYears,
-          summary: 'Cloud backend development and distributed services',
-        },
-      ],
-      policy_acknowledged: true,
+      // Only what the candidate actually entered.
+      education_history: degree.trim() || institution.trim() ? [{ degree, institution, year: eduYear }] : [],
+      experience_history: prevCompany.trim() || prevRole.trim() ? [{ company: prevCompany, role: prevRole, period: prevYears }] : [],
+      policy_acknowledged: policyAgreed,
       is_final_submit: true,
     };
 
@@ -291,7 +309,7 @@ export const CandidateOnboardingWizard: React.FC<{
 
         {onExit && (
           <button className="btn btn-ghost btn-sm" onClick={onExit}>
-            Exit Demo
+            Exit Preview
           </button>
         )}
       </div>

@@ -78,7 +78,7 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
             padding: 0,
           }}
           title={isAdmin ? "Humora Management Console" : "Humora Platform (My Workday Hub)"}
-          onClick={() => dispatch(navigateToPage(isAdmin ? 'radar' : 'hub'))}
+          onClick={() => dispatch(navigateToPage(isAdmin ? 'company_settings' : 'hub'))}
         >
           <PeopleOSLogo size={24} />
         </button>
@@ -240,14 +240,14 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
 
           {/* Status Presence Dot */}
           <span
-            className={`status-dot ${isPunchedIn ? 'active' : ''}`}
+            className={`status-dot ${isAdmin || isPunchedIn ? 'active' : ''}`}
             style={{
               position: 'absolute',
               bottom: '-1px',
               right: '-1px',
               border: '2px solid var(--surface-1)',
             }}
-            title={isPunchedIn ? 'Active Workday (Punched In)' : 'Away / Punched Out'}
+            title={isAdmin ? 'Administrator Online' : isPunchedIn ? 'Active Workday (Punched In)' : 'Away / Punched Out'}
           />
 
           {/* User Profile Flyout Popover */}

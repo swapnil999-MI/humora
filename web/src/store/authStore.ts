@@ -21,18 +21,64 @@ export interface AuthState {
     last_name: string;
   }) => Promise<any>;
   fetchMe: () => Promise<User | null>;
+  setSessionFromTokens: (accessToken: string, refreshToken: string, user?: User | null) => Promise<void>;
   updatePresence: (status: string) => Promise<string | null>;
   logout: () => void;
 }
 
 const savedUser = typeof localStorage !== 'undefined' ? localStorage.getItem('humora_user') : null;
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const routeUserByRole = (user: User | null | undefined) => {
+  const userRoles = user?.roles || [];
+  const isAdmin = userRoles.some((r) => ['superadmin', 'admin', 'hr_admin'].includes(r.toLowerCase()));
+  if (isAdmin) {
+    useUiStore.getState().setWorkspace('management');
+    const currentHash = typeof window !== 'undefined' ? window.location.hash.replace(/^#\/?/, '').trim() : '';
+    const essPages = ['hub', 'attendance', 'leaves', 'payroll', 'profile', '', 'login'];
+    if (essPages.includes(currentHash)) {
+      useUiStore.getState().navigateToPage('company_settings');
+      if (typeof window !== 'undefined') {
+        window.location.hash = '#/company_settings';
+      }
+    }
+  } else {
+    useUiStore.getState().setWorkspace('employee');
+    const currentHash = typeof window !== 'undefined' ? window.location.hash.replace(/^#\/?/, '').trim() : '';
+    const mgmtPages = ['shifts', 'radar', 'approvals', 'capacity', 'directory', 'onboarding', 'company_settings', '', 'login'];
+    if (mgmtPages.includes(currentHash)) {
+      useUiStore.getState().navigateToPage('hub');
+      if (typeof window !== 'undefined') {
+        window.location.hash = '#/hub';
+      }
+    }
+  }
+};
+
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: savedUser ? JSON.parse(savedUser) : null,
   accessToken: getToken(),
   isAuthenticated: !!getToken(),
   isLoading: false,
   error: null,
+
+  setSessionFromTokens: async (accessToken, refreshToken, user) => {
+    setTokens(accessToken, refreshToken);
+    if (user) {
+      localStorage.setItem('humora_user', JSON.stringify(user));
+      set({ isAuthenticated: true, user, accessToken });
+      routeUserByRole(user);
+    } else {
+      set({ isAuthenticated: true, accessToken });
+      try {
+        const me = await api.get<User>('/auth/me');
+        localStorage.setItem('humora_user', JSON.stringify(me));
+        set({ user: me });
+        routeUserByRole(me);
+      } catch (e) {
+        console.error('Failed to fetch user profile after session set:', e);
+      }
+    }
+  },
 
   login: async (credentials) => {
     set({ isLoading: true, error: null });
@@ -51,6 +97,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         user: data.user,
         accessToken: data.access_token,
       });
+      routeUserByRole(data.user);
       return { unwrap: () => Promise.resolve(data) };
     } catch (err: any) {
       const msg = err.message || 'Login failed';
@@ -78,6 +125,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         user: data.user,
         accessToken: data.access_token,
       });
+      routeUserByRole(data.user);
       return { unwrap: () => Promise.resolve(data) };
     } catch (err: any) {
       const msg = err.message || 'Registration failed';
@@ -91,6 +139,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await api.get<User>('/auth/me');
       localStorage.setItem('humora_user', JSON.stringify(user));
       set({ user, isAuthenticated: true });
+      routeUserByRole(user);
       return user;
     } catch (err: any) {
       return null;
@@ -112,12 +161,18 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: () => {
     clearTokens();
     useHrmsStore.getState().resetHrmsStore();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('humora_user');
+    }
     set({
       user: null,
       accessToken: null,
       isAuthenticated: false,
       error: null,
     });
+    if (typeof window !== 'undefined') {
+      window.location.hash = '#/login';
+    }
   },
 }));
 

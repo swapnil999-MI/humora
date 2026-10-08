@@ -7,17 +7,11 @@ import android.os.Vibrator
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -39,16 +34,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.paylogic.humora.core.theme.BrandGradientEnd
-import com.paylogic.humora.core.theme.BrandGradientStart
-import com.paylogic.humora.core.theme.DarkBorder
-import com.paylogic.humora.core.theme.DarkSurfaceVariant
-import com.paylogic.humora.core.theme.EmeraldSuccess
-import com.paylogic.humora.core.theme.TextPrimaryDark
-import com.paylogic.humora.core.theme.TextSecondaryDark
+import com.paylogic.humora.core.theme.*
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/**
+ * Tactile Claymorphism Swipe Slider.
+ * Carved debossed track with a high-elevation 3D inflated clay thumb.
+ */
 @Composable
 fun SwipeToPunchSlider(
     isPunchedIn: Boolean,
@@ -60,9 +53,9 @@ fun SwipeToPunchSlider(
     val coroutineScope = rememberCoroutineScope()
     val dragOffset = remember { Animatable(0f) }
 
-    val trackHeight = 64.dp
+    val trackHeight = 66.dp
     val thumbSize = 54.dp
-    val thumbPadding = 5.dp
+    val thumbPadding = 6.dp
 
     fun triggerHaptic() {
         try {
@@ -80,8 +73,21 @@ fun SwipeToPunchSlider(
         modifier = modifier
             .fillMaxWidth()
             .height(trackHeight)
-            .clip(RoundedCornerShape(32.dp))
-            .background(DarkSurfaceVariant)
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(34.dp),
+                ambientColor = Color(0x66000000),
+                spotColor = Color(0x8A000000)
+            )
+            .clip(RoundedCornerShape(34.dp))
+            .background(ClaySurfacePressed)
+            .border(
+                1.2.dp,
+                Brush.verticalGradient(
+                    listOf(Color.Black.copy(alpha = 0.50f), Color.White.copy(alpha = 0.12f))
+                ),
+                RoundedCornerShape(34.dp)
+            )
     ) {
         val maxDragPx = with(density) {
             (maxWidth - thumbSize - (thumbPadding * 2)).toPx()
@@ -89,18 +95,18 @@ fun SwipeToPunchSlider(
 
         val progress = if (maxDragPx > 0) (dragOffset.value / maxDragPx).coerceIn(0f, 1f) else 0f
 
-        // Progress Background Glow
+        // Progress Fill
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            if (isPunchedIn) Color(0xFFE11D48) else BrandGradientStart,
-                            if (isPunchedIn) Color(0xFFF43F5E) else EmeraldSuccess
+                            if (isPunchedIn) Color(0xFFE11D48) else BrandPrimary,
+                            if (isPunchedIn) Color(0xFFBE123C) else EmeraldSuccess
                         )
                     ),
-                    alpha = progress * 0.4f
+                    alpha = progress * 0.35f
                 )
         )
 
@@ -118,22 +124,33 @@ fun SwipeToPunchSlider(
             )
         }
 
-        // Draggable Thumb Button
+        // Inflated 3D Clay Thumb Knob
         Box(
             modifier = Modifier
                 .padding(start = thumbPadding)
                 .offset { IntOffset(dragOffset.value.roundToInt(), 0) }
                 .size(thumbSize)
                 .align(Alignment.CenterStart)
+                .shadow(
+                    elevation = 10.dp,
+                    shape = CircleShape,
+                    ambientColor = Color(0x66000000),
+                    spotColor = Color(0x99000000)
+                )
                 .clip(CircleShape)
                 .background(
-                    Brush.linearGradient(
-                        colors = if (isPunchedIn) {
-                            listOf(Color(0xFFE11D48), Color(0xFFBE123C))
-                        } else {
-                            listOf(BrandGradientStart, BrandGradientEnd)
-                        }
-                    )
+                    if (isPunchedIn) {
+                        Brush.linearGradient(listOf(Color(0xFFF43F5E), Color(0xFFBE123C)))
+                    } else {
+                        ClayAccentGradient
+                    }
+                )
+                .border(
+                    1.2.dp,
+                    Brush.verticalGradient(
+                        listOf(Color.White.copy(alpha = 0.45f), Color.White.copy(alpha = 0.16f))
+                    ),
+                    CircleShape
                 )
                 .draggable(
                     orientation = Orientation.Horizontal,
@@ -163,7 +180,7 @@ fun SwipeToPunchSlider(
             Icon(
                 imageVector = if (progress > 0.85f) Icons.Default.Check else Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = "Swipe Action",
-                tint = TextPrimaryDark,
+                tint = Color.White,
                 modifier = Modifier.size(24.dp)
             )
         }

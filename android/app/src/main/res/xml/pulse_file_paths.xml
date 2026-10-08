@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Files Pulse shares with other apps: decrypted attachments the user opens, and camera captures. -->
+<paths>
+    <cache-path name="pulse_media" path="pulse-media/" />
+    <cache-path name="camera" path="camera/" />
+</paths>

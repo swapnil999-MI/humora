@@ -22,9 +22,19 @@ import {
   KeyRound,
   ExternalLink,
   AlertTriangle,
+  Navigation,
+  Crosshair,
+  Compass,
+  ShieldAlert,
+  RefreshCw,
 } from 'lucide-react';
 import { CompanyProfile, TenantSMTPConfig } from '../../types';
 import { api } from '../../api/client';
+import {
+  GeofenceConfig,
+  getActiveGeofenceConfig,
+  saveActiveGeofenceConfig,
+} from '../../utils/geofence';
 
 export const CompanySettingsDesk: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -33,6 +43,13 @@ export const CompanySettingsDesk: React.FC = () => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFileDetails, setUploadedFileDetails] = useState<{ name: string; size: string } | null>(null);
+
+  // Corporate Geofencing Perimeter Configuration State
+  const [geofenceForm, setGeofenceForm] = useState<GeofenceConfig>(() => getActiveGeofenceConfig());
+  const [officeLocationId, setOfficeLocationId] = useState<string | null>(null);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [isSavingGeofence, setIsSavingGeofence] = useState(false);
+  const [geofenceSavedSuccess, setGeofenceSavedSuccess] = useState(false);
 
   const [smtpForm, setSmtpForm] = useState<TenantSMTPConfig>({
     host: 'smtp.gmail.com',
@@ -84,6 +101,26 @@ export const CompanySettingsDesk: React.FC = () => {
   useEffect(() => {
     // Always fetch fresh company profile for the current tenant from the backend server
     dispatch(fetchCompanyProfile() as any);
+
+    // Fetch office locations configured on the backend
+    api.get<any[]>('/hrms/locations')
+      .then((res: any) => {
+        const locations = Array.isArray(res) ? res : res?.data;
+        if (Array.isArray(locations) && locations.length > 0) {
+          const loc = locations[0];
+          setOfficeLocationId(loc.id);
+          setGeofenceForm((prev) => ({
+            ...prev,
+            name: loc.name || prev.name,
+            lat: Number(loc.latitude) || prev.lat,
+            lng: Number(loc.longitude) || prev.lng,
+            radiusMeters: Number(loc.radius_meters) || prev.radiusMeters,
+          }));
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to fetch backend office locations:', err);
+      });
 
     // Load active SMTP configuration
     api.get<TenantSMTPConfig>('/hrms/company/smtp')
@@ -321,6 +358,118 @@ export const CompanySettingsDesk: React.FC = () => {
     } finally {
       setIsTestingSmtp(false);
     }
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      dispatch(addToast({ type: 'error', message: 'Geolocation is not supported by this browser.' }));
+      return;
+    }
+    setIsDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsDetectingLocation(false);
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lng = Number(pos.coords.longitude.toFixed(6));
+        const accuracy = Math.round(pos.coords.accuracy);
+        setGeofenceForm((prev) => ({
+          ...prev,
+          lat,
+          lng,
+          address: prev.address || `GPS Lock (±${accuracy}m precision)`,
+        }));
+        setGeofenceSavedSuccess(false);
+        dispatch(
+          addToast({
+            type: 'success',
+            message: `Locked onto admin device GPS: ${lat}, ${lng} (±${accuracy}m precision)`,
+          })
+        );
+      },
+      (err) => {
+        setIsDetectingLocation(false);
+        dispatch(
+          addToast({
+            type: 'error',
+            message: err.message || 'Failed to retrieve current device coordinates.',
+          })
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const handleSaveGeofence = async (e?: React.MouseEvent | React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!geofenceForm.name.trim()) {
+      dispatch(addToast({ type: 'error', message: 'Please specify an office / campus name.' }));
+      return;
+    }
+    if (isNaN(geofenceForm.lat) || isNaN(geofenceForm.lng)) {
+      dispatch(addToast({ type: 'error', message: 'Valid latitude and longitude are required.' }));
+      return;
+    }
+
+    setIsSavingGeofence(true);
+    try {
+      if (officeLocationId) {
+        await api.put(`/hrms/locations/${officeLocationId}`, {
+          name: geofenceForm.name,
+          latitude: Number(geofenceForm.lat),
+          longitude: Number(geofenceForm.lng),
+          radius_meters: Number(geofenceForm.radiusMeters),
+        });
+      } else {
+        const createRes: any = await api.post('/hrms/locations', {
+          name: geofenceForm.name,
+          latitude: Number(geofenceForm.lat),
+          longitude: Number(geofenceForm.lng),
+          radius_meters: Number(geofenceForm.radiusMeters),
+        });
+        const createdId = createRes?.data?.id || createRes?.id;
+        if (createdId) {
+          setOfficeLocationId(createdId);
+        }
+      }
+
+      saveActiveGeofenceConfig(geofenceForm);
+      setGeofenceSavedSuccess(true);
+      dispatch(
+        addToast({
+          type: 'success',
+          message: `Corporate Geofence perimeter deployed to database for "${geofenceForm.name}" (${geofenceForm.radiusMeters}m radius)!`,
+        })
+      );
+      setTimeout(() => setGeofenceSavedSuccess(false), 4000);
+    } catch (err: any) {
+      saveActiveGeofenceConfig(geofenceForm);
+      dispatch(
+        addToast({
+          type: 'error',
+          message: err?.response?.data?.message || err?.message || 'Failed to sync geofence to backend',
+        })
+      );
+    } finally {
+      setIsSavingGeofence(false);
+    }
+  };
+
+  const handleSyncFromCompanyAddress = () => {
+    const combinedAddress = [form.address_line1, form.address_line2].filter(Boolean).join(', ');
+    setGeofenceForm((prev) => ({
+      ...prev,
+      name: prev.name || `${form.name || 'Humora'} HQ`,
+      address: combinedAddress || prev.address,
+      city: form.city || prev.city,
+      state: form.state || prev.state,
+      country: form.country || prev.country,
+    }));
+    dispatch(
+      addToast({
+        type: 'info',
+        message: 'Synced location name and address from Company Profile. Update coordinates if needed.',
+      })
+    );
   };
 
   const inputStyle: React.CSSProperties = {
@@ -610,7 +759,7 @@ export const CompanySettingsDesk: React.FC = () => {
                 <input
                   type="text"
                   style={{ ...inputStyle, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}
-                  value={form.cin || ''}
+                  value={form.cin || 'Not set'}
                   onChange={(e) => handleChange('cin', e.target.value)}
                   placeholder="e.g. U72200KA2024PTC189201"
                   required
@@ -622,7 +771,7 @@ export const CompanySettingsDesk: React.FC = () => {
                 <input
                   type="text"
                   style={{ ...inputStyle, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}
-                  value={form.gstin || ''}
+                  value={form.gstin || 'Not set'}
                   onChange={(e) => handleChange('gstin', e.target.value)}
                   placeholder="e.g. 29AAACH7409R1ZZ"
                   required
@@ -634,7 +783,7 @@ export const CompanySettingsDesk: React.FC = () => {
                 <input
                   type="text"
                   style={{ ...inputStyle, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}
-                  value={form.pan || ''}
+                  value={form.pan || 'Not set'}
                   onChange={(e) => handleChange('pan', e.target.value)}
                   placeholder="e.g. AAACH7409R"
                   required
@@ -794,7 +943,323 @@ export const CompanySettingsDesk: React.FC = () => {
             </div>
           </div>
 
-          {/* Card 4: Authorized Signatory */}
+          {/* Card 4: Corporate Work Location & Geo-Fencing Perimeter Management */}
+          <div className="company-settings-card" id="geofence-admin-card">
+            <div style={{ ...cardHeaderStyle, justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Navigation size={18} color="var(--accent-primary)" />
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#ffffff' }}>
+                    Corporate Work Location & Geo-Fencing Perimeter
+                  </h2>
+                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Define physical GPS office center for biometric facial/fingerprint login, shift check-in, and perimeter access
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    padding: '3px 10px',
+                    borderRadius: '12px',
+                    background: geofenceForm.isEnforced ? 'rgba(16, 185, 129, 0.12)' : 'rgba(234, 179, 8, 0.12)',
+                    color: geofenceForm.isEnforced ? '#34d399' : '#facc15',
+                    border: `1px solid ${geofenceForm.isEnforced ? 'rgba(16, 185, 129, 0.3)' : 'rgba(234, 179, 8, 0.3)'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  {geofenceForm.isEnforced ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}
+                  {geofenceForm.isEnforced ? 'Perimeter Enforced' : 'Flexible Policy'}
+                </span>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '3px 10px',
+                    borderRadius: '12px',
+                    background: 'var(--accent-subtle)',
+                    color: 'var(--accent-primary)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                  }}
+                >
+                  Radius: {geofenceForm.radiusMeters}m
+                </span>
+              </div>
+            </div>
+
+            {/* Office Coordinates Source */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  📍 Enter the office latitude & longitude below, or use your current GPS position:
+                </span>
+                <button
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  disabled={isDetectingLocation}
+                  className="btn btn-ghost"
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    border: '1px solid var(--accent-primary)',
+                    background: 'var(--accent-subtle)',
+                    color: 'var(--accent-primary)',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
+                >
+                  {isDetectingLocation ? <RefreshCw size={12} className="spin-slow" /> : <Crosshair size={12} />}
+                  <span>{isDetectingLocation ? 'Detecting GPS...' : 'Use My Current Location'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Manual Form Inputs Grid */}
+            <div className="company-settings-grid-2">
+              <div className="company-settings-col-span-2">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={labelStyle}>Official Office / Campus Name *</label>
+                  <button
+                    type="button"
+                    onClick={handleSyncFromCompanyAddress}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--accent-primary)',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      padding: '0 0 4px',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    Sync with Company Address
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={geofenceForm.name}
+                  onChange={(e) => {
+                    setGeofenceForm((p) => ({ ...p, name: e.target.value }));
+                    setGeofenceSavedSuccess(false);
+                  }}
+                  placeholder="e.g. Humora Innovation Hub & Tech Campus"
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Perimeter Center Latitude (°N) *</label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
+                  value={geofenceForm.lat}
+                  onChange={(e) => {
+                    setGeofenceForm((p) => ({ ...p, lat: parseFloat(e.target.value) || 0 }));
+                    setGeofenceSavedSuccess(false);
+                  }}
+                  placeholder="e.g. 12.9716"
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Perimeter Center Longitude (°E) *</label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
+                  value={geofenceForm.lng}
+                  onChange={(e) => {
+                    setGeofenceForm((p) => ({ ...p, lng: parseFloat(e.target.value) || 0 }));
+                    setGeofenceSavedSuccess(false);
+                  }}
+                  placeholder="e.g. 77.5946"
+                  required
+                />
+              </div>
+
+              <div className="company-settings-col-span-2">
+                <label style={labelStyle}>Physical Office Building & Floor Address</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={geofenceForm.address || ''}
+                  onChange={(e) => {
+                    setGeofenceForm((p) => ({ ...p, address: e.target.value }));
+                    setGeofenceSavedSuccess(false);
+                  }}
+                  placeholder="e.g. Level 8, Cyber Tower B, Electronic City Phase 1"
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>City / Municipality</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={geofenceForm.city || ''}
+                  onChange={(e) => {
+                    setGeofenceForm((p) => ({ ...p, city: e.target.value }));
+                    setGeofenceSavedSuccess(false);
+                  }}
+                  placeholder="e.g. Bengaluru"
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Country</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={geofenceForm.country || ''}
+                  onChange={(e) => {
+                    setGeofenceForm((p) => ({ ...p, country: e.target.value }));
+                    setGeofenceSavedSuccess(false);
+                  }}
+                  placeholder="e.g. India"
+                />
+              </div>
+            </div>
+
+            {/* Allowed Radius Selector */}
+            <div>
+              <label style={labelStyle}>
+                Allowed Physical Radius Perimeter (Current: <strong style={{ color: 'var(--accent-primary)' }}>{geofenceForm.radiusMeters} meters</strong>)
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                {[
+                  { r: 50, label: '50m (Floor / Suite)' },
+                  { r: 100, label: '100m (Building)' },
+                  { r: 250, label: '250m (Campus Hub)' },
+                  { r: 500, label: '500m (Zone)' },
+                  { r: 1000, label: '1km (District)' },
+                ].map((item) => (
+                  <button
+                    key={item.r}
+                    type="button"
+                    onClick={() => {
+                      setGeofenceForm((p) => ({ ...p, radiusMeters: item.r }));
+                      setGeofenceSavedSuccess(false);
+                    }}
+                    className={`clay-radius-pill ${geofenceForm.radiusMeters === item.r ? 'active' : ''}`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="range"
+                min="20"
+                max="2000"
+                step="10"
+                value={geofenceForm.radiusMeters}
+                onChange={(e) => {
+                  setGeofenceForm((p) => ({ ...p, radiusMeters: parseInt(e.target.value) || 250 }));
+                  setGeofenceSavedSuccess(false);
+                }}
+                style={{ width: '100%', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+              />
+            </div>
+
+            {/* Enforcement Policy Toggle */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                background: 'var(--surface-0)',
+                border: '1px solid var(--border-hairline)',
+                borderRadius: '10px',
+                gap: '12px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ShieldCheck size={15} color="var(--accent-primary)" />
+                  <span>Enforce Strict Physical Perimeter for Login & Attendance Punch</span>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  When enabled, employees must be physically within the {geofenceForm.radiusMeters}m perimeter to log in or register clock-in events.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setGeofenceForm((p) => ({ ...p, isEnforced: !p.isEnforced }));
+                  setGeofenceSavedSuccess(false);
+                }}
+                className={`clay-btn ${geofenceForm.isEnforced ? 'clay-btn-primary' : 'clay-btn-ghost'}`}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  borderRadius: '20px',
+                }}
+              >
+                {geofenceForm.isEnforced ? 'Perimeter Enforced' : 'Flexible (Permissive)'}
+              </button>
+            </div>
+
+            {/* Action Row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.hash = '#/login';
+                }}
+                className="btn btn-ghost"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Compass size={14} />
+                <span>Test in Login Screen</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveGeofence}
+                className="btn btn-primary"
+                style={{
+                  padding: '8px 20px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                }}
+              >
+                {geofenceSavedSuccess ? <CheckCircle2 size={15} /> : <Save size={15} />}
+                <span>{geofenceSavedSuccess ? 'Perimeter Deployed!' : 'Save & Deploy Geofence'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Card 5: Authorized Signatory */}
           <div className="company-settings-card">
             <div style={cardHeaderStyle}>
               <PenTool size={18} color="#fbbf24" />
@@ -1390,15 +1855,15 @@ export const CompanySettingsDesk: React.FC = () => {
               >
                 <div>
                   <span style={{ color: '#64748b', display: 'block', fontSize: '9px' }}>CIN</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{form.cin || 'U72200KA2024PTC189201'}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{form.cin || 'Not set'}</span>
                 </div>
                 <div>
                   <span style={{ color: '#64748b', display: 'block', fontSize: '9px' }}>GSTIN</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{form.gstin || '29AAACH7409R1ZZ'}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{form.gstin || 'Not set'}</span>
                 </div>
                 <div>
                   <span style={{ color: '#64748b', display: 'block', fontSize: '9px' }}>PAN / TAN</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{form.pan || 'AAACH7409R'}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{form.pan || 'Not set'}</span>
                 </div>
                 <div>
                   <span style={{ color: '#64748b', display: 'block', fontSize: '9px' }}>Signatory</span>
@@ -1433,6 +1898,84 @@ export const CompanySettingsDesk: React.FC = () => {
               style={{ width: '100%', padding: '10px', fontSize: '12px', fontWeight: 600 }}
             >
               {isSaving ? 'Publishing...' : 'Save & Update All Payslips'}
+            </button>
+          </div>
+
+          {/* Geofence Perimeter Summary Card in Preview Column */}
+          <div
+            style={{
+              background: 'var(--surface-1)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              borderRadius: '14px',
+              padding: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              boxShadow: 'var(--shadow-md)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-hairline)', paddingBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Navigation size={16} color="var(--accent-primary)" />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>
+                  Perimeter Deployment
+                </span>
+              </div>
+              <span
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  color: geofenceForm.isEnforced ? '#34d399' : '#facc15',
+                  background: geofenceForm.isEnforced ? 'rgba(16, 185, 129, 0.12)' : 'rgba(234, 179, 8, 0.12)',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                }}
+              >
+                {geofenceForm.isEnforced ? 'Active • Strict' : 'Permissive'}
+              </span>
+            </div>
+
+            <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#cbd5e1' }}>
+              <div style={{ fontWeight: 600, color: '#ffffff', marginBottom: '2px' }}>
+                {geofenceForm.name}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                {geofenceForm.address || `${geofenceForm.city || ''}, ${geofenceForm.country || ''}`}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '8px',
+                background: 'var(--surface-0)',
+                padding: '10px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-hairline)',
+                fontSize: '11px',
+              }}
+            >
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px' }}>GPS Center</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                  {geofenceForm.lat.toFixed(4)}°, {geofenceForm.lng.toFixed(4)}°
+                </span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px' }}>Radius Boundary</span>
+                <span style={{ fontWeight: 700, color: '#ffffff' }}>{geofenceForm.radiusMeters} meters</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSaveGeofence}
+              className="btn btn-primary"
+              style={{ width: '100%', padding: '9px', fontSize: '12px', fontWeight: 600 }}
+            >
+              {geofenceSavedSuccess ? 'Perimeter Deployed!' : 'Save & Deploy Geofence'}
             </button>
           </div>
 

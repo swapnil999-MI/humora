@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   DollarSign,
   Users,
   Zap,
   AlertCircle,
-  TrendingUp,
   CheckCircle2,
-  Calendar,
   ShieldCheck,
 } from 'lucide-react';
+import {
+  api,
+} from '../../../api/client';
+import type { TeamCapacityResponse } from '../../../types';
 
 interface FounderPulseBarProps {
   pendingCount: number;
@@ -18,6 +20,62 @@ interface FounderPulseBarProps {
   onFilterLowRisk?: () => void;
 }
 
+interface PayrollRunSummary {
+  month: number;
+  year: number;
+  status: string;
+  total_employees: number;
+  total_net: number;
+  total_gross: number;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
+
+const card: React.CSSProperties = {
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border-hairline)',
+  borderRadius: 'var(--radius-lg, 12px)',
+  padding: '16px 20px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+  boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.2))',
+};
+
+const Card: React.FC<{
+  title: string;
+  icon: React.ReactNode;
+  accent?: string;
+  value: React.ReactNode;
+  unit?: React.ReactNode;
+  footer: React.ReactNode;
+}> = ({ title, icon, accent = 'var(--text-muted)', value, unit, footer }) => (
+  <div style={card}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <span style={{ fontSize: '12px', fontWeight: 600, color: accent, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{title}</span>
+      <div
+        style={{
+          width: '28px', height: '28px', borderRadius: '8px', background: 'var(--surface-3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent,
+        }}
+      >
+        {icon}
+      </div>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+      <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{value}</span>
+      {unit && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{unit}</span>}
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>{footer}</div>
+  </div>
+);
+
+/**
+ * Live organisation vitals for the approvals console: the latest payroll run, who is clocked in
+ * today, team load from assigned story points, and the decision inbox. Every number comes from the
+ * server; a card shows "—" until (or unless) its data exists.
+ */
 export const FounderPulseBar: React.FC<FounderPulseBarProps> = ({
   pendingCount,
   highRiskCount,
@@ -25,265 +83,112 @@ export const FounderPulseBar: React.FC<FounderPulseBarProps> = ({
   onFilterHighRisk,
   onFilterLowRisk,
 }) => {
+  const [payroll, setPayroll] = useState<PayrollRunSummary | null | undefined>(undefined);
+  const [capacity, setCapacity] = useState<TeamCapacityResponse | null | undefined>(undefined);
+
+  useEffect(() => {
+    api.get<PayrollRunSummary[]>('/hrms/payroll/runs')
+      .then((runs) => {
+        const done = (runs || []).filter((r) => r.status === 'completed').sort((a, b) => b.year - a.year || b.month - a.month);
+        setPayroll(done[0] ?? null);
+      })
+      .catch(() => setPayroll(null));
+    api.get<TeamCapacityResponse>('/fusion/team-capacity')
+      .then((c) => setCapacity(c ?? null))
+      .catch(() => setCapacity(null));
+  }, []);
+
+  const loading = <span style={{ color: 'var(--text-muted)' }}>…</span>;
+
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '16px',
-        width: '100%',
-      }}
-    >
-      {/* Metric 1: Monthly Payroll & Expense Commitment */}
-      <div
-        style={{
-          background: 'var(--surface-1)',
-          border: '1px solid var(--border-hairline)',
-          borderRadius: 'var(--radius-lg, 12px)',
-          padding: '16px 20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.2))',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Monthly Payroll Run
-          </span>
-          <div
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '8px',
-              background: 'rgba(245, 158, 11, 0.12)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--accent-primary, #f59e0b)',
-            }}
-          >
-            <DollarSign size={16} />
-          </div>
-        </div>
+    <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+      <Card
+        title="Last Payroll Run"
+        icon={<DollarSign size={16} />}
+        value={payroll === undefined ? loading : payroll ? inr(payroll.total_net) : '—'}
+        unit={payroll ? 'net paid' : undefined}
+        footer={
+          payroll ? (
+            <span>
+              {MONTHS[payroll.month - 1]} {payroll.year} • {payroll.total_employees} employees • gross {inr(payroll.total_gross)}
+            </span>
+          ) : payroll === null ? (
+            <span>No completed payroll run yet</span>
+          ) : null
+        }
+      />
 
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-          <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-            ₹18,45,000
-          </span>
-          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            ($24.6K)
-          </span>
-        </div>
+      <Card
+        title="Clocked In Today"
+        icon={<Users size={16} />}
+        value={capacity === undefined ? loading : capacity ? `${capacity.clocked_in_count} / ${capacity.total_engineers}` : '—'}
+        footer={
+          capacity ? (
+            <span>{capacity.on_leave_count} on leave today</span>
+          ) : capacity === null ? (
+            <span>Attendance data unavailable</span>
+          ) : null
+        }
+      />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--accent-emerald, #10b981)' }}>
-          <TrendingUp size={13} />
-          <span style={{ fontWeight: 600 }}>92% of Q3 Budget</span>
-          <span style={{ color: 'var(--text-muted)' }}>• 48 Active Compensations</span>
-        </div>
-      </div>
+      <Card
+        title="Team Load"
+        icon={<Zap size={16} />}
+        accent={capacity && capacity.overallocated_count > 0 ? '#fbbf24' : undefined}
+        value={capacity === undefined ? loading : capacity ? capacity.overallocated_count : '—'}
+        unit={capacity ? 'overloaded' : undefined}
+        footer={
+          capacity ? (
+            <span>
+              More than 15 story points assigned • {capacity.available_count} with spare capacity
+            </span>
+          ) : capacity === null ? (
+            <span>Sprint data unavailable</span>
+          ) : null
+        }
+      />
 
-      {/* Metric 2: Live Workforce Presence */}
-      <div
-        style={{
-          background: 'var(--surface-1)',
-          border: '1px solid var(--border-hairline)',
-          borderRadius: 'var(--radius-lg, 12px)',
-          padding: '16px 20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.2))',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Workforce Presence
-          </span>
-          <div
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '8px',
-              background: 'rgba(16, 185, 129, 0.12)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--accent-emerald, #10b981)',
-            }}
-          >
-            <Users size={16} />
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-          <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-            48 / 50
-          </span>
-          <span
-            style={{
-              background: 'rgba(16, 185, 129, 0.15)',
-              color: 'var(--accent-emerald, #10b981)',
-              fontSize: '11px',
-              fontWeight: 700,
-              padding: '2px 6px',
-              borderRadius: '4px',
-            }}
-          >
-            96% Active
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
-          <Calendar size={13} color="var(--accent-primary, #f59e0b)" />
-          <span>2 Planned Leaves</span>
-          <span>• 0 Unexcused • Operations Nominal</span>
-        </div>
-      </div>
-
-      {/* Metric 3: Agile Sprint Velocity */}
-      <div
-        style={{
-          background: 'var(--surface-1)',
-          border: '1px solid var(--border-hairline)',
-          borderRadius: 'var(--radius-lg, 12px)',
-          padding: '16px 20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.2))',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Active Sprint Velocity
-          </span>
-          <div
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '8px',
-              background: 'rgba(59, 130, 246, 0.12)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#60a5fa',
-            }}
-          >
-            <Zap size={16} />
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-          <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-            Sprint 24
-          </span>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent-emerald, #10b981)' }}>
-            78% Delivered
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
-          <CheckCircle2 size={13} color="var(--accent-emerald, #10b981)" />
-          <span>42 / 54 Story Points</span>
-          <span>• 0 Critical Blockers</span>
-        </div>
-      </div>
-
-      {/* Metric 4: Executive Approvals Queue */}
-      <div
-        style={{
-          background: pendingCount > 0 ? 'rgba(245, 158, 11, 0.05)' : 'var(--surface-1)',
-          border: pendingCount > 0 ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid var(--border-hairline)',
-          borderRadius: 'var(--radius-lg, 12px)',
-          padding: '16px 20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.2))',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: pendingCount > 0 ? '#fbbf24' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Decision Inbox
-          </span>
-          <div
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '8px',
-              background: pendingCount > 0 ? 'rgba(245, 158, 11, 0.2)' : 'var(--surface-3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: pendingCount > 0 ? '#fbbf24' : 'var(--text-muted)',
-            }}
-          >
-            <ShieldCheck size={16} />
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-          <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-            {pendingCount}
-          </span>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-            pending sign-offs
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
-          {highRiskCount > 0 ? (
-            <button
-              onClick={onFilterHighRisk}
-              style={{
-                background: 'rgba(239, 68, 68, 0.15)',
-                color: '#f87171',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: '4px',
-                padding: '2px 6px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                fontSize: '11px',
-              }}
-              title="Filter high-risk items"
-            >
-              <AlertCircle size={11} />
-              {highRiskCount} High Risk
-            </button>
-          ) : (
-            <span style={{ color: 'var(--accent-emerald, #10b981)', fontWeight: 600 }}>Zero High Risk</span>
-          )}
-
-          {lowRiskCount > 0 && (
-            <button
-              onClick={onFilterLowRisk}
-              style={{
-                background: 'rgba(16, 185, 129, 0.15)',
-                color: '#34d399',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                borderRadius: '4px',
-                padding: '2px 6px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                fontSize: '11px',
-              }}
-              title="Filter low-risk auto-approvable items"
-            >
-              <CheckCircle2 size={11} />
-              {lowRiskCount} Quick-Pass
-            </button>
-          )}
-        </div>
-      </div>
+      <Card
+        title="Decision Inbox"
+        icon={<ShieldCheck size={16} />}
+        accent={pendingCount > 0 ? '#fbbf24' : undefined}
+        value={pendingCount}
+        unit="pending sign-offs"
+        footer={
+          <>
+            {highRiskCount > 0 ? (
+              <button
+                onClick={onFilterHighRisk}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '4px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '4px',
+                  fontWeight: 700, cursor: 'pointer', fontSize: '11px',
+                }}
+                title="Show high-risk items"
+              >
+                <AlertCircle size={11} />
+                {highRiskCount} High Risk
+              </button>
+            ) : (
+              <span style={{ color: 'var(--accent-emerald, #10b981)', fontWeight: 600 }}>No high-risk items</span>
+            )}
+            {lowRiskCount > 0 && (
+              <button
+                onClick={onFilterLowRisk}
+                style={{
+                  background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '4px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '4px',
+                  fontWeight: 700, cursor: 'pointer', fontSize: '11px',
+                }}
+                title="Show low-risk items"
+              >
+                <CheckCircle2 size={11} />
+                {lowRiskCount} Low Risk
+              </button>
+            )}
+          </>
+        }
+      />
     </div>
   );
 };

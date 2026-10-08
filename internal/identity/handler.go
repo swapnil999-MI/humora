@@ -9,10 +9,11 @@ import (
 
 type Handler struct {
 	service Service
+	authExt AuthExtService
 }
 
-func NewHandler(service Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service Service, authExt AuthExtService) *Handler {
+	return &Handler{service: service, authExt: authExt}
 }
 
 // Register handles organization onboarding and primary admin account creation.
@@ -153,3 +154,87 @@ func (h *Handler) ResetPassword(c *fiber.Ctx) error {
 
 	return response.Success(c, fiber.StatusOK, "Password has been reset successfully. You may now log in.", nil)
 }
+
+// GetAuthProviders returns which OAuth providers and auth methods are available.
+func (h *Handler) GetAuthProviders(c *fiber.Ctx) error {
+	providers := h.authExt.GetEnabledProviders()
+	return response.TypedSuccess(c, fiber.StatusOK, "Auth providers retrieved", providers)
+}
+
+// InitiateOAuth redirects the client to the chosen social identity provider.
+func (h *Handler) InitiateOAuth(c *fiber.Ctx) error {
+	provider := c.Params("provider")
+	clientType := c.Query("client", "web")
+
+	redirectURL, err := h.authExt.InitiateOAuth(provider, clientType)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	return c.Redirect(redirectURL, fiber.StatusTemporaryRedirect)
+}
+
+// OAuthCallback handles the redirect back from Google, GitHub, or Microsoft.
+func (h *Handler) OAuthCallback(c *fiber.Ctx) error {
+	provider := c.Params("provider")
+	code := c.Query("code")
+	state := c.Query("state")
+
+	if code == "" || state == "" {
+		return response.Error(c, fiber.StatusBadRequest, "Missing code or state parameters from identity provider")
+	}
+
+	destinationURL, err := h.authExt.HandleOAuthCallback(c.UserContext(), provider, code, state)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, err.Error())
+	}
+
+	return c.Redirect(destinationURL, fiber.StatusTemporaryRedirect)
+}
+
+// InitiateQR creates a temporary QR login session challenge.
+func (h *Handler) InitiateQR(c *fiber.Ctx) error {
+	res, err := h.authExt.InitiateQRLogin(c.UserContext())
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Failed to create QR login session")
+	}
+	return response.TypedSuccess(c, fiber.StatusCreated, "QR login challenge initiated", res)
+}
+
+// GetQRStatus checks the authorization state of an active QR session.
+func (h *Handler) GetQRStatus(c *fiber.Ctx) error {
+	sessionID := c.Query("session_id")
+	if sessionID == "" {
+		return response.Error(c, fiber.StatusBadRequest, "session_id parameter is required")
+	}
+
+	res, err := h.authExt.GetQRStatus(c.UserContext(), sessionID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, err.Error())
+	}
+	return response.TypedSuccess(c, fiber.StatusOK, "QR login status", res)
+}
+
+// ConfirmQR is called by an authenticated mobile app to authorize the Web browser session.
+func (h *Handler) ConfirmQR(c *fiber.Ctx) error {
+	userIDStr, ok := c.Locals("user_id").(string)
+	if !ok || userIDStr == "" {
+		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized session")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid user ID")
+	}
+
+	var req QRConfirmRequest
+	if err := c.BodyParser(&req); err != nil || req.SessionID == "" {
+		return response.Error(c, fiber.StatusBadRequest, "session_id is required")
+	}
+
+	if err := h.authExt.ConfirmQRLogin(c.UserContext(), req.SessionID, userID); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, "Web session authorized successfully", nil)
+}
+

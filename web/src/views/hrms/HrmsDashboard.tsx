@@ -320,9 +320,9 @@ export const HrmsDashboard: React.FC = () => {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
           {(leaveBalances || []).map((bal) => {
-            const credited = bal.credited || (bal.balance + bal.used) || 12;
+            const credited = bal.credited || (bal.balance + bal.used) || 0;
             const used = bal.used || 0;
-            const usedPercent = Math.min(100, Math.round((used / credited) * 100));
+            const usedPercent = credited > 0 ? Math.min(100, Math.round((used / credited) * 100)) : 0;
 
             return (
               <div

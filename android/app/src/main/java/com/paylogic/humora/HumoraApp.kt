@@ -7,6 +7,7 @@ import com.paylogic.humora.data.remote.HumoraApiClient
 import com.paylogic.humora.data.remote.NetworkConfig
 import com.paylogic.humora.data.remote.SessionManager
 import com.paylogic.humora.data.repository.*
+import com.paylogic.humora.pulse.PulseService
 
 class HumoraApp : Application() {
 
@@ -34,6 +35,15 @@ class HumoraApp : Application() {
     lateinit var payrollRepository: PayrollRepository
         private set
 
+    lateinit var adminRepository: AdminRepository
+        private set
+
+    lateinit var pulseService: PulseService
+        private set
+
+    lateinit var appNotifier: com.paylogic.humora.notifications.AppNotifier
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -55,6 +65,9 @@ class HumoraApp : Application() {
         leavesRepository = LeavesRepository(apiClient)
         workRepository = WorkRepository(apiClient)
         payrollRepository = PayrollRepository(apiClient)
+        adminRepository = AdminRepository(apiClient, sessionManager)
+        pulseService = PulseService(this, sessionManager, apiClient)
+        appNotifier = com.paylogic.humora.notifications.AppNotifier(this, sessionManager, apiClient)
     }
 
     companion object {

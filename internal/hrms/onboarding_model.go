@@ -81,6 +81,7 @@ type InviteCandidateRequest struct {
 	DepartmentID        *uuid.UUID `json:"department_id,omitempty"`
 	DesignationID       *uuid.UUID `json:"designation_id,omitempty"`
 	ManagerID           *uuid.UUID `json:"manager_id,omitempty"`
+	ShiftID             *uuid.UUID `json:"shift_id,omitempty"`
 	ExpectedJoiningDate string     `json:"expected_joining_date" validate:"required"`
 	EmploymentType      string     `json:"employment_type"`
 	HourlyCostRate      float64    `json:"hourly_cost_rate"`
@@ -116,6 +117,7 @@ type ConvertCandidateRequest struct {
 	DepartmentID     *uuid.UUID `json:"department_id,omitempty"`
 	DesignationID    *uuid.UUID `json:"designation_id,omitempty"`
 	ManagerID        *uuid.UUID `json:"manager_id,omitempty"`
+	ShiftID          *uuid.UUID `json:"shift_id,omitempty"`
 	HourlyCostRate   *float64   `json:"hourly_cost_rate,omitempty"`
 	InitialPassword  *string    `json:"initial_password,omitempty"`
 	// Finalized payable & compensation breakdown

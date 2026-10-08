@@ -112,3 +112,28 @@ func (r *ResetPasswordRequest) Validate() string {
 	return ""
 }
 
+// AuthProvidersResponse lists which login methods are active
+type AuthProvidersResponse struct {
+	Google    bool `json:"google"`
+	Github    bool `json:"github"`
+	Microsoft bool `json:"microsoft"`
+	QRCode    bool `json:"qr_code"`
+}
+
+// QRInitiateResponse returns session token for QR rendering
+type QRInitiateResponse struct {
+	SessionID string `json:"session_id"`
+	QRPayload string `json:"qr_payload"`
+	ExpiresIn int64  `json:"expires_in"`
+}
+
+// QRStatusResponse returns the current state of a QR login session
+type QRStatusResponse struct {
+	Status string        `json:"status"` // "pending", "authenticated", "expired"
+	Auth   *AuthResponse `json:"auth,omitempty"`
+}
+
+// QRConfirmRequest is sent by an authenticated mobile app to approve a QR session
+type QRConfirmRequest struct {
+	SessionID string `json:"session_id"`
+}

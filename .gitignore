@@ -45,3 +45,9 @@ web/dist/
 # Scratch & debug biometric storage
 scratch/
 storage/
+
+# Production secrets
+infra/prod/.env.production
+
+# Built image archives
+/dist/

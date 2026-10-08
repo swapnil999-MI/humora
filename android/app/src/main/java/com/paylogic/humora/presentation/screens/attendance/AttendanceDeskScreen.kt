@@ -5,9 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,7 +14,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -26,6 +26,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.paylogic.humora.core.theme.*
 import com.paylogic.humora.data.model.MonthlyAttendanceDay
+import com.paylogic.humora.presentation.components.ClayButton
 import com.paylogic.humora.presentation.components.GlassCard
 import com.paylogic.humora.presentation.viewmodel.AttendanceViewModel
 
@@ -35,6 +36,7 @@ fun AttendanceDeskScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showFacePunchModal by remember { mutableStateOf(false) }
+    var showFingerprintPunchModal by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -151,8 +153,8 @@ fun AttendanceDeskScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "GPS Verified",
-                                color = EmeraldSuccess,
+                                text = if (uiState.locationKnown) "GPS Verified" else "Locating…",
+                                color = if (uiState.locationKnown) EmeraldSuccess else TextMutedDark,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -161,55 +163,66 @@ fun AttendanceDeskScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    // Issue #1 Fix: Derive GPS text from uiState instead of hardcoded strings
+                    val fence = uiState.geofence
+                    val geoText = when {
+                        uiState.officesConfigured == false -> "No office location is set up yet. Ask HR to add one."
+                        !uiState.locationKnown -> "Checking your location…"
+                        fence == null -> "Checking office locations…"
+                        fence.isInside -> "Inside ${fence.officeName} • ${fence.distanceMeters.toInt()}m from the centre"
+                        else -> "Outside ${fence.officeName} • ${fence.distanceMeters.toInt()}m away (allowed ${fence.radiusMeters.toInt()}m)"
+                    }
                     Text(
-                        text = "Current Location: 18m from Corporate HQ (Within 200m perimeter)",
+                        text = geoText,
                         color = TextSecondaryDark,
                         fontSize = 13.sp
                     )
                     Spacer(modifier = Modifier.height(4.dp))
+                    // Issue #2 Fix: No hardcoded lat/lon — show GPS verification status only
                     Text(
-                        text = "High Accuracy GPS • Lat: 12.9716, Lon: 77.5946 (±3.2m)",
+                        text = if (uiState.locationKnown) "GPS location acquired" else "Acquiring GPS signal…",
                         color = TextMutedDark,
                         fontSize = 11.sp
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Biometric Selfie / Punch Buttons
+                    // Biometric Selfie / Fingerprint Punch Buttons (Tactile 3D Clay)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Button(
-                            onClick = { showFacePunchModal = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "Selfie",
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Face Punch", fontWeight = FontWeight.SemiBold)
-                        }
+                        ClayButton(
+                            text = "Face Punch",
+                            icon = Icons.Default.CameraAlt,
+                            brush = ClayAccentGradient,
+                            modifier = Modifier.weight(1f),
+                            cornerRadius = 14.dp,
+                            onClick = { showFacePunchModal = true }
+                        )
 
-                        OutlinedButton(
-                            onClick = { viewModel.triggerOfflineSync() },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Sync,
-                                contentDescription = "Sync",
-                                tint = TextPrimaryDark,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Sync Queue", color = TextPrimaryDark, fontWeight = FontWeight.SemiBold)
-                        }
+                        ClayButton(
+                            text = "Fingerprint",
+                            icon = Icons.Default.Fingerprint,
+                            brush = ClaySecondaryGradient,
+                            modifier = Modifier.weight(1f),
+                            cornerRadius = 14.dp,
+                            onClick = { showFingerprintPunchModal = true }
+                        )
                     }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    ClayButton(
+                        text = "Sync Offline Queue",
+                        icon = Icons.Default.Sync,
+                        brush = ClayDarkButtonGradient,
+                        contentColor = TextSecondaryDark,
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 14.dp,
+                        elevation = 4.dp,
+                        onClick = { viewModel.triggerOfflineSync() }
+                    )
                 }
             }
         }
@@ -223,8 +236,13 @@ fun AttendanceDeskScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Issue #3 Fix: Derive month/year from uiState instead of hardcoded "September 2026"
+                        val monthNames = listOf("", "January", "February", "March", "April",
+                            "May", "June", "July", "August", "September", "October", "November", "December")
+                        val calMonth = uiState.monthlyCalendar.month.coerceIn(1, 12)
+                        val calYear = uiState.monthlyCalendar.year
                         Text(
-                            text = "September 2026 Calendar",
+                            text = "${monthNames[calMonth]} $calYear Calendar",
                             color = TextPrimaryDark,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
@@ -239,49 +257,68 @@ fun AttendanceDeskScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    uiState.calendarError?.let {
+                        Text(text = it, color = TextMutedDark, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
                     val calendarDays = uiState.monthlyCalendar.days
 
-                    // 7 Columns Grid for days
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(7),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(210.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        userScrollEnabled = false
+                    // Bug #7 Fix: Replace LazyVerticalGrid (which needed fixed height inside LazyColumn)
+                    // with a plain Column+Row grid that adapts to content height naturally.
+                    val rows = calendarDays.chunked(7)
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(calendarDays) { day ->
-                            val normalizedStatus = day.status.lowercase()
-                            val (bgColor, textColor) = when (normalizedStatus) {
-                                "present" -> Pair(EmeraldSuccess.copy(alpha = 0.2f), EmeraldSuccess)
-                                "half_day", "late" -> Pair(AmberWarning.copy(alpha = 0.2f), AmberWarning)
-                                "absent" -> Pair(RoseError.copy(alpha = 0.2f), RoseError)
-                                "weekend" -> Pair(DarkSurfaceVariant, TextMutedDark)
-                                else -> Pair(Color.Transparent, TextMutedDark)
-                            }
-
-                            val dayNumber = day.date.takeLast(2).toIntOrNull() ?: 1
-
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(bgColor)
-                                    .border(
-                                        1.dp,
-                                        if (normalizedStatus == "present") EmeraldSuccess.copy(alpha = 0.4f) else DarkBorder,
-                                        RoundedCornerShape(8.dp)
-                                    ),
-                                contentAlignment = Alignment.Center
+                        rows.forEach { rowDays ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    text = dayNumber.toString(),
-                                    color = textColor,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
+                                rowDays.forEach { day ->
+                                    val normalizedStatus = day.status.lowercase()
+                                    val isPresent = normalizedStatus == "present"
+                                    val isAbsent = normalizedStatus == "absent"
+                                    val isHalfDay = normalizedStatus == "half_day" || normalizedStatus == "late"
+                                    val dayNumber = day.date.takeLast(2).toIntOrNull() ?: 1
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1f)
+                                            .shadow(2.dp, RoundedCornerShape(10.dp), ambientColor = Color(0x66000000))
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(
+                                                when {
+                                                    isPresent -> ClaySuccessGradient
+                                                    isAbsent -> ClayErrorGradient
+                                                    isHalfDay -> ClayWarningGradient
+                                                    else -> SolidColor(ClaySurfaceElevated)
+                                                }
+                                            )
+                                            .border(
+                                                1.dp,
+                                                Brush.verticalGradient(
+                                                    listOf(Color.White.copy(alpha = 0.28f), Color.White.copy(alpha = 0.12f))
+                                                ),
+                                                RoundedCornerShape(10.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = dayNumber.toString(),
+                                            color = if (isPresent || isAbsent || isHalfDay) Color.White else TextMutedDark,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                                // Fill remaining cells in last row to keep alignment
+                                repeat(7 - rowDays.size) {
+                                    Box(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
@@ -337,10 +374,29 @@ fun AttendanceDeskScreen(
 
     // Biometric Face Punch Modal
     if (showFacePunchModal) {
+        // Bug #5 Fix: derive punch direction from state instead of hardcoding "in"
+        val punchType = if (uiState.isPunchedIn) "out" else "in"
         com.paylogic.humora.presentation.components.BiometricFacePunchSheet(
-            punchType = "in",
+            punchType = punchType,
             onDismiss = { showFacePunchModal = false },
             onPunchSuccess = { msg ->
+                // Bug #6 Fix: forward the success message to the action banner
+                viewModel.clearActionMessage()
+                viewModel.loadMonthlyAttendance()
+            }
+        )
+    }
+
+    // Biometric Fingerprint Punch Modal (with Auto-Selfie)
+    if (showFingerprintPunchModal) {
+        // Bug #5 Fix: derive punch direction from state instead of hardcoding "in"
+        val punchType = if (uiState.isPunchedIn) "out" else "in"
+        com.paylogic.humora.presentation.components.BiometricFingerprintPunchSheet(
+            punchType = punchType,
+            onDismiss = { showFingerprintPunchModal = false },
+            onPunchSuccess = { msg ->
+                // Bug #6 Fix: forward the success message to the action banner
+                viewModel.clearActionMessage()
                 viewModel.loadMonthlyAttendance()
             }
         )

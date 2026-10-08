@@ -145,13 +145,13 @@ func TestNewMinioStorageFromConfigValidation(t *testing.T) {
 
 	// Test valid config creation
 	storage, err := NewMinioStorageFromConfig(&configs.MinioConfig{
-		Endpoint:        "localhost:9000",
+		Endpoint:        "192.168.1.50:9000",
 		AccessKeyID:     "minioadmin",
 		SecretAccessKey: "minioadmin",
 		UseSSL:          false,
 		DefaultBucket:   "test-bucket",
 		Region:          "us-east-1",
-		PublicURL:       "http://localhost:9000",
+		PublicURL:       "http://192.168.1.50:9000",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error creating MinioStorage: %v", err)
@@ -167,15 +167,15 @@ func TestNewMinioStorageFromConfigValidation(t *testing.T) {
 	if storage.Location() != "us-east-1" {
 		t.Errorf("expected location us-east-1, got %s", storage.Location())
 	}
-	if storage.BaseURL() != "http://localhost:9000" {
-		t.Errorf("expected baseURL http://localhost:9000, got %s", storage.BaseURL())
+	if storage.BaseURL() != "http://192.168.1.50:9000" {
+		t.Errorf("expected baseURL http://192.168.1.50:9000, got %s", storage.BaseURL())
 	}
-	expectedURL := "http://localhost:9000/test-bucket/gateway/logo/sample.png"
+	expectedURL := "http://192.168.1.50:9000/test-bucket/gateway/logo/sample.png"
 	if gotURL := storage.GetURL("test-bucket", "gateway/logo/sample.png"); gotURL != expectedURL {
 		t.Errorf("expected GetURL %s, got %s", expectedURL, gotURL)
 	}
-	if gotFormatted := storage.FormatURL("paylogic-media/gateway/logo/sample.png"); gotFormatted != "http://localhost:9000/paylogic-media/gateway/logo/sample.png" {
-		t.Errorf("expected FormatURL %s, got %s", "http://localhost:9000/paylogic-media/gateway/logo/sample.png", gotFormatted)
+	if gotFormatted := storage.FormatURL("paylogic-media/gateway/logo/sample.png"); gotFormatted != "http://192.168.1.50:9000/paylogic-media/gateway/logo/sample.png" {
+		t.Errorf("expected FormatURL %s, got %s", "http://192.168.1.50:9000/paylogic-media/gateway/logo/sample.png", gotFormatted)
 	}
 }
 
@@ -190,9 +190,9 @@ func TestPackageLevelStorageHelpers(t *testing.T) {
 	}
 
 	storage, _ := NewMinioStorageFromConfig(&configs.MinioConfig{
-		Endpoint:      "localhost:9000",
+		Endpoint:      "192.168.1.50:9000",
 		DefaultBucket: "my-bucket",
-		PublicURL:     "http://localhost:9000",
+		PublicURL:     "http://192.168.1.50:9000",
 	})
 	SetDefaultStorage(storage)
 
@@ -200,8 +200,8 @@ func TestPackageLevelStorageHelpers(t *testing.T) {
 		t.Errorf("expected default storage to match set storage")
 	}
 
-	if got := FormatURL("paylogic-media/test.png"); got != "http://localhost:9000/paylogic-media/test.png" {
-		t.Errorf("expected FormatURL http://localhost:9000/paylogic-media/test.png, got %s", got)
+	if got := FormatURL("paylogic-media/test.png"); got != "http://192.168.1.50:9000/paylogic-media/test.png" {
+		t.Errorf("expected FormatURL http://192.168.1.50:9000/paylogic-media/test.png, got %s", got)
 	}
 }
 

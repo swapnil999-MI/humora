@@ -134,8 +134,8 @@ export const MyProfileDesk: React.FC = () => {
       setPersonalEmail(myProfile.employee.personal_email || '');
       setCurrentAddress(myProfile.personal_details?.current_address || '');
       setPermanentAddress(myProfile.personal_details?.permanent_address || '');
-      setBloodGroup(myProfile.personal_details?.blood_group || 'O+');
-      setMaritalStatus(myProfile.personal_details?.marital_status || 'Single');
+      setBloodGroup(myProfile.personal_details?.blood_group || '');
+      setMaritalStatus(myProfile.personal_details?.marital_status || '');
     }
   }, [myProfile]);
 
@@ -456,7 +456,7 @@ export const MyProfileDesk: React.FC = () => {
                     border: '1px solid var(--border-subtle)',
                   }}
                 >
-                  {emp?.employee_code || 'EMP-001'}
+                  {emp?.employee_code || 'No employee code'}
                 </span>
                 <span
                   style={{
@@ -484,11 +484,11 @@ export const MyProfileDesk: React.FC = () => {
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Briefcase size={14} color="var(--text-muted)" />
-                  {emp?.designation_title || 'Software Engineer'}
+                  {emp?.designation_title || 'No designation'}
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Building size={14} color="var(--text-muted)" />
-                  {emp?.department_name || 'Engineering'}
+                  {emp?.department_name || 'No department'}
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Calendar size={14} color="var(--text-muted)" />
@@ -707,6 +707,7 @@ export const MyProfileDesk: React.FC = () => {
                   value={bloodGroup}
                   onChange={(e) => setBloodGroup(e.target.value)}
                 >
+                  <option value="">Not set</option>
                   <option value="A+">A+</option>
                   <option value="A-">A-</option>
                   <option value="B+">B+</option>
@@ -718,7 +719,7 @@ export const MyProfileDesk: React.FC = () => {
                 </select>
               ) : (
                 <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginTop: '4px' }}>
-                  {bloodGroup || 'O+'}
+                  {bloodGroup || 'Not specified'}
                 </div>
               )}
             </div>
@@ -739,7 +740,7 @@ export const MyProfileDesk: React.FC = () => {
                 Gender
               </label>
               <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginTop: '4px' }}>
-                {personal.gender || 'Female'}
+                {personal.gender || 'Not specified'}
               </div>
             </div>
 
@@ -755,13 +756,14 @@ export const MyProfileDesk: React.FC = () => {
                   value={maritalStatus}
                   onChange={(e) => setMaritalStatus(e.target.value)}
                 >
+                  <option value="">Not set</option>
                   <option value="Single">Single</option>
                   <option value="Married">Married</option>
                   <option value="Other">Other</option>
                 </select>
               ) : (
                 <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginTop: '4px' }}>
-                  {maritalStatus || 'Single'}
+                  {maritalStatus || 'Not specified'}
                 </div>
               )}
             </div>
@@ -927,7 +929,7 @@ export const MyProfileDesk: React.FC = () => {
                 Bank Name
               </label>
               <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginTop: '4px' }}>
-                {bank.bank_name || 'Silicon Valley Commercial Bank'}
+                {bank.bank_name || 'Not provided'}
               </div>
             </div>
 
@@ -936,7 +938,7 @@ export const MyProfileDesk: React.FC = () => {
                 Account Number
               </label>
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
-                {bank.account_number_masked || '•••• •••• •••• 8912'}
+                {bank.account_number_masked || 'Not provided'}
               </div>
             </div>
 
@@ -945,7 +947,7 @@ export const MyProfileDesk: React.FC = () => {
                 Routing / IFSC Code
               </label>
               <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
-                {bank.routing_number || '121000358'}
+                {bank.routing_number || 'Not provided'}
               </div>
             </div>
 
@@ -954,7 +956,7 @@ export const MyProfileDesk: React.FC = () => {
                 Tax Identifier (PAN / SSN)
               </label>
               <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
-                {bank.tax_id_masked || '•••-••-4591'}
+                {bank.tax_id_masked || 'Not provided'}
               </div>
             </div>
 

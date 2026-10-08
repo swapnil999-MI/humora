@@ -259,7 +259,7 @@ export const TeamRadarDesk: React.FC = () => {
                     {member.first_name} {member.last_name}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    {member.department_name || 'Engineering'} &bull; {member.employee_code}
+                    {member.department_name || 'No department'} &bull; {member.employee_code}
                   </div>
                 </div>
               </div>
@@ -277,7 +277,7 @@ export const TeamRadarDesk: React.FC = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
                   <Clock size={13} />
-                  <span>Shift: {member.shift_name || 'General Day Shift'}</span>
+                  <span>Shift: {member.shift_name || 'Not assigned'}</span>
                 </div>
 
                 <span

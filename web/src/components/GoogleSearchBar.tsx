@@ -107,6 +107,10 @@ export const GoogleSearchBar: React.FC = () => {
 
   const { employees, attendanceSummary } = useAppSelector((state) => state.hrms);
   const { kanbanBoard, backlog, projects } = useAppSelector((state) => state.work);
+  const { user } = useAppSelector((state) => state.auth);
+
+  const userRoles = user?.roles || [];
+  const isAdmin = userRoles.some((r) => ['superadmin', 'admin', 'hr_admin'].includes(r.toLowerCase()));
 
   // Global listener for Cmd+K / Ctrl+K and custom event to focus search
   useEffect(() => {
@@ -146,75 +150,93 @@ export const GoogleSearchBar: React.FC = () => {
   const allResults = useMemo(() => {
     const items: SearchResultItem[] = [];
 
-    // 1. Core Quick Actions & Pages
-    items.push({
-      id: 'action-punch',
-      category: 'action',
-      title: attendanceSummary?.punched_in ? 'Punch Out & Check Out' : 'Punch In & Start Workday',
-      subtitle: attendanceSummary?.punched_in ? 'Stop current session timer' : 'Start attendance tracking',
-      badge: 'Action',
-      icon: attendanceSummary?.punched_in ? (
-        <LogOut size={15} color="var(--accent-primary)" />
-      ) : (
-        <LogIn size={15} color="var(--accent-primary)" />
-      ),
-      action: () => {
-        dispatch(recordPunch({ punch_type: attendanceSummary?.punched_in ? 'out' : 'in', source: 'web' }));
-        setIsOpen(false);
-      },
-    });
+    // 1. Employee-Specific Actions & ESS Pages (Only for Employees)
+    if (!isAdmin) {
+      items.push({
+        id: 'action-punch',
+        category: 'action',
+        title: attendanceSummary?.punched_in ? 'Punch Out & Check Out' : 'Punch In & Start Workday',
+        subtitle: attendanceSummary?.punched_in ? 'Stop current session timer' : 'Start attendance tracking',
+        badge: 'Action',
+        icon: attendanceSummary?.punched_in ? (
+          <LogOut size={15} color="var(--accent-primary)" />
+        ) : (
+          <LogIn size={15} color="var(--accent-primary)" />
+        ),
+        action: () => {
+          dispatch(recordPunch({ punch_type: attendanceSummary?.punched_in ? 'out' : 'in', source: 'web' }));
+          setIsOpen(false);
+        },
+      });
 
-    items.push({
-      id: 'page-hub',
-      category: 'pages',
-      title: 'My Workday Hub',
-      subtitle: 'Unified employee cockpit & sprint overview',
-      badge: 'ESS Page',
-      icon: <Compass size={15} color="var(--accent-primary)" />,
-      action: () => {
-        dispatch(navigateToPage('hub'));
-        setIsOpen(false);
-      },
-    });
+      items.push({
+        id: 'page-hub',
+        category: 'pages',
+        title: 'My Workday Hub',
+        subtitle: 'Unified employee cockpit & sprint overview',
+        badge: 'ESS Page',
+        icon: <Compass size={15} color="var(--accent-primary)" />,
+        action: () => {
+          dispatch(navigateToPage('hub'));
+          setIsOpen(false);
+        },
+      });
 
-    items.push({
-      id: 'page-attendance',
-      category: 'pages',
-      title: 'My Attendance & Terminal',
-      subtitle: 'Punch records, time tracking & regularization',
-      badge: 'ESS Page',
-      icon: <Clock size={15} color="var(--accent-primary)" />,
-      action: () => {
-        dispatch(navigateToPage('attendance'));
-        setIsOpen(false);
-      },
-    });
+      items.push({
+        id: 'page-attendance',
+        category: 'pages',
+        title: 'My Attendance & Terminal',
+        subtitle: 'Punch records, time tracking & regularization',
+        badge: 'ESS Page',
+        icon: <Clock size={15} color="var(--accent-primary)" />,
+        action: () => {
+          dispatch(navigateToPage('attendance'));
+          setIsOpen(false);
+        },
+      });
 
-    items.push({
-      id: 'page-leaves',
-      category: 'pages',
-      title: 'Leaves & Absence Planner',
-      subtitle: 'Apply for leave, absence balances & quotas',
-      badge: 'ESS Page',
-      icon: <Calendar size={15} color="var(--accent-primary)" />,
-      action: () => {
-        dispatch(navigateToPage('leaves'));
-        setIsOpen(false);
-      },
-    });
+      items.push({
+        id: 'page-leaves',
+        category: 'pages',
+        title: 'Leaves & Absence Planner',
+        subtitle: 'Apply for leave, absence balances & quotas',
+        badge: 'ESS Page',
+        icon: <Calendar size={15} color="var(--accent-primary)" />,
+        action: () => {
+          dispatch(navigateToPage('leaves'));
+          setIsOpen(false);
+        },
+      });
 
-    items.push({
-      id: 'page-payroll',
-      category: 'pages',
-      title: 'Payroll & Salary Slips',
-      subtitle: 'Payslip downloads, CTC breakdown & taxes',
-      badge: 'ESS Page',
-      icon: <CreditCard size={15} color="var(--accent-primary)" />,
-      action: () => {
-        dispatch(navigateToPage('payroll'));
-        setIsOpen(false);
-      },
-    });
+      items.push({
+        id: 'page-payroll',
+        category: 'pages',
+        title: 'Payroll & Salary Slips',
+        subtitle: 'Payslip downloads, CTC breakdown & taxes',
+        badge: 'ESS Page',
+        icon: <CreditCard size={15} color="var(--accent-primary)" />,
+        action: () => {
+          dispatch(navigateToPage('payroll'));
+          setIsOpen(false);
+        },
+      });
+    }
+
+    // Admin & Management Pages
+    if (isAdmin) {
+      items.push({
+        id: 'page-company-settings',
+        category: 'pages',
+        title: 'Company Settings & Setup',
+        subtitle: 'Corporate geofence, SMTP, and company profile',
+        badge: 'Console',
+        icon: <Building2 size={15} color="var(--accent-primary)" />,
+        action: () => {
+          dispatch(navigateToPage('company_settings'));
+          setIsOpen(false);
+        },
+      });
+    }
 
     items.push({
       id: 'page-directory',

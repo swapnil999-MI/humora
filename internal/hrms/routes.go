@@ -1,6 +1,8 @@
 package hrms
 
 import (
+	"time"
+
 	"humora-backend/pkg/middleware"
 
 	"github.com/gofiber/fiber/v2"
@@ -9,7 +11,7 @@ import (
 // RegisterRoutes mounts all protected and public HRMS endpoints under /api/v1/hrms.
 func RegisterRoutes(router fiber.Router, handler *Handler, onboardingHandler *OnboardingHandler, payrollHandler *PayrollHandler, companyHandler *CompanyHandler) {
 	// Public Candidate Onboarding Portal (Access via unique invite token)
-	candidateGroup := router.Group("/hrms/onboarding/candidate")
+	candidateGroup := router.Group("/hrms/onboarding/candidate", middleware.RateLimiter(30, time.Minute))
 	candidateGroup.Get("/:token", onboardingHandler.GetCandidateByToken)
 	candidateGroup.Put("/:token", onboardingHandler.SaveCandidateDossier)
 
@@ -42,6 +44,12 @@ func RegisterRoutes(router fiber.Router, handler *Handler, onboardingHandler *On
 	onboardGroup.Post("/invite", onboardingHandler.InviteCandidate)
 	onboardGroup.Post("/candidates/:id/convert", onboardingHandler.ApproveAndConvertCandidate)
 
+	// Departments & Designations
+	hrmsGroup.Get("/departments", handler.ListDepartments)
+	hrmsGroup.Post("/departments", managementOnly, handler.CreateDepartment)
+	hrmsGroup.Get("/designations", handler.ListDesignations)
+	hrmsGroup.Post("/designations", managementOnly, handler.CreateDesignation)
+
 	// Employees & Organization Directory
 	empGroup := hrmsGroup.Group("/employees")
 	empGroup.Post("/", managementOnly, handler.CreateEmployee)
@@ -49,6 +57,14 @@ func RegisterRoutes(router fiber.Router, handler *Handler, onboardingHandler *On
 	empGroup.Get("/org-tree", handler.GetOrgTree)
 	empGroup.Get("/:id", handler.GetEmployee)
 	empGroup.Post("/:id/biometric-face", managementOnly, handler.UpdateEmployeeBiometricFace)
+
+	// Office Geofenced Locations Desk
+	locGroup := hrmsGroup.Group("/locations")
+	locGroup.Get("/", handler.ListOfficeLocations)
+	locGroup.Get("/:id", handler.GetOfficeLocation)
+	locGroup.Post("/", managementOnly, handler.CreateOfficeLocation)
+	locGroup.Put("/:id", managementOnly, handler.UpdateOfficeLocation)
+	locGroup.Delete("/:id", managementOnly, handler.DeleteOfficeLocation)
 
 	// Attendance & Geofenced Punch Desk
 	attGroup := hrmsGroup.Group("/attendance")
@@ -95,6 +111,7 @@ func RegisterRoutes(router fiber.Router, handler *Handler, onboardingHandler *On
 	payrollGroup.Get("/tax/declaration", payrollHandler.GetMyITDeclaration)
 	payrollGroup.Post("/tax/declaration", payrollHandler.SaveITDeclaration)
 	payrollGroup.Get("/reimbursements", payrollHandler.ListReimbursements)
+	payrollGroup.Get("/reimbursements/team", managementOnly, payrollHandler.ListTeamReimbursements)
+	payrollGroup.Put("/reimbursements/:id/review", managementOnly, payrollHandler.ReviewReimbursement)
 	payrollGroup.Post("/reimbursements", payrollHandler.SubmitReimbursement)
 }
-

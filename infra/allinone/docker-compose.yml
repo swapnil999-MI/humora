@@ -1,0 +1,40 @@
+# Humora — single-server install.
+#
+#   1. Set HUMORA_URL below to the address people will open (e.g. http://192.168.1.20:8080
+#      or https://hr.yourcompany.com if a TLS proxy sits in front).
+#   2. docker volume create humora-data      (once; see below)
+#   3. BACKUP_PATH=/mnt/backup-disk/humora docker compose up -d
+#   4. Open HUMORA_URL and register your organisation to create the first admin.
+#
+# All data (database, files, generated secrets) lives in the `humora-data` volume.
+# Backups (nightly + continuous database log for point-in-time restore) go to BACKUP_PATH,
+# which must be on a DIFFERENT disk or a NAS, so one failed disk cannot take both.
+#
+# The data volume is `external`, so Compose never creates or deletes it: `docker compose down -v`
+# cannot wipe the database by accident.
+
+services:
+  humora:
+    image: ${HUMORA_IMAGE:-ghcr.io/swapnil999-mi/humora:latest}
+    container_name: humora
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      HUMORA_URL: ${HUMORA_URL:-http://localhost:8080}
+      BACKUP_TIME: "02:00"   # daily, UTC
+      BACKUP_KEEP: "7"       # days of full backups (and point-in-time history) to keep
+      # Optional: alerts and social login
+      # TELEGRAM_BOT_TOKEN: ""
+      # TELEGRAM_CHAT_ID: ""
+      # GOOGLE_CLIENT_ID: ""
+      # GOOGLE_CLIENT_SECRET: ""
+    volumes:
+      - humora-data:/data
+      - ${BACKUP_PATH:-./humora-backups}:/backups
+    # Leave time for PostgreSQL to shut down cleanly.
+    stop_grace_period: 120s
+
+volumes:
+  humora-data:
+    external: true

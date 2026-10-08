@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
@@ -22,11 +23,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.paylogic.humora.core.theme.*
 import com.paylogic.humora.data.model.LeaveBalanceItem
 import com.paylogic.humora.data.model.LeaveRequestItem
-import com.paylogic.humora.presentation.components.GlassCard
+import com.paylogic.humora.presentation.components.ClayBadge
+import com.paylogic.humora.presentation.components.ClayButton
+import com.paylogic.humora.presentation.components.ClayCard
+import com.paylogic.humora.presentation.components.clayEffect
 import com.paylogic.humora.presentation.viewmodel.LeavesViewModel
 
 @Composable
@@ -106,20 +113,20 @@ fun LeavesScreen(
             }
         }
 
-        // 2. SANDWICH RULE NOTICE & APPLY BUTTON
+        // 2. QUICK APPLY ACTION
         item {
-            GlassCard {
+            ClayCard {
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info",
-                            tint = AmberWarning,
+                            imageVector = Icons.Default.CalendarMonth,
+                            contentDescription = "Leave",
+                            tint = BrandPrimary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Sandwich Rule Policy Active",
+                            text = "Apply for Leave",
                             color = TextPrimaryDark,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
@@ -127,21 +134,19 @@ fun LeavesScreen(
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Taking leaves immediately before and after weekend/holidays counts intervening days as leave on the backend.",
+                        text = "Submit planned leaves or emergency time-off requests directly for approval.",
                         color = TextSecondaryDark,
                         fontSize = 12.sp
                     )
                     Spacer(modifier = Modifier.height(14.dp))
-                    Button(
-                        onClick = { showApplyModal = true },
+                    ClayButton(
+                        text = "New Leave Application",
+                        icon = Icons.Default.Add,
+                        brush = ClayAccentGradient,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = "Apply")
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Apply for Leave", fontWeight = FontWeight.Bold)
-                    }
+                        cornerRadius = 14.dp,
+                        onClick = { showApplyModal = true }
+                    )
                 }
             }
         }
@@ -172,19 +177,18 @@ fun LeavesScreen(
         var selectedTypeId by remember {
             mutableStateOf(uiState.leaveTypes.firstOrNull()?.id ?: "")
         }
-        var fromDateInput by remember { mutableStateOf("2026-09-25") }
-        var toDateInput by remember { mutableStateOf("2026-09-26") }
+        // Issue #12 Fix: Pre-fill with today's date dynamically instead of hardcoded stale dates
+        val today = java.time.LocalDate.now()
+        var fromDateInput by remember { mutableStateOf(today.toString()) }
+        var toDateInput   by remember { mutableStateOf(today.toString()) }
         var reasonInput by remember { mutableStateOf("") }
         var errorMsg by remember { mutableStateOf<String?>(null) }
 
         Dialog(onDismissRequest = { showApplyModal = false }) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(DarkSurface)
-                    .border(1.dp, DarkBorder, RoundedCornerShape(20.dp))
-                    .padding(20.dp)
+            ClayCard(
+                cornerRadius = 24.dp,
+                elevation = 16.dp,
+                contentPadding = PaddingValues(20.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -208,21 +212,27 @@ fun LeavesScreen(
                     Text("Select Leave Category", color = TextSecondaryDark, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Leave Type Selector Chips
+                    // Leave Type Selector Chips (Tactile 3D Clay Pills)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(uiState.leaveTypes) { type ->
                             val isSelected = selectedTypeId == type.id
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) BrandPrimary else DarkSurfaceVariant)
-                                    .border(1.dp, if (isSelected) BrandPrimary else DarkBorder, RoundedCornerShape(8.dp))
+                                    .shadow(if (isSelected) 4.dp else 1.dp, RoundedCornerShape(12.dp), ambientColor = Color(0x66000000))
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSelected) ClayAccentGradient else SolidColor(ClaySurfacePressed))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) Brush.verticalGradient(listOf(Color.White.copy(0.45f), Color.White.copy(0.18f)))
+                                        else Brush.verticalGradient(listOf(Color.White.copy(0.15f), Color.White.copy(0.08f))),
+                                        RoundedCornerShape(12.dp)
+                                    )
                                     .clickable { selectedTypeId = type.id }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .padding(horizontal = 12.dp, vertical = 7.dp)
                             ) {
                                 Text(
                                     text = "${type.name} (${type.code})",
-                                    color = TextPrimaryDark,
+                                    color = if (isSelected) Color.White else TextSecondaryDark,
                                     fontSize = 11.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
@@ -241,12 +251,14 @@ fun LeavesScreen(
                             onValueChange = { fromDateInput = it },
                             label = { Text("From (YYYY-MM-DD)", fontSize = 10.sp) },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = TextPrimaryDark,
                                 unfocusedTextColor = TextPrimaryDark,
                                 focusedBorderColor = BrandPrimary,
-                                unfocusedBorderColor = DarkBorder
+                                unfocusedBorderColor = DarkBorder,
+                                focusedContainerColor = ClaySurfacePressed,
+                                unfocusedContainerColor = ClaySurfacePressed
                             )
                         )
                         OutlinedTextField(
@@ -254,12 +266,14 @@ fun LeavesScreen(
                             onValueChange = { toDateInput = it },
                             label = { Text("To (YYYY-MM-DD)", fontSize = 10.sp) },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = TextPrimaryDark,
                                 unfocusedTextColor = TextPrimaryDark,
                                 focusedBorderColor = BrandPrimary,
-                                unfocusedBorderColor = DarkBorder
+                                unfocusedBorderColor = DarkBorder,
+                                focusedContainerColor = ClaySurfacePressed,
+                                unfocusedContainerColor = ClaySurfacePressed
                             )
                         )
                     }
@@ -272,12 +286,14 @@ fun LeavesScreen(
                         label = { Text("Reason for absence", fontSize = 11.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 3,
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimaryDark,
                             unfocusedTextColor = TextPrimaryDark,
                             focusedBorderColor = BrandPrimary,
-                            unfocusedBorderColor = DarkBorder
+                            unfocusedBorderColor = DarkBorder,
+                            focusedContainerColor = ClaySurfacePressed,
+                            unfocusedContainerColor = ClaySurfacePressed
                         )
                     )
 
@@ -288,11 +304,17 @@ fun LeavesScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Button(
+                    ClayButton(
+                        text = "Submit Application",
+                        modifier = Modifier.fillMaxWidth(),
+                        isLoading = uiState.isSubmitting,
+                        enabled = !uiState.isSubmitting,
+                        brush = ClayAccentGradient,
+                        cornerRadius = 14.dp,
                         onClick = {
                             if (reasonInput.isBlank()) {
                                 errorMsg = "Please enter reason for absence"
-                                return@Button
+                                return@ClayButton
                             }
                             val effectiveTypeId = selectedTypeId.ifBlank {
                                 uiState.leaveTypes.firstOrNull()?.id ?: "20000000-0000-0000-0000-000000000003"
@@ -304,18 +326,8 @@ fun LeavesScreen(
                                     errorMsg = msg
                                 }
                             }
-                        },
-                        enabled = !uiState.isSubmitting,
-                        colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        if (uiState.isSubmitting) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
-                        } else {
-                            Text("Submit Application", fontWeight = FontWeight.Bold)
                         }
-                    }
+                    )
                 }
             }
         }
@@ -324,13 +336,11 @@ fun LeavesScreen(
 
 @Composable
 private fun LeaveBalanceCard(balance: LeaveBalanceItem) {
-    Box(
-        modifier = Modifier
-            .width(130.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(DarkSurface)
-            .border(1.dp, DarkBorder, RoundedCornerShape(14.dp))
-            .padding(14.dp)
+    ClayCard(
+        modifier = Modifier.width(135.dp),
+        cornerRadius = 20.dp,
+        elevation = 7.dp,
+        contentPadding = PaddingValues(14.dp)
     ) {
         Column {
             Text(
@@ -363,13 +373,10 @@ private fun LeaveBalanceCard(balance: LeaveBalanceItem) {
 
 @Composable
 private fun LeaveRequestCard(req: LeaveRequestItem) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(DarkSurface)
-            .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
-            .padding(14.dp)
+    ClayCard(
+        cornerRadius = 20.dp,
+        elevation = 6.dp,
+        contentPadding = PaddingValues(14.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -400,25 +407,17 @@ private fun LeaveRequestCard(req: LeaveRequestItem) {
                 }
             }
 
-            val (statusBg, statusText) = when (req.status.lowercase()) {
-                "approved" -> Pair(EmeraldSuccess.copy(alpha = 0.2f), EmeraldSuccess)
-                "pending" -> Pair(AmberWarning.copy(alpha = 0.2f), AmberWarning)
-                else -> Pair(RoseError.copy(alpha = 0.2f), RoseError)
+            val badgeBrush = when (req.status.lowercase()) {
+                "approved" -> ClaySuccessGradient
+                "pending" -> ClayWarningGradient
+                else -> ClayErrorGradient
             }
 
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(statusBg)
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = req.status.uppercase(),
-                    color = statusText,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            ClayBadge(
+                text = req.status.uppercase(),
+                brush = badgeBrush,
+                textColor = Color.White
+            )
         }
     }
 }

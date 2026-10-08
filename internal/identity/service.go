@@ -81,8 +81,10 @@ func (s *service) Register(ctx context.Context, req *RegisterRequest) (*AuthResp
 		return nil, fmt.Errorf("failed to create tenant: %w", err)
 	}
 
-	// 4. Create Default Roles for Tenant
+	// 4. Create Default Roles & Seed Tenant Data (Company Profile, Locations, Shifts, Leave Types, Agile Workflows)
 	_ = s.repo.CreateDefaultRoles(ctx, tenant.ID)
+	adminFullName := strings.TrimSpace(req.FirstName + " " + req.LastName)
+	_ = s.repo.SeedDefaultTenantData(ctx, tenant.ID, tenant.Name, req.AdminEmail, adminFullName)
 
 	// 5. Create Admin User
 	user := &User{
@@ -97,10 +99,16 @@ func (s *service) Register(ctx context.Context, req *RegisterRequest) (*AuthResp
 		return nil, fmt.Errorf("failed to create admin user: %w", err)
 	}
 
-	// 6. Assign Superadmin role to Admin User in user_roles (Admins do NOT have an employee profile)
-	superadminRole, err := s.repo.GetRoleByName(ctx, tenant.ID, "superadmin")
-	if err == nil && superadminRole != nil {
+	// 6. Assign Superadmin and Admin roles to Admin User in user_roles
+	if superadminRole, err := s.repo.GetRoleByName(ctx, tenant.ID, "superadmin"); err == nil && superadminRole != nil {
 		_ = s.repo.AssignRoleToUser(ctx, user.ID, superadminRole.ID)
+	}
+	if adminRole, err := s.repo.GetRoleByName(ctx, tenant.ID, "admin"); err == nil && adminRole != nil {
+		_ = s.repo.AssignRoleToUser(ctx, user.ID, adminRole.ID)
+	}
+	// The founder is also an employee: approving leave, expenses and corrections needs that profile.
+	if err := s.repo.CreateDefaultHRMSEmployee(ctx, tenant.ID, user.ID, req.AdminEmail, req.FirstName, req.LastName); err != nil {
+		return nil, fmt.Errorf("failed to create admin employee profile: %w", err)
 	}
 
 	// 7. Generate Tokens
@@ -197,16 +205,9 @@ func (s *service) RefreshToken(ctx context.Context, refreshToken string) (*AuthR
 		return nil, errors.New("refresh_token is required")
 	}
 
-	token, err := jwt.ParseWithClaims(refreshToken, &middleware.UserClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(configs.AppConfig.Server.JWTSecret), nil
-	})
-	if err != nil || !token.Valid {
+	claims, err := middleware.ParseToken(refreshToken, middleware.RefreshTokenAudience)
+	if err != nil {
 		return nil, errors.New("invalid or expired refresh token")
-	}
-
-	claims, ok := token.Claims.(*middleware.UserClaims)
-	if !ok {
-		return nil, errors.New("invalid token claims")
 	}
 
 	userID, err := uuid.Parse(claims.UserID)
@@ -217,6 +218,9 @@ func (s *service) RefreshToken(ctx context.Context, refreshToken string) (*AuthR
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil || user == nil {
 		return nil, errors.New("user account no longer exists")
+	}
+	if user.Status != "active" {
+		return nil, fmt.Errorf("account is %s. please contact your administrator", user.Status)
 	}
 
 	tenant, err := s.repo.GetTenantByID(ctx, user.TenantID)
@@ -303,7 +307,8 @@ func generateTokens(user *User, tenant *Tenant, roles, perms []string) (string, 
 			ExpiresAt: jwt.NewNumericDate(accessExpiry),
 			IssuedAt:  jwt.NewNumericDate(now),
 			Subject:   user.ID.String(),
-			Issuer:    "humora-auth",
+			Issuer:    middleware.TokenIssuer,
+			Audience:  jwt.ClaimStrings{middleware.AccessTokenAudience},
 		},
 	}
 
@@ -322,7 +327,8 @@ func generateTokens(user *User, tenant *Tenant, roles, perms []string) (string, 
 			ExpiresAt: jwt.NewNumericDate(refreshExpiry),
 			IssuedAt:  jwt.NewNumericDate(now),
 			Subject:   user.ID.String(),
-			Issuer:    "humora-auth",
+			Issuer:    middleware.TokenIssuer,
+			Audience:  jwt.ClaimStrings{middleware.RefreshTokenAudience},
 		},
 	}
 

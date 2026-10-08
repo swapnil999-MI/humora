@@ -1,7 +1,9 @@
 package hrms
 
 import (
+	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"humora-backend/pkg/response"
@@ -129,7 +131,7 @@ func (h *PayrollHandler) ListMyPayslips(c *fiber.Ctx) error {
 // GetPayslip retrieves an itemized payslip document by ID.
 // GET /api/v1/hrms/payroll/payslips/:id
 func (h *PayrollHandler) GetPayslip(c *fiber.Ctx) error {
-	tenantID, _, err := parseTenantAndUser(c)
+	tenantID, userID, err := parseTenantAndUser(c)
 	if err != nil {
 		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
 	}
@@ -142,6 +144,15 @@ func (h *PayrollHandler) GetPayslip(c *fiber.Ctx) error {
 	payslip, err := h.service.GetPayslipByID(c.UserContext(), tenantID, payslipID)
 	if err != nil {
 		return response.Error(c, fiber.StatusNotFound, err.Error())
+	}
+
+	// Employees may only read their own payslips; payroll management may read any in the tenant.
+	role, _ := c.Locals("role").(string)
+	if role != "superadmin" && role != "admin" && role != "hr_admin" {
+		emp, err := h.empRepo.GetEmployeeByUserID(c.UserContext(), tenantID, userID)
+		if err != nil || emp.ID != payslip.EmployeeID {
+			return response.Error(c, fiber.StatusNotFound, "Payslip not found")
+		}
 	}
 
 	return response.Success(c, fiber.StatusOK, "Payslip details retrieved", payslip)
@@ -271,4 +282,56 @@ func (h *PayrollHandler) ListReimbursements(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.StatusOK, "Reimbursement claims retrieved", claims)
+}
+
+// ListTeamReimbursements lists the organisation's claims for review (management only).
+// GET /api/v1/hrms/payroll/reimbursements/team?status=pending
+func (h *PayrollHandler) ListTeamReimbursements(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	claims, err := h.service.ListTeamReimbursements(c.UserContext(), tenantID, c.Query("status", "pending"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+	return response.Success(c, fiber.StatusOK, "Reimbursement claims retrieved", claims)
+}
+
+type reviewReimbursementRequest struct {
+	Status string `json:"status"` // approved | rejected
+}
+
+// ReviewReimbursement approves or rejects a pending claim (management only).
+// PUT /api/v1/hrms/payroll/reimbursements/:id/review
+func (h *PayrollHandler) ReviewReimbursement(c *fiber.Ctx) error {
+	tenantID, userID, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	claimID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid claim ID")
+	}
+	var req reviewReimbursementRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid review payload")
+	}
+	reviewerName, _ := c.Locals("email").(string)
+	var reviewerEmployeeID *uuid.UUID
+	if emp, err := h.empRepo.GetEmployeeByUserID(c.UserContext(), tenantID, userID); err == nil {
+		reviewerName = strings.TrimSpace(emp.FirstName + " " + emp.LastName)
+		reviewerEmployeeID = &emp.ID
+	}
+	claim, err := h.service.ReviewReimbursement(c.UserContext(), tenantID, claimID, userID, reviewerEmployeeID, reviewerName, req.Status)
+	if errors.Is(err, ErrClaimNotPending) {
+		return response.Error(c, fiber.StatusConflict, err.Error())
+	}
+	if errors.Is(err, ErrOwnClaim) {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+	return response.Success(c, fiber.StatusOK, "Claim "+claim.Status, claim)
 }

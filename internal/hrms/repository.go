@@ -19,6 +19,9 @@ type Repository interface {
 
 	GetOfficeLocation(ctx context.Context, tenantID, locationID uuid.UUID) (*OfficeLocation, error)
 	ListOfficeLocations(ctx context.Context, tenantID uuid.UUID) ([]OfficeLocation, error)
+	CreateOfficeLocation(ctx context.Context, loc *OfficeLocation) error
+	UpdateOfficeLocation(ctx context.Context, loc *OfficeLocation) error
+	DeleteOfficeLocation(ctx context.Context, tenantID, locationID uuid.UUID) error
 
 	CreateAttendancePunch(ctx context.Context, punch *AttendancePunch) error
 	GetLastPunch(ctx context.Context, tenantID, employeeID uuid.UUID) (*AttendancePunch, error)
@@ -55,6 +58,12 @@ type Repository interface {
 	ListRegularizations(ctx context.Context, tenantID uuid.UUID, employeeID *uuid.UUID, status string) ([]AttendanceRegularization, error)
 	GetRegularizationByID(ctx context.Context, tenantID, id uuid.UUID) (*AttendanceRegularization, error)
 	UpdateRegularizationStatus(ctx context.Context, tenantID, id, approverID uuid.UUID, status string) (*AttendanceRegularization, error)
+
+	// Departments & Designations
+	ListDepartments(ctx context.Context, tenantID uuid.UUID) ([]Department, error)
+	CreateDepartment(ctx context.Context, dept *Department) error
+	ListDesignations(ctx context.Context, tenantID uuid.UUID) ([]Designation, error)
+	CreateDesignation(ctx context.Context, desig *Designation) error
 
 	// Biometric Face Enrollment
 	UpdateEmployeeBiometricFace(ctx context.Context, tenantID, employeeID uuid.UUID, faceURL, embeddingJSON string, sampleCount int) error
@@ -226,6 +235,45 @@ func (r *repository) ListOfficeLocations(ctx context.Context, tenantID uuid.UUID
 	query := `SELECT * FROM hrms_office_locations WHERE tenant_id = $1 ORDER BY name ASC`
 	err := r.db.SelectContext(ctx, &locs, query, tenantID)
 	return locs, err
+}
+
+func (r *repository) CreateOfficeLocation(ctx context.Context, loc *OfficeLocation) error {
+	query := `
+		INSERT INTO hrms_office_locations (
+			id, tenant_id, name, latitude, longitude, radius_meters,
+			polygon_coordinates, allowed_ip_ranges, allowed_wifi_bssid, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`
+	if loc.ID == uuid.Nil {
+		loc.ID = uuid.New()
+	}
+	loc.CreatedAt = time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, query,
+		loc.ID, loc.TenantID, loc.Name, loc.Latitude, loc.Longitude, loc.RadiusMeters,
+		loc.PolygonCoordinates, loc.AllowedIPRanges, loc.AllowedWiFiBSSID, loc.CreatedAt,
+	)
+	return err
+}
+
+func (r *repository) UpdateOfficeLocation(ctx context.Context, loc *OfficeLocation) error {
+	query := `
+		UPDATE hrms_office_locations
+		SET name = $1, latitude = $2, longitude = $3, radius_meters = $4,
+		    polygon_coordinates = $5, allowed_ip_ranges = $6, allowed_wifi_bssid = $7
+		WHERE tenant_id = $8 AND id = $9
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		loc.Name, loc.Latitude, loc.Longitude, loc.RadiusMeters,
+		loc.PolygonCoordinates, loc.AllowedIPRanges, loc.AllowedWiFiBSSID,
+		loc.TenantID, loc.ID,
+	)
+	return err
+}
+
+func (r *repository) DeleteOfficeLocation(ctx context.Context, tenantID, locationID uuid.UUID) error {
+	query := `DELETE FROM hrms_office_locations WHERE tenant_id = $1 AND id = $2`
+	_, err := r.db.ExecContext(ctx, query, tenantID, locationID)
+	return err
 }
 
 func (r *repository) CreateAttendancePunch(ctx context.Context, punch *AttendancePunch) error {
@@ -557,15 +605,7 @@ func (r *repository) GetEmployeeShift(ctx context.Context, tenantID, employeeID 
 		return nil, err
 	}
 
-	fallbackQuery := `SELECT * FROM hrms_shifts WHERE tenant_id = $1 ORDER BY created_at ASC LIMIT 1`
-	err = r.db.GetContext(ctx, &shift, fallbackQuery, tenantID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &shift, nil
+	return nil, nil
 }
 
 func (r *repository) ListEmployeeRosters(ctx context.Context, tenantID uuid.UUID) ([]EmployeeShiftRosterView, error) {
@@ -730,5 +770,39 @@ func (r *repository) UpdateRegularizationStatus(ctx context.Context, tenantID, i
 		return nil, err
 	}
 	return &reg, nil
+}
+
+func (r *repository) ListDepartments(ctx context.Context, tenantID uuid.UUID) ([]Department, error) {
+	query := `SELECT id, tenant_id, name, lead_id, parent_id, created_at FROM hrms_departments WHERE tenant_id = $1 ORDER BY name ASC`
+	var depts []Department
+	err := r.db.SelectContext(ctx, &depts, query, tenantID)
+	return depts, err
+}
+
+func (r *repository) CreateDepartment(ctx context.Context, dept *Department) error {
+	query := `
+		INSERT INTO hrms_departments (id, tenant_id, name, parent_id, created_at)
+		VALUES ($1, $2, $3, $4, NOW())
+		ON CONFLICT (tenant_id, name) DO UPDATE SET name = EXCLUDED.name
+		RETURNING id, created_at
+	`
+	return r.db.QueryRowxContext(ctx, query, dept.ID, dept.TenantID, dept.Name, dept.ParentID).Scan(&dept.ID, &dept.CreatedAt)
+}
+
+func (r *repository) ListDesignations(ctx context.Context, tenantID uuid.UUID) ([]Designation, error) {
+	query := `SELECT id, tenant_id, title, grade_level, created_at FROM hrms_designations WHERE tenant_id = $1 ORDER BY title ASC`
+	var desigs []Designation
+	err := r.db.SelectContext(ctx, &desigs, query, tenantID)
+	return desigs, err
+}
+
+func (r *repository) CreateDesignation(ctx context.Context, desig *Designation) error {
+	query := `
+		INSERT INTO hrms_designations (id, tenant_id, title, grade_level, created_at)
+		VALUES ($1, $2, $3, $4, NOW())
+		ON CONFLICT (tenant_id, title) DO UPDATE SET title = EXCLUDED.title
+		RETURNING id, created_at
+	`
+	return r.db.QueryRowxContext(ctx, query, desig.ID, desig.TenantID, desig.Title, desig.GradeLevel).Scan(&desig.ID, &desig.CreatedAt)
 }
 

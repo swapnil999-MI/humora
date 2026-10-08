@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Hash,
-  Lock,
   Plus,
   Search,
   Paperclip,
@@ -9,82 +8,63 @@ import {
   Send,
   FileText,
   Image as ImageIcon,
-  CheckCircle2,
   AlertCircle,
   Clock,
-  User,
-  Users,
-  UserPlus,
   X,
-  ExternalLink,
-  ChevronRight,
   Download,
-  Eye,
-  AtSign,
-  Radio,
-  Sparkles,
-  ShieldAlert,
-  Flame,
-  ThumbsUp,
-  Heart,
-  Rocket,
   MessageSquare,
   Mic,
-  MicOff,
-  Volume2,
   Play,
   Pause,
-  Bookmark,
   Pin,
   Reply,
-  Copy,
   Check,
   CheckCheck,
-  Zap,
-  Phone,
-  PhoneCall,
-  PhoneOff,
-  Video,
-  VideoOff,
-  ShieldCheck,
   MoreVertical,
-  Camera,
-  Folder,
-  ChevronDown,
-  CornerDownRight,
-  Bell,
-  BellOff,
-  Star,
-  Maximize2,
-  RotateCcw,
-  CheckSquare,
-  TrendingUp,
-  ArrowLeft,
-  Calendar,
 } from 'lucide-react';
 import {
   usePulseStore,
   PulseAttachment,
   PulseTaskTag,
-  PulseMessage,
-  PulseVoiceNote,
-  PulseChannel,
-  PulseDirectMessage,
+  PulseMemberView,
+  PulseTick,
 } from '../../store/pulseStore';
-import { useWorkStore } from '../../store/workStore';
-import { useUiStore } from '../../store/uiStore';
+import {
+  useAuthStore,
+} from '../../store/authStore';
+import {
+  useWorkStore,
+} from '../../store/workStore';
+import {
+  useFusionStore,
+} from '../../store/fusionStore';
+import {
+  api,
+} from '../../api/client';
+import type { Issue } from '../../types';
+import {
+  useUiStore,
+} from '../../store/uiStore';
 
-interface GroupMember {
-  id: string;
-  userId: string;
-  name: string;
-  role: string;
-  department: string;
-  status: 'online' | 'away' | 'busy' | 'offline';
-  customStatus?: string;
-  isAdmin?: boolean;
-  dmId?: string;
-}
+type GroupMember = PulseMemberView;
+
+// WhatsApp-style delivery state of an outgoing message.
+const MessageTick: React.FC<{ tick?: PulseTick; size?: number }> = ({ tick, size = 13 }) => {
+  switch (tick) {
+    case 'pending':
+      return <Clock size={size - 2} color="var(--text-muted)" />;
+    case 'failed':
+      return <AlertCircle size={size} color="var(--accent-danger, #ef4444)" />;
+    case 'sent':
+      return <Check size={size} color="var(--text-muted)" />;
+    case 'delivered':
+      return <CheckCheck size={size} color="var(--text-muted)" />;
+    case 'read':
+      return <CheckCheck size={size} color="var(--accent-primary)" />;
+    default:
+      return null;
+  }
+};
 
 export const PulseDesk: React.FC = () => {
   const {
@@ -93,11 +73,16 @@ export const PulseDesk: React.FC = () => {
     channels,
     directMessages,
     messages,
+    members,
+    error: pulseError,
+    init: initPulse,
+    setViewing,
+    sendFile,
+    sendVoiceNote,
+    openMedia,
     searchQuery,
     isCreateChannelModalOpen,
     isMentionTaskModalOpen,
-    isHuddleActive,
-    huddleChannelId,
     activeThreadMessage,
     setActiveConversation,
     setSearchQuery,
@@ -105,15 +90,36 @@ export const PulseDesk: React.FC = () => {
     toggleReaction,
     toggleStarMessage,
     togglePinMessage,
-    toggleHuddle,
+    typing,
+    notifyTyping,
     setActiveThreadMessage,
     createChannel,
     setCreateChannelModalOpen,
     setMentionTaskModalOpen,
   } = usePulseStore();
 
-  const { kanbanBoard, setActiveIssue } = useWorkStore();
+  const { setActiveIssue } = useWorkStore();
+  const { myWorkday, fetchMyWorkday } = useFusionStore();
+  useEffect(() => {
+    void fetchMyWorkday();
+  }, [fetchMyWorkday]);
   const { addToast } = useUiStore();
+  const userId = useAuthStore((state) => state.user?.id);
+
+  // Start the encrypted messaging engine for the signed-in user.
+  useEffect(() => {
+    if (userId) void initPulse(userId);
+  }, [userId, initPulse]);
+
+  // Incoming messages count as read only while this screen is open.
+  useEffect(() => {
+    setViewing(true);
+    return () => setViewing(false);
+  }, [setViewing]);
+
+  useEffect(() => {
+    if (pulseError) addToast({ type: 'error', message: pulseError });
+  }, [pulseError, addToast]);
 
   // Local state for message input
   const [inputText, setInputText] = useState('');
@@ -140,82 +146,12 @@ export const PulseDesk: React.FC = () => {
   const [isPinnedDrawerOpen, setIsPinnedDrawerOpen] = useState(false);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
 
-  // Right-Side Task Inspector & Sprint Tasks Drawer States
-  const [inspectedTask, setInspectedTask] = useState<PulseTaskTag | null>(null);
-  const [isTasksListDrawerOpen, setIsTasksListDrawerOpen] = useState(false);
-  const [taskActiveTab, setTaskActiveTab] = useState<'overview' | 'worklogs' | 'activity'>('overview');
-  const [taskStopwatchRunning, setTaskStopwatchRunning] = useState(false);
-  const [taskStopwatchSeconds, setTaskStopwatchSeconds] = useState(0);
-  const taskTimerRef = useRef<any>(null);
-
-  // Dynamic status & logged hours map for tasks
-  const [taskStatusMap, setTaskStatusMap] = useState<Record<string, 'todo' | 'in_progress' | 'review' | 'done'>>({
-    'task-pay-101': 'in_progress',
-    'task-eng-204': 'review',
-    'task-ux-302': 'done',
-    'task-api-105': 'todo',
-  });
-
-  const [taskHoursLogged, setTaskHoursLogged] = useState<Record<string, number>>({
-    'task-pay-101': 3.5,
-    'task-eng-204': 6.0,
-    'task-ux-302': 2.5,
-    'task-api-105': 1.0,
-  });
-
-  const [taskWorklogEntries, setTaskWorklogEntries] = useState<
-    Record<string, Array<{ id: string; time: string; hours: number; desc: string; user: string }>>
-  >({
-    'task-pay-101': [
-      { id: 'wl-1', time: '10:30 AM', hours: 2.0, desc: 'Biometric shift LOP algorithm test cases', user: 'Rohan Deshmukh' },
-      { id: 'wl-2', time: '02:15 PM', hours: 1.5, desc: 'Section 115BAC TDS tax bracket formulas', user: 'Rohan Deshmukh' },
-    ],
-    'task-eng-204': [
-      { id: 'wl-3', time: '09:00 AM', hours: 3.5, desc: 'Fiber v2 connection pool refactor', user: 'Alex Rivera' },
-      { id: 'wl-4', time: '01:45 PM', hours: 2.5, desc: 'Database keep-alive ping optimization', user: 'Alex Rivera' },
-    ],
-  });
-  const [activeCallPartner, setActiveCallPartner] = useState<{
-    name: string;
-    role: string;
-    type: 'voice' | 'video';
-  } | null>(null);
-  const [callDuration, setCallDuration] = useState(0);
-  const [isCallMuted, setIsCallMuted] = useState(false);
-
-  // Audio note playback simulation
+  // Voice-note playback
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
-  const [voiceElapsedSec, setVoiceElapsedSec] = useState(18);
+  const [voiceElapsedSec, setVoiceElapsedSec] = useState(0);
 
   // Thread discussion drawer
   const [threadInputText, setThreadInputText] = useState('');
-  const [threadReplies, setThreadReplies] = useState<
-    Record<string, { id: string; senderName: string; role: string; text: string; time: string }[]>
-  >({
-    'msg-eng-voice-1': [
-      {
-        id: 'tr-1',
-        senderName: 'Alex Rivera',
-        role: 'Staff Lead',
-        text: 'Checked! Upstream cluster health is green on both ports.',
-        time: '10:14 AM',
-      },
-      {
-        id: 'tr-2',
-        senderName: 'Rohan Deshmukh',
-        role: 'Fullstack Eng',
-        text: 'Confirmed. Ready for traffic cutover as per the runbook.',
-        time: '10:18 AM',
-      },
-      {
-        id: 'tr-3',
-        senderName: 'Priya Sharma',
-        role: 'Product Designer',
-        text: 'Zero UI regressions detected on our staging smoke run.',
-        time: '10:22 AM',
-      },
-    ],
-  });
 
   // Group creation modal state
   const [newChannelName, setNewChannelName] = useState('');
@@ -232,261 +168,48 @@ export const PulseDesk: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentMessages.length, activeId]);
 
-  // Voice note playback timer
-  useEffect(() => {
-    let timer: any;
-    if (playingVoiceId) {
-      timer = setInterval(() => {
-        setVoiceElapsedSec((prev) => {
-          if (prev >= 45) {
-            setPlayingVoiceId(null);
-            return 0;
-          }
-          return prev + 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [playingVoiceId]);
+  // Voice note playback and recording
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const recorderRef = useRef<{ recorder: MediaRecorder; startedAt: number } | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
-  // Active call duration timer
-  useEffect(() => {
-    let callTimer: any;
-    if (activeCallPartner) {
-      callTimer = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
-    } else {
-      setCallDuration(0);
-    }
-    return () => clearInterval(callTimer);
-  }, [activeCallPartner]);
-
-  // Task Inspector live stopwatch timer
-  useEffect(() => {
-    if (taskStopwatchRunning) {
-      taskTimerRef.current = setInterval(() => {
-        setTaskStopwatchSeconds((prev) => prev + 1);
-      }, 1000);
-    } else if (taskTimerRef.current) {
-      clearInterval(taskTimerRef.current);
-    }
-    return () => {
-      if (taskTimerRef.current) clearInterval(taskTimerRef.current);
-    };
-  }, [taskStopwatchRunning]);
-
-  const formatSeconds = (sec: number) => {
-    const hrs = Math.floor(sec / 3600);
-    const mins = Math.floor((sec % 3600) / 60);
-    const secs = sec % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const stopVoicePlayback = () => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setPlayingVoiceId(null);
   };
+
+  const handleToggleVoicePlayback = async (messageId: string) => {
+    if (playingVoiceId === messageId) {
+      stopVoicePlayback();
+      return;
+    }
+    stopVoicePlayback();
+    const url = await openMedia(messageId);
+    if (!url) return;
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.ontimeupdate = () => setVoiceElapsedSec(audio.currentTime);
+    audio.onended = stopVoicePlayback;
+    setVoiceElapsedSec(0);
+    setPlayingVoiceId(messageId);
+    void audio.play().catch(stopVoicePlayback);
+  };
+
+  // Stop audio and release the microphone when leaving the screen.
+  useEffect(
+    () => () => {
+      audioRef.current?.pause();
+      recorderRef.current?.recorder.stream.getTracks().forEach((t) => t.stop());
+    },
+    []
+  );
 
   // Determine active conversation details
   const activeChannel = channels.find((c) => c.id === activeId);
   const activeDM = directMessages.find((dm) => dm.id === activeId);
 
-  // WhatsApp Squad Members Data Roster
-  const allSquadMembers: Record<string, GroupMember[]> = {
-    'chan-engineering': [
-      {
-        id: 'mem-1',
-        userId: 'user-sarah',
-        name: 'Sarah Jenkins',
-        role: 'VP of Engineering',
-        department: 'Engineering Leadership',
-        status: 'online',
-        customStatus: 'Reviewing Q3 sprint deliverables',
-        isAdmin: true,
-        dmId: 'dm-sarah',
-      },
-      {
-        id: 'mem-2',
-        userId: 'user-alex',
-        name: 'Alex Rivera',
-        role: 'Staff Lead Architect',
-        department: 'Core Infrastructure',
-        status: 'online',
-        customStatus: 'Testing NGINX blue-green switches',
-        isAdmin: true,
-        dmId: 'dm-alex',
-      },
-      {
-        id: 'mem-3',
-        userId: 'user-priya',
-        name: 'Priya Sharma',
-        role: 'Principal Product Designer',
-        department: 'Product Design',
-        status: 'online',
-        customStatus: 'Polishing dark mode design tokens',
-        dmId: 'dm-priya',
-      },
-      {
-        id: 'mem-4',
-        userId: 'user-rohan',
-        name: 'Rohan Deshmukh',
-        role: 'Senior Fullstack Engineer',
-        department: 'Frontend Engineering',
-        status: 'away',
-        customStatus: 'Reconciling weekly timesheets',
-        dmId: 'dm-rohan',
-      },
-      {
-        id: 'mem-5',
-        userId: 'user-current',
-        name: 'You',
-        role: 'Senior Systems Engineer',
-        department: 'Platform Architecture',
-        status: 'online',
-        customStatus: 'In Deep Flow 🎧',
-      },
-      {
-        id: 'mem-6',
-        userId: 'user-vikram',
-        name: 'Vikram Patel',
-        role: 'DevOps & Cloud Lead',
-        department: 'Infrastructure',
-        status: 'online',
-        customStatus: 'Terraform pipelines green 🚀',
-      },
-      {
-        id: 'mem-7',
-        userId: 'user-ananya',
-        name: 'Ananya Iyer',
-        role: 'Lead QA Automation',
-        department: 'Quality Engineering',
-        status: 'online',
-        customStatus: 'Running E2E regression suite',
-      },
-    ],
-    'chan-general': [
-      {
-        id: 'mem-1',
-        userId: 'user-sarah',
-        name: 'Sarah Jenkins',
-        role: 'VP of Engineering',
-        department: 'Leadership',
-        status: 'online',
-        isAdmin: true,
-        dmId: 'dm-sarah',
-      },
-      {
-        id: 'mem-2',
-        userId: 'user-alex',
-        name: 'Alex Rivera',
-        role: 'Staff Lead',
-        department: 'Engineering',
-        status: 'online',
-        dmId: 'dm-alex',
-      },
-      {
-        id: 'mem-3',
-        userId: 'user-priya',
-        name: 'Priya Sharma',
-        role: 'Product Designer',
-        department: 'Design',
-        status: 'online',
-        dmId: 'dm-priya',
-      },
-      {
-        id: 'mem-4',
-        userId: 'user-rohan',
-        name: 'Rohan Deshmukh',
-        role: 'Senior Engineer',
-        department: 'Engineering',
-        status: 'away',
-        dmId: 'dm-rohan',
-      },
-      {
-        id: 'mem-5',
-        userId: 'user-current',
-        name: 'You',
-        role: 'Senior Systems Engineer',
-        department: 'Platform',
-        status: 'online',
-      },
-    ],
-    'chan-sprint-room': [
-      {
-        id: 'mem-1',
-        userId: 'user-sarah',
-        name: 'Sarah Jenkins',
-        role: 'VP of Engineering',
-        department: 'Leadership',
-        status: 'online',
-        isAdmin: true,
-        dmId: 'dm-sarah',
-      },
-      {
-        id: 'mem-2',
-        userId: 'user-alex',
-        name: 'Alex Rivera',
-        role: 'Staff Lead',
-        department: 'Engineering',
-        status: 'online',
-        dmId: 'dm-alex',
-      },
-      {
-        id: 'mem-4',
-        userId: 'user-rohan',
-        name: 'Rohan Deshmukh',
-        role: 'Senior Engineer',
-        department: 'Engineering',
-        status: 'away',
-        dmId: 'dm-rohan',
-      },
-      {
-        id: 'mem-5',
-        userId: 'user-current',
-        name: 'You',
-        role: 'Senior Systems Engineer',
-        department: 'Platform',
-        status: 'online',
-      },
-    ],
-    'chan-product-design': [
-      {
-        id: 'mem-3',
-        userId: 'user-priya',
-        name: 'Priya Sharma',
-        role: 'Principal Product Designer',
-        department: 'Design',
-        status: 'online',
-        isAdmin: true,
-        dmId: 'dm-priya',
-      },
-      {
-        id: 'mem-1',
-        userId: 'user-sarah',
-        name: 'Sarah Jenkins',
-        role: 'VP of Engineering',
-        department: 'Leadership',
-        status: 'online',
-        dmId: 'dm-sarah',
-      },
-      {
-        id: 'mem-4',
-        userId: 'user-rohan',
-        name: 'Rohan Deshmukh',
-        role: 'Senior Engineer',
-        department: 'Engineering',
-        status: 'away',
-        dmId: 'dm-rohan',
-      },
-      {
-        id: 'mem-5',
-        userId: 'user-current',
-        name: 'You',
-        role: 'Senior Systems Engineer',
-        department: 'Platform',
-        status: 'online',
-      },
-    ],
-  };
-
-  const currentGroupMembers: GroupMember[] =
-    allSquadMembers[activeId] || allSquadMembers['chan-engineering'];
+  const currentGroupMembers: GroupMember[] = members[activeId] || [];
 
   const filteredGroupMembers = currentGroupMembers.filter(
     (m) =>
@@ -495,59 +218,17 @@ export const PulseDesk: React.FC = () => {
       m.department.toLowerCase().includes(memberSearchQuery.toLowerCase())
   );
 
-  // Available manager-assigned sprint tasks for tagging
-  const availableSprintTasks: PulseTaskTag[] = [
-    {
-      id: 'task-pay-101',
-      key: 'PAY-101',
-      title: 'Implement Biometric LOP Deductions & IT Regime TDS Planner',
-      status: 'in_progress',
-      priority: 'urgent',
-      assigneeName: 'Rohan Deshmukh',
-      assignedByManager: 'Sarah Jenkins (VP)',
-      storyPoints: 5,
-    },
-    {
-      id: 'task-eng-204',
-      key: 'ENG-204',
-      title: 'Optimize Fiber v2 Route Middleware & SQL Connection Pooling',
-      status: 'review',
-      priority: 'high',
-      assigneeName: 'Alex Rivera',
-      assignedByManager: 'Sarah Jenkins (VP)',
-      storyPoints: 8,
-    },
-    {
-      id: 'task-ux-302',
-      key: 'UX-302',
-      title: 'Standardize Soft Button Theme & Toast Notifications',
-      status: 'done',
-      priority: 'medium',
-      assigneeName: 'Priya Sharma',
-      assignedByManager: 'Sarah Jenkins (VP)',
-      storyPoints: 3,
-    },
-    {
-      id: 'task-api-105',
-      key: 'API-105',
-      title: 'Wire Up Timesheet Sign-Off & Biometric Sync Endpoints',
-      status: 'todo',
-      priority: 'high',
-      assigneeName: 'Alex Rivera',
-      assignedByManager: 'Alex Rivera (Lead)',
-      storyPoints: 5,
-    },
-    {
-      id: 'task-sec-404',
-      key: 'SEC-404',
-      title: 'Corporate Seal & Digital Signatory Verification Audit',
-      status: 'in_progress',
-      priority: 'urgent',
-      assigneeName: 'Sarah Jenkins',
-      assignedByManager: 'Sarah Jenkins (VP)',
-      storyPoints: 4,
-    },
-  ];
+  // Tasks the user can tag: their own focus tasks from the Work module.
+  const availableSprintTasks: PulseTaskTag[] = (myWorkday?.focus_tasks ?? []).map((t) => ({
+    id: t.id,
+    key: t.issue_key,
+    title: t.title,
+    status: t.status_category === 'done' ? 'done' : t.status_category === 'in_progress' ? 'in_progress' : 'todo',
+    priority: (['low', 'medium', 'high', 'urgent'].includes(t.priority) ? t.priority : 'medium') as PulseTaskTag['priority'],
+    assigneeName: myWorkday?.employee_name ?? '',
+    assignedByManager: '',
+    storyPoints: t.story_points,
+  }));
 
   const filteredSprintTasks = availableSprintTasks.filter(
     (t) =>
@@ -579,16 +260,27 @@ export const PulseDesk: React.FC = () => {
   });
 
   // Filter messages in stream for In-Chat Search
+  const threadRepliesOf = (rootId: string) => currentMessages.filter((m) => m.threadRootId === rootId);
+  // Thread replies live in the thread drawer, not the main timeline.
+  const timelineMessages = currentMessages.filter((m) => !m.threadRootId);
   const displayMessages = inChatSearchQuery.trim()
-    ? currentMessages.filter((m) =>
+    ? timelineMessages.filter((m) =>
         m.content.toLowerCase().includes(inChatSearchQuery.toLowerCase())
       )
-    : currentMessages;
+    : timelineMessages;
 
   // Send message handler
   const handleSend = () => {
     if (!inputText.trim() && stagedAttachments.length === 0 && stagedTaskTags.length === 0) return;
 
+    if (!inputText.trim()) {
+      addToast({ type: 'info', message: 'Type a message to send with the tagged task.' });
+      return;
+    }
+    // The task picker still lists sample tasks; only tags that point at a real task can be sent.
+    if (stagedTaskTags.some((t) => !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(t.id))) {
+      addToast({ type: 'info', message: 'That tag does not point at a task you can access, so the message was sent without it.' });
+    }
     sendMessage(activeId, inputText, stagedAttachments, stagedTaskTags);
     setInputText('');
     setStagedAttachments([]);
@@ -605,25 +297,25 @@ export const PulseDesk: React.FC = () => {
     }
   };
 
-  // Handle file attachment simulation
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const file = files[0];
-    const isImg = file.type.startsWith('image/');
-    const newAtt: PulseAttachment = {
-      id: `att-${Date.now()}`,
-      name: file.name,
-      size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-      type: isImg ? 'image' : file.name.endsWith('.pdf') ? 'pdf' : 'document',
-      url: URL.createObjectURL(file),
-      previewUrl: isImg ? URL.createObjectURL(file) : undefined,
-    };
-
-    setStagedAttachments((prev) => [...prev, newAtt]);
+  // Encrypt and send the chosen file straight away.
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
     setIsAttachMenuOpen(false);
-    addToast({ type: 'info', message: `Attached "${file.name}" to draft.` });
+    if (!file) return;
+    addToast({ type: 'info', message: `Encrypting and sending "${file.name}"...` });
+    if (await sendFile(activeId, file)) addToast({ type: 'success', message: `Sent "${file.name}".` });
+  };
+
+  // Decrypt an attachment and either save it or open it in a new tab.
+  const handleOpenAttachment = async (att: PulseAttachment, download: boolean) => {
+    const url = await openMedia(att.id);
+    if (!url) return;
+    const link = document.createElement('a');
+    link.href = url;
+    if (download) link.download = att.name;
+    else link.target = '_blank';
+    link.click();
   };
 
   // Stage a tagged task
@@ -636,64 +328,45 @@ export const PulseDesk: React.FC = () => {
     setTaskSearchQuery('');
   };
 
-  // Quick 30m Log Shortcut directly on chat task card
-  const handleQuickLog30m = (taskKey: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    addToast({
-      type: 'success',
-      message: `⚡ Quick-Logged +30m to [${taskKey}] & synced to Workday ledger.`,
-    });
-  };
-
-  // Simulate Instant Audio Memo Recording (WhatsApp Mic Button)
-  const handleRecordAudioMemo = () => {
-    const simulatedWaveform = [
-      24, 42, 65, 88, 48, 72, 96, 100, 78, 55, 68, 86, 92, 60, 42, 76, 88, 56, 40, 72, 48, 28, 38,
-      18,
-    ];
-    const voiceNote: PulseVoiceNote = {
-      duration: '0:34',
-      waveform: simulatedWaveform,
-      transcription:
-        'Voice memo: Verified the zero-downtime blue-green health check scripts and NGINX configs.',
+  // Mic button: first press starts recording, second press stops and sends.
+  const handleRecordAudioMemo = async () => {
+    const active = recorderRef.current;
+    if (active) {
+      active.recorder.stop();
+      return;
+    }
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      addToast({ type: 'error', message: 'Microphone access was not allowed.' });
+      return;
+    }
+    const recorder = new MediaRecorder(stream);
+    const chunks: Blob[] = [];
+    const conversationId = activeId;
+    const startedAt = Date.now();
+    recorder.ondataavailable = (ev) => chunks.push(ev.data);
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      recorderRef.current = null;
+      setIsRecording(false);
+      const recording = new Blob(chunks, { type: recorder.mimeType });
+      if (recording.size === 0) return;
+      if (await sendVoiceNote(conversationId, recording, Date.now() - startedAt)) {
+        addToast({ type: 'success', message: '🎙️ Voice note sent.' });
+      }
     };
-    sendMessage(activeId, '', [], [], voiceNote);
-    addToast({ type: 'success', message: '🎙️ Voice note recorded & sent.' });
+    recorderRef.current = { recorder, startedAt };
+    recorder.start();
+    setIsRecording(true);
+    addToast({ type: 'info', message: 'Recording... press the mic again to send.' });
   };
 
   // WhatsApp UX: Direct Message a Member
   const handleDirectMessageMember = (member: GroupMember) => {
     setIsInfoDrawerOpen(false);
-    if (member.dmId) {
-      setActiveConversation(member.dmId, 'dm');
-      addToast({ type: 'success', message: `Switched to direct chat with ${member.name}.` });
-    } else {
-      addToast({
-        type: 'info',
-        message: `Direct message thread initialized for ${member.name}.`,
-      });
-    }
-  };
-
-  // WhatsApp UX: Start Call with Member
-  const handleStartCallMember = (partner: { name: string; role: string }, type: 'voice' | 'video') => {
-    setActiveCallPartner({ name: partner.name, role: partner.role, type });
-    addToast({
-      type: 'info',
-      message: `📞 Calling ${partner.name} (${type === 'voice' ? 'Voice Call' : 'Video Call'})...`,
-    });
-  };
-
-  // End Call Handler
-  const handleEndCall = () => {
-    if (activeCallPartner) {
-      addToast({
-        type: 'info',
-        message: `Call ended with ${activeCallPartner.name}. Duration: ${Math.floor(callDuration / 60)}m ${callDuration % 60}s.`,
-      });
-      setActiveCallPartner(null);
-      setCallDuration(0);
-    }
+    if (member.dmId) setActiveConversation(member.dmId, 'dm');
   };
 
   // Create Channel/Group submission
@@ -707,119 +380,20 @@ export const PulseDesk: React.FC = () => {
     addToast({ type: 'success', message: `Created group #${newChannelName}.` });
   };
 
-  // Open right-side Task Inspector drawer
-  const handleInspectTask = (task: PulseTaskTag) => {
-    setIsInfoDrawerOpen(false);
-    setIsPinnedDrawerOpen(false);
-    setIsTasksListDrawerOpen(false);
-    setActiveThreadMessage(null);
-
-    setInspectedTask(task);
-    setTaskActiveTab('overview');
-    setTaskStopwatchRunning(false);
-    setTaskStopwatchSeconds(0);
-  };
-
-  // Expand from right-side Task Inspector to full-screen Kanban IssueDrawer
-  const handleExpandToFullModal = (task: PulseTaskTag) => {
-    const allBoardIssues = kanbanBoard?.columns.flatMap((c) => c.issues) || [];
-    const foundIssue = allBoardIssues.find((i) => i.issue_key === task.key || i.id === task.id);
-
-    if (foundIssue) {
-      setActiveIssue(foundIssue);
-    } else {
-      setActiveIssue({
-        id: task.id,
-        tenant_id: 'tenant-1',
-        project_id: 'proj-1',
-        issue_number: 101,
-        issue_key: task.key,
-        title: task.title,
-        description: `Task tagged from Team Pulse conversation.\n\nManager: ${task.assignedByManager}\nStatus: ${taskStatusMap[task.id] || task.status}`,
-        issue_type: 'task',
-        status_id: 'status-todo',
-        status_name: taskStatusMap[task.id] || task.status,
-        status_category: 'in_progress',
-        priority: task.priority as any,
-        reporter_id: 'user-sarah',
-        story_points: task.storyPoints || 3,
-        original_estimate_seconds: 28800,
-        remaining_estimate_seconds: 14400,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+  // A tagged task opens the live issue in the Work module's drawer.
+  const openTaskIssue = async (task: PulseTaskTag) => {
+    try {
+      setActiveIssue(await api.get<Issue>(`/work/issues/${task.id}`));
+    } catch {
+      addToast({ type: 'error', message: `${task.key} could not be opened. You may not have access to it.` });
     }
   };
 
-  // Quick Log Time to Sprint Task
-  const handleQuickLogTime = (taskId: string, hoursToAdd: number, taskKey: string) => {
-    setTaskHoursLogged((prev) => ({
-      ...prev,
-      [taskId]: Number(((prev[taskId] || 0) + hoursToAdd).toFixed(2)),
-    }));
-    const newEntry = {
-      id: `wl-${Date.now()}`,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      hours: hoursToAdd,
-      desc: `Quick logged +${hoursToAdd}h from Team Pulse task inspector`,
-      user: 'Rohan Deshmukh (You)',
-    };
-    setTaskWorklogEntries((prev) => ({
-      ...prev,
-      [taskId]: [newEntry, ...(prev[taskId] || [])],
-    }));
-    addToast({
-      type: 'success',
-      message: `+${hoursToAdd >= 1 ? `${hoursToAdd}h` : `${Math.round(hoursToAdd * 60)}m`} logged to ${taskKey} & synced with Timesheet Ledger!`,
-    });
-  };
-
-  // Update Status for Sprint Task
-  const handleUpdateTaskStatus = (taskId: string, newStatus: 'todo' | 'in_progress' | 'review' | 'done', taskKey: string) => {
-    setTaskStatusMap((prev) => ({
-      ...prev,
-      [taskId]: newStatus,
-    }));
-    addToast({
-      type: 'info',
-      message: `${taskKey} status updated to ${newStatus.replace('_', ' ').toUpperCase()}!`,
-    });
-  };
-
-  // Post Task Progress Update directly to Chat Stream
-  const handlePostTaskUpdateToChat = (task: PulseTaskTag) => {
-    const currentHours = taskHoursLogged[task.id] || 3.5;
-    const currentStatus = taskStatusMap[task.id] || task.status;
-    const updateText = `⚡ Update on ${task.key} (${task.title}): Status is [${currentStatus.replace('_', ' ').toUpperCase()}]. Total logged: ${currentHours}h. Biometric sync active.`;
-
-    if (activeType === 'channel' && activeChannel) {
-      sendMessage(activeChannel.id, updateText);
-    } else if (activeDM) {
-      sendMessage(activeDM.id, updateText);
-    }
-    addToast({
-      type: 'success',
-      message: `Posted update for ${task.key} to ${activeType === 'channel' ? `#${activeChannel?.name}` : activeDM?.name || 'chat'}!`,
-    });
-  };
-
-  // Post reply in thread drawer
+  // Thread replies are ordinary encrypted messages that name their thread root.
   const handleSendThreadReply = () => {
     if (!activeThreadMessage || !threadInputText.trim()) return;
-    const msgId = activeThreadMessage.id;
-    const newReply = {
-      id: `tr-${Date.now()}`,
-      senderName: 'You',
-      role: 'Senior Engineer',
-      text: threadInputText,
-      time: 'Just now',
-    };
-    setThreadReplies((prev) => ({
-      ...prev,
-      [msgId]: [...(prev[msgId] || []), newReply],
-    }));
+    void sendMessage(activeId, threadInputText, [], [], undefined, { threadRootId: activeThreadMessage.id });
     setThreadInputText('');
-    addToast({ type: 'success', message: 'Thread reply posted.' });
   };
 
   return (
@@ -846,130 +420,6 @@ export const PulseDesk: React.FC = () => {
         }}
       />
 
-      {/* ========================================================================= */}
-      {/* ACTIVE CALL FLOATING OVERLAY / BANNER (WHATSAPP UX)                       */}
-      {/* ========================================================================= */}
-      {activeCallPartner && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '24px',
-            zIndex: 100,
-            background: 'linear-gradient(135deg, rgba(32, 30, 27, 0.96) 0%, rgba(18, 17, 16, 0.98) 100%)',
-            border: '1px solid var(--accent-primary)',
-            borderRadius: '14px',
-            padding: '12px 18px',
-            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.7), 0 0 16px rgba(245, 158, 11, 0.25)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-          }}
-        >
-          <div style={{ position: 'relative' }}>
-            <div
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                background: 'var(--accent-primary)',
-                color: '#000000',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '14px',
-              }}
-            >
-              {activeCallPartner.name.charAt(0)}
-            </div>
-            <span
-              style={{
-                position: 'absolute',
-                bottom: 0,
-                right: 0,
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                background: '#10b981',
-                boxShadow: '0 0 8px #10b981',
-              }}
-            />
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {activeCallPartner.name}
-              </span>
-              <span
-                style={{
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  padding: '1px 6px',
-                  borderRadius: '4px',
-                  background: 'rgba(16, 185, 129, 0.2)',
-                  color: '#10b981',
-                }}
-              >
-                {callDuration > 2 ? 'Connected' : 'Ringing...'}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '10px' }}>
-                <div className="huddle-wave-bar" style={{ height: '8px' }} />
-                <div className="huddle-wave-bar" style={{ height: '12px', animationDelay: '-0.3s' }} />
-                <div className="huddle-wave-bar" style={{ height: '7px', animationDelay: '-0.5s' }} />
-              </div>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {activeCallPartner.type === 'voice' ? 'Direct Voice Call' : 'Direct Video Call'} &bull;{' '}
-                {Math.floor(callDuration / 60)}:{(callDuration % 60).toString().padStart(2, '0')}
-              </span>
-            </div>
-          </div>
-
-          {/* Call Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
-            <button
-              onClick={() => setIsCallMuted((p) => !p)}
-              className="btn btn-ghost"
-              style={{
-                padding: '8px',
-                borderRadius: '50%',
-                background: isCallMuted ? 'rgba(239, 68, 68, 0.2)' : 'var(--surface-3)',
-                color: isCallMuted ? '#ef4444' : 'var(--text-primary)',
-              }}
-              title={isCallMuted ? 'Unmute' : 'Mute'}
-            >
-              {isCallMuted ? <MicOff size={15} /> : <Mic size={15} />}
-            </button>
-
-            <button
-              onClick={handleEndCall}
-              style={{
-                background: '#ef4444',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '50%',
-                width: '34px',
-                height: '34px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: '0 0 10px rgba(239, 68, 68, 0.4)',
-              }}
-              title="End Call"
-            >
-              <PhoneOff size={16} />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* 1. WHATSAPP WEB STYLE LEFT SIDEBAR: CHATS LIST & FILTER PILLS             */}
@@ -1038,16 +488,8 @@ export const PulseDesk: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Action Icons (Moments/Status, New Group, Menu) */}
+          {/* Right Action Icons (New Group, Menu) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
-            <button
-              onClick={() => addToast({ type: 'info', message: 'Team Presence Radar active.' })}
-              className="btn btn-ghost"
-              style={{ padding: '7px', borderRadius: '50%', color: 'var(--text-muted)' }}
-              title="Team Status & Radar"
-            >
-              <Radio size={18} />
-            </button>
 
             <button
               onClick={() => setCreateChannelModalOpen(true)}
@@ -1106,16 +548,6 @@ export const PulseDesk: React.FC = () => {
                   style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px' }}
                 >
                   Starred & Pinned
-                </button>
-                <button
-                  onClick={() => {
-                    setIsSidebarMenuOpen(false);
-                    addToast({ type: 'info', message: 'Notification preferences saved.' });
-                  }}
-                  className="btn btn-ghost"
-                  style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px' }}
-                >
-                  Chat Settings
                 </button>
               </div>
             )}
@@ -1199,15 +631,10 @@ export const PulseDesk: React.FC = () => {
               ? activeType === 'channel' && activeId === item.id
               : activeType === 'dm' && activeId === item.id;
 
-            const timeDisplay = isGroup
-              ? (item as any).createdAt === '2026-02-15'
-                ? 'Yesterday'
-                : '10:42 AM'
-              : (item as any).lastMessageTime || 'Yesterday';
+            const timeDisplay = item.lastMessageTime || '';
 
-            const snippet = isGroup
-              ? (item as any).topic
-              : (item as any).lastMessageSnippet || 'Hey team!';
+            const snippet =
+              item.lastMessageSnippet || (isGroup ? (item as any).topic : (item as any).role) || '';
 
             return (
               <div
@@ -1215,6 +642,7 @@ export const PulseDesk: React.FC = () => {
                 onClick={() => {
                   setActiveConversation(item.id, isGroup ? 'channel' : 'dm');
                 }}
+                className={`pulse-channel-item ${isActive ? 'active' : ''}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1287,8 +715,12 @@ export const PulseDesk: React.FC = () => {
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden' }}>
-                      {/* WhatsApp Double Checkmark icon on snippet */}
-                      <CheckCheck size={14} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
+                      {/* Delivery state of the last message, when it is the user's own */}
+                      {item.lastMessageTick && (
+                        <span style={{ display: 'flex', flexShrink: 0 }}>
+                          <MessageTick tick={item.lastMessageTick} size={14} />
+                        </span>
+                      )}
                       <span
                         style={{
                           fontSize: '12px',
@@ -1390,50 +822,18 @@ export const PulseDesk: React.FC = () => {
 
             <div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {activeType === 'channel' ? `#${activeChannel?.name}` : activeDM?.name}
+                {activeChannel ? `#${activeChannel.name}` : activeDM?.name || 'Pulse'}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 {activeType === 'channel'
-                  ? 'Sarah, Alex, Rohan, Priya, You, Vikram...'
-                  : activeDM?.status === 'online'
-                  ? 'online'
-                  : 'last seen today at 10:42 AM'}
+                  ? currentGroupMembers.map((m) => m.name).join(', ')
+                  : activeDM?.role || ''}
               </div>
             </div>
           </div>
 
           {/* Right Action Icons: Video, Voice Call, In-Chat Search, Menu */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
-            {/* Video Call Button */}
-            <button
-              onClick={() =>
-                handleStartCallMember(
-                  { name: activeType === 'channel' ? activeChannel?.name || 'Group' : activeDM?.name || 'Contact', role: 'Live Session' },
-                  'video'
-                )
-              }
-              className="btn btn-ghost"
-              style={{ padding: '8px', borderRadius: '50%', color: 'var(--text-muted)' }}
-              title="Video Call"
-            >
-              <Video size={18} />
-            </button>
-
-            {/* Voice Call Button */}
-            <button
-              onClick={() =>
-                handleStartCallMember(
-                  { name: activeType === 'channel' ? activeChannel?.name || 'Group' : activeDM?.name || 'Contact', role: 'Voice Call' },
-                  'voice'
-                )
-              }
-              className="btn btn-ghost"
-              style={{ padding: '8px', borderRadius: '50%', color: 'var(--text-muted)' }}
-              title="Voice Call"
-            >
-              <Phone size={17} />
-            </button>
-
             {/* In-Chat Search Trigger */}
             <button
               onClick={() => setIsChatSearchOpen((p) => !p)}
@@ -1491,43 +891,12 @@ export const PulseDesk: React.FC = () => {
                 <button
                   onClick={() => {
                     setIsChatHeaderMenuOpen(false);
-                    setIsTasksListDrawerOpen(true);
-                    setInspectedTask(null);
-                  }}
-                  className="btn btn-ghost"
-                  style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px', color: 'var(--accent-primary)' }}
-                >
-                  ⚡ Sprint Tasks Roster
-                </button>
-                <button
-                  onClick={() => {
-                    setIsChatHeaderMenuOpen(false);
                     setIsPinnedDrawerOpen(true);
                   }}
                   className="btn btn-ghost"
                   style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px' }}
                 >
                   Starred & Pinned
-                </button>
-                <button
-                  onClick={() => {
-                    setIsChatHeaderMenuOpen(false);
-                    addToast({ type: 'info', message: 'Chat notifications muted for 8 hours.' });
-                  }}
-                  className="btn btn-ghost"
-                  style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px' }}
-                >
-                  Mute Notifications
-                </button>
-                <button
-                  onClick={() => {
-                    setIsChatHeaderMenuOpen(false);
-                    addToast({ type: 'info', message: 'Chat cleared.' });
-                  }}
-                  className="btn btn-ghost"
-                  style={{ justifyContent: 'flex-start', padding: '6px 10px', fontSize: '12px', color: '#ef4444' }}
-                >
-                  Clear Messages
                 </button>
               </div>
             )}
@@ -1594,20 +963,28 @@ export const PulseDesk: React.FC = () => {
             gap: '8px',
           }}
         >
-          {/* Floating WhatsApp Date Separator Pill */}
-          <div className="whatsapp-date-pill">
-            TODAY
-          </div>
-
           {/* Render Messages in WhatsApp Bubbles */}
-          {displayMessages.map((msg) => {
+          {displayMessages.map((msg, index) => {
+            const day = new Date(msg.createdAt).toDateString();
+            const showDay = index === 0 || new Date(displayMessages[index - 1].createdAt).toDateString() !== day;
             const isMe = msg.senderId === 'user-current';
             const isHovered = hoveredMessageId === msg.id;
-            const replies = threadReplies[msg.id] || [];
+            const replies = threadRepliesOf(msg.id);
 
             return (
+              <React.Fragment key={msg.id}>
+              {showDay && (
+                <div className="whatsapp-date-pill">
+                  {day === new Date().toDateString()
+                    ? 'TODAY'
+                    : day === new Date(Date.now() - 86400000).toDateString()
+                      ? 'YESTERDAY'
+                      : new Date(msg.createdAt).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
+                </div>
+              )}
               <div
                 key={msg.id}
+                className={`pulse-msg-row ${isMe ? 'msg-out' : 'msg-in'}`}
                 onMouseEnter={() => setHoveredMessageId(msg.id)}
                 onMouseLeave={() => setHoveredMessageId(null)}
                 style={{
@@ -1624,6 +1001,7 @@ export const PulseDesk: React.FC = () => {
                 {/* Floating Micro Hover Reactions Pill */}
                 {isHovered && (
                   <div
+                    className="whatsapp-reaction-bar"
                     style={{
                       position: 'absolute',
                       top: '-18px',
@@ -1641,30 +1019,51 @@ export const PulseDesk: React.FC = () => {
                   >
                     <button
                       onClick={() => toggleReaction(msg.id, '👍', 'user-current')}
+                      className="reaction-emoji-btn"
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
                     >
                       👍
                     </button>
                     <button
                       onClick={() => toggleReaction(msg.id, '❤️', 'user-current')}
+                      className="reaction-emoji-btn"
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
                     >
                       ❤️
                     </button>
                     <button
                       onClick={() => toggleReaction(msg.id, '🔥', 'user-current')}
+                      className="reaction-emoji-btn"
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
                     >
                       🔥
                     </button>
                     <button
+                      type="button"
+                      onClick={() => toggleStarMessage(msg.id)}
+                      title={msg.isStarred ? 'Unstar' : 'Star (this device)'}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', opacity: msg.isStarred ? 1 : 0.6 }}
+                    >
+                      ⭐
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => togglePinMessage(msg.id)}
+                      title={msg.isPinned ? 'Unpin' : 'Pin (this device)'}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', opacity: msg.isPinned ? 1 : 0.6 }}
+                    >
+                      📌
+                    </button>
+                    <button
                       onClick={() => toggleReaction(msg.id, '🚀', 'user-current')}
+                      className="reaction-emoji-btn"
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
                     >
                       🚀
                     </button>
                     <button
                       onClick={() => setActiveThreadMessage(msg)}
+                      className="reaction-emoji-btn"
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 2px' }}
                       title="Reply"
                     >
@@ -1757,13 +1156,8 @@ export const PulseDesk: React.FC = () => {
                       }}
                     >
                       <button
-                        onClick={() => {
-                          if (playingVoiceId === msg.id) setPlayingVoiceId(null);
-                          else {
-                            setPlayingVoiceId(msg.id);
-                            setVoiceElapsedSec(0);
-                          }
-                        }}
+                        onClick={() => handleToggleVoicePlayback(msg.id)}
+                        className={`voice-play-btn ${playingVoiceId === msg.id ? 'is-active' : ''}`}
                         style={{
                           width: '32px',
                           height: '32px',
@@ -1786,12 +1180,13 @@ export const PulseDesk: React.FC = () => {
                         {msg.voiceNote.waveform.map((val, idx) => {
                           const isPlayed =
                             playingVoiceId === msg.id
-                              ? idx / msg.voiceNote!.waveform.length <= voiceElapsedSec / 45
+                              ? idx / msg.voiceNote!.waveform.length <= voiceElapsedSec / (msg.voiceNote!.durationSec || 1)
                               : false;
 
                           return (
                             <div
                               key={idx}
+                              className={`waveform-bar ${playingVoiceId === msg.id ? 'is-playing' : ''}`}
                               style={{
                                 flex: 1,
                                 height: `${Math.max(10, (val / 100) * 20)}px`,
@@ -1805,138 +1200,61 @@ export const PulseDesk: React.FC = () => {
 
                       <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>
                         {playingVoiceId === msg.id
-                          ? `0:${voiceElapsedSec.toString().padStart(2, '0')}`
+                          ? `${Math.floor(voiceElapsedSec / 60)}:${Math.floor(voiceElapsedSec % 60).toString().padStart(2, '0')}`
                           : msg.voiceNote.duration}
                       </span>
                     </div>
                   )}
 
-                  {/* Embedded Task Card in Bubble */}
+                  {/* Tagged tasks: a label snapshot; opening one loads the live issue */}
                   {msg.taggedTasks && msg.taggedTasks.length > 0 && (
-                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {msg.taggedTasks.map((task) => {
-                        const status = taskStatusMap[task.id] || task.status;
-                        const hours = taskHoursLogged[task.id] || 3.5;
-                        const isUrgent = task.priority === 'urgent';
-                        const progressPct = Math.min(100, Math.round((hours / 8.0) * 100));
-
-                        return (
-                          <div key={task.id} className="whatsapp-task-card">
-                            {/* Top row: Key, Status & Priority */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span
-                                  style={{
-                                    fontSize: '11px',
-                                    fontWeight: 800,
-                                    color: 'var(--accent-primary)',
-                                    fontFamily: 'var(--font-mono)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                  }}
-                                >
-                                  <Zap size={11} color="var(--accent-primary)" />
-                                  {task.key}
-                                </span>
-                                <span
-                                  style={{
-                                    fontSize: '9px',
-                                    fontWeight: 700,
-                                    padding: '1px 5px',
-                                    borderRadius: '4px',
-                                    background: 'rgba(245, 158, 11, 0.15)',
-                                    color: 'var(--accent-primary)',
-                                    textTransform: 'uppercase',
-                                  }}
-                                >
-                                  {status.replace('_', ' ')}
-                                </span>
-                              </div>
-                              <span
-                                style={{
-                                  fontSize: '9px',
-                                  fontWeight: 700,
-                                  color: isUrgent ? '#f43f5e' : 'var(--accent-primary)',
-                                  textTransform: 'uppercase',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '2px',
-                                }}
-                              >
-                                {isUrgent && <Flame size={10} />}
-                                {task.priority}
-                              </span>
-                            </div>
-
-                            {/* Title */}
-                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35, marginBottom: '6px' }}>
-                              {task.title}
-                            </div>
-
-                            {/* Biometric timesheet progress bar */}
-                            <div style={{ marginBottom: '8px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)', marginBottom: '3px' }}>
-                                <span>Logged: {hours}h / 8h</span>
-                                <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{progressPct}% Synced</span>
-                              </div>
-                              <div style={{ height: '4px', width: '100%', background: 'var(--border-subtle)', borderRadius: '2px', overflow: 'hidden' }}>
-                                <div
-                                  style={{
-                                    height: '100%',
-                                    width: `${progressPct}%`,
-                                    background: 'linear-gradient(90deg, #f59e0b, #d97706)',
-                                    borderRadius: '2px',
-                                  }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Manager attribution & 3 Soft UI Action buttons */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                                {task.assignedByManager}
-                              </span>
-                              <div style={{ display: 'flex', gap: '4px' }}>
-                                <button
-                                  onClick={(e) => handleQuickLog30m(task.key, e)}
-                                  className="btn btn-ghost"
-                                  style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '6px', color: 'var(--accent-primary)', gap: '2px' }}
-                                  title="Quick log 30m"
-                                >
-                                  <Clock size={11} />
-                                  <span>+30m</span>
-                                </button>
-                                <button
-                                  onClick={() => setActiveThreadMessage(msg)}
-                                  className="btn btn-ghost"
-                                  style={{ fontSize: '10px', padding: '3px 6px', borderRadius: '6px', color: 'var(--text-muted)' }}
-                                  title="Discuss in thread"
-                                >
-                                  <Reply size={11} />
-                                </button>
-                                <button
-                                  onClick={() => handleInspectTask(task)}
-                                  className="btn btn-primary"
-                                  style={{ fontSize: '10px', padding: '3px 10px', borderRadius: '6px', gap: '3px' }}
-                                >
-                                  <Zap size={11} />
-                                  <span>Inspect</span>
-                                </button>
-                              </div>
-                            </div>
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {msg.taggedTasks.map((task) => (
+                        <button
+                          key={task.id}
+                          type="button"
+                          className="whatsapp-task-card"
+                          onClick={() => void openTaskIssue(task)}
+                          style={{ textAlign: 'left', cursor: 'pointer' }}
+                          title="Open in Work"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-primary)' }}>{task.key}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                              {task.status.replace('_', ' ')}
+                            </span>
                           </div>
-                        );
-                      })}
+                          <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', marginTop: '2px' }}>{task.title}</div>
+                        </button>
+                      ))}
                     </div>
+                  )}
+
+                  {replies.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveThreadMessage(msg)}
+                      className="btn btn-ghost"
+                      style={{ marginTop: '6px', padding: '2px 8px', fontSize: '11px', color: 'var(--accent-primary)' }}
+                    >
+                      {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+                    </button>
                   )}
 
                   {/* Attachments */}
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {msg.attachments.map((att) => (
+                        <React.Fragment key={att.id}>
+                        {att.previewUrl && (
+                          <img
+                            src={att.previewUrl}
+                            alt={att.name}
+                            onClick={() => handleOpenAttachment(att, false)}
+                            style={{ maxWidth: '260px', maxHeight: '260px', width: att.url ? 'auto' : '160px', borderRadius: '6px', cursor: 'pointer', objectFit: 'cover' }}
+                          />
+                        )}
                         <div
-                          key={att.id}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1955,12 +1273,13 @@ export const PulseDesk: React.FC = () => {
                             </span>
                           </div>
                           <button
-                            onClick={() => addToast({ type: 'info', message: `Downloading ${att.name}...` })}
+                            onClick={() => handleOpenAttachment(att, true)}
                             style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: 0 }}
                           >
                             <Download size={12} />
                           </button>
                         </div>
+                        </React.Fragment>
                       ))}
                     </div>
                   )}
@@ -1979,9 +1298,15 @@ export const PulseDesk: React.FC = () => {
                       {msg.timestamp}
                     </span>
 
-                    {/* WhatsApp Read Receipt Double Checkmark */}
+                    {msg.isEdited && !msg.isDeleted && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>edited</span>
+                    )}
+
+                    {/* One tick: stored. Two ticks: delivered. Blue ticks: read. */}
                     {isMe && (
-                      <CheckCheck size={13} color="var(--accent-primary)" />
+                      <span className="receipt-checkmarks">
+                        <MessageTick tick={msg.tick} />
+                      </span>
                     )}
                   </div>
                 </div>
@@ -1989,6 +1314,7 @@ export const PulseDesk: React.FC = () => {
                 {/* Overlapping Reaction Tag Pill (WhatsApp Style) */}
                 {msg.reactions && msg.reactions.length > 0 && (
                   <div
+                    className="whatsapp-reaction-pill"
                     style={{
                       position: 'absolute',
                       bottom: '-8px',
@@ -2013,8 +1339,39 @@ export const PulseDesk: React.FC = () => {
                   </div>
                 )}
               </div>
+              </React.Fragment>
             );
           })}
+
+          {/* Live typing indicator (from the other members' devices) */}
+          {(typing[activeId]?.length ?? 0) > 0 && (
+            <div
+              className="pulse-typing-indicator"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                alignSelf: 'flex-start',
+                margin: '2px 8px 6px',
+                padding: '5px 12px',
+                borderRadius: '16px',
+                background: 'var(--clay-surface)',
+                border: '1px solid var(--border-hairline)',
+                boxShadow: 'var(--shadow-xs)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>
+                {typing[activeId].length === 1
+                  ? `${typing[activeId][0]} is typing...`
+                  : `${typing[activeId].length} people are typing...`}
+              </span>
+            </div>
+          )}
 
           <div ref={messagesEndRef} />
         </div>
@@ -2036,6 +1393,7 @@ export const PulseDesk: React.FC = () => {
           {/* WhatsApp Vertical Attachment Popover Menu */}
           {isAttachMenuOpen && (
             <div
+              className="pulse-attach-popover"
               style={{
                 position: 'absolute',
                 bottom: '100%',
@@ -2144,7 +1502,10 @@ export const PulseDesk: React.FC = () => {
             <textarea
               rows={1}
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              onChange={(e) => {
+                setInputText(e.target.value);
+                if (e.target.value.trim()) notifyTyping(activeId);
+              }}
               onKeyDown={handleKeyDown}
               placeholder="Type a message"
               style={{
@@ -2165,7 +1526,7 @@ export const PulseDesk: React.FC = () => {
           {inputText.trim().length > 0 || stagedAttachments.length > 0 || stagedTaskTags.length > 0 ? (
             <button
               onClick={handleSend}
-              className="btn btn-primary"
+              className="btn btn-primary pulse-send-btn"
               style={{
                 width: '38px',
                 height: '38px',
@@ -2183,7 +1544,7 @@ export const PulseDesk: React.FC = () => {
           ) : (
             <button
               onClick={handleRecordAudioMemo}
-              className="btn btn-ghost"
+              className="btn btn-ghost pulse-mic-btn"
               style={{
                 width: '38px',
                 height: '38px',
@@ -2192,11 +1553,11 @@ export const PulseDesk: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'var(--accent-primary)',
-                background: 'rgba(245, 158, 11, 0.12)',
+                color: isRecording ? '#ffffff' : 'var(--accent-primary)',
+                background: isRecording ? '#ef4444' : 'rgba(245, 158, 11, 0.12)',
                 flexShrink: 0,
               }}
-              title="Click to send audio voice memo"
+              title={isRecording ? 'Stop and send voice note' : 'Record a voice note'}
             >
               <Mic size={18} />
             </button>
@@ -2280,7 +1641,7 @@ export const PulseDesk: React.FC = () => {
               </div>
 
               <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                {activeType === 'channel' ? `#${activeChannel?.name}` : activeDM?.name}
+                {activeChannel ? `#${activeChannel.name}` : activeDM?.name || 'Pulse'}
               </h2>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 {activeType === 'channel'
@@ -2290,53 +1651,7 @@ export const PulseDesk: React.FC = () => {
 
               {/* WhatsApp Quick Action Tiles (Call, Video, Search) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '16px' }}>
-                <button
-                  onClick={() =>
-                    handleStartCallMember(
-                      { name: activeType === 'channel' ? activeChannel?.name || 'Group' : activeDM?.name || 'Contact', role: 'Voice' },
-                      'voice'
-                    )
-                  }
-                  className="btn btn-secondary"
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '10px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    width: '80px',
-                  }}
-                >
-                  <Phone size={15} color="var(--accent-primary)" />
-                  <span>Audio</span>
-                </button>
 
-                <button
-                  onClick={() =>
-                    handleStartCallMember(
-                      { name: activeType === 'channel' ? activeChannel?.name || 'Group' : activeDM?.name || 'Contact', role: 'Video' },
-                      'video'
-                    )
-                  }
-                  className="btn btn-secondary"
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '10px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    width: '80px',
-                  }}
-                >
-                  <Video size={15} color="var(--accent-primary)" />
-                  <span>Video</span>
-                </button>
 
                 <button
                   onClick={() => setIsChatSearchOpen(true)}
@@ -2371,7 +1686,7 @@ export const PulseDesk: React.FC = () => {
                 {activeType === 'channel' ? 'Group Description' : 'About'}
               </div>
               <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                {activeType === 'channel' ? activeChannel?.topic : activeDM?.lastMessageSnippet || 'In Deep Flow 🎧'}
+                {activeType === 'channel' ? activeChannel?.topic : activeDM?.role || ''}
               </p>
             </div>
 
@@ -2394,87 +1709,6 @@ export const PulseDesk: React.FC = () => {
               <span style={{ fontSize: '12px', color: 'var(--accent-primary)', fontWeight: 600 }}>
                 18 Files &gt;
               </span>
-            </div>
-
-            {/* Group Sprint Tasks Section */}
-            <div
-              style={{
-                padding: '16px 20px',
-                borderBottom: '8px solid var(--surface-0)',
-                background: 'var(--surface-1)',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '10px',
-                  cursor: 'pointer',
-                }}
-                onClick={() => {
-                  setIsInfoDrawerOpen(false);
-                  setIsTasksListDrawerOpen(true);
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Zap size={15} color="var(--accent-primary)" />
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    Group Sprint Tasks
-                  </span>
-                </div>
-                <span style={{ fontSize: '12px', color: 'var(--accent-primary)', fontWeight: 600 }}>
-                  {availableSprintTasks.length} Tasks &gt;
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {availableSprintTasks.slice(0, 3).map((task) => {
-                  const status = taskStatusMap[task.id] || task.status;
-                  const hours = taskHoursLogged[task.id] || 3.5;
-                  return (
-                    <div
-                      key={task.id}
-                      onClick={() => handleInspectTask(task)}
-                      style={{
-                        padding: '10px 12px',
-                        background: 'var(--surface-2)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
-                          {task.key}
-                        </span>
-                        <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent-primary)', textTransform: 'uppercase' }}>
-                          {status.replace('_', ' ')}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        {task.title}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        <span>{task.assignedByManager.split(' ')[0]}</span>
-                        <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{hours}h logged • Inspect &rarr;</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
 
             {/* WhatsApp Participants Section (If Group) */}
@@ -2591,14 +1825,6 @@ export const PulseDesk: React.FC = () => {
                             >
                               <MessageSquare size={13} />
                             </button>
-                            <button
-                              onClick={() => handleStartCallMember(member, 'voice')}
-                              className="btn btn-ghost"
-                              style={{ padding: '6px', borderRadius: '6px', color: '#10b981' }}
-                              title="Voice call"
-                            >
-                              <Phone size={13} />
-                            </button>
                           </div>
                         )}
                       </div>
@@ -2664,16 +1890,16 @@ export const PulseDesk: React.FC = () => {
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {(threadReplies[activeThreadMessage.id] || []).map((reply) => (
+            {threadRepliesOf(activeThreadMessage.id).map((reply) => (
               <div key={reply.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-primary)' }}>
                     {reply.senderName}
                   </span>
-                  <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{reply.time}</span>
+                  <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{reply.timestamp}</span>
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', background: 'var(--surface-2)', padding: '8px 12px', borderRadius: '8px' }}>
-                  {reply.text}
+                  {reply.content}
                 </div>
               </div>
             ))}
@@ -2746,620 +1972,27 @@ export const PulseDesk: React.FC = () => {
             </button>
           </div>
 
-          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ padding: '12px', background: 'var(--surface-2)', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '4px' }}>
-                📌 SPRINT WAR ROOM GOAL
-              </div>
-              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>
-                {activeChannel?.pinnedGoal || 'Zero-downtime blue-green release at 18:00 IST'}
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {currentMessages.filter((m) => m.isPinned || m.isStarred).length === 0 && (
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                Nothing starred or pinned in this chat yet. Hover a message to star or pin it (kept on this device).
               </p>
-            </div>
-
-            <div style={{ padding: '12px', background: 'var(--surface-2)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                📄 System Architecture Spec
-              </div>
-              <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)' }}>
-                Attached by Rohan Deshmukh &bull; 2.4 MB PDF
-              </p>
-            </div>
+            )}
+            {currentMessages
+              .filter((m) => m.isPinned || m.isStarred)
+              .map((m) => (
+                <div key={m.id} style={{ padding: '10px 12px', background: 'var(--surface-2)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '4px' }}>
+                    {m.isPinned ? '📌 Pinned' : '⭐ Starred'} • {m.senderName} • {m.timestamp}
+                  </div>
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>{m.content}</p>
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                    {m.isStarred && <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '2px 6px' }} onClick={() => toggleStarMessage(m.id)}>Unstar</button>}
+                    {m.isPinned && <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '2px 6px' }} onClick={() => togglePinMessage(m.id)}>Unpin</button>}
+                  </div>
+                </div>
+              ))}
           </div>
-        </aside>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 8. SPRINT TASKS ROSTER DRAWER (RIGHT SIDE)                                */}
-      {/* ========================================================================= */}
-      {isTasksListDrawerOpen && !inspectedTask && (
-        <aside
-          style={{
-            width: '390px',
-            borderLeft: '1px solid var(--border-hairline)',
-            background: 'var(--surface-1)',
-            display: 'flex',
-            flexDirection: 'column',
-            flexShrink: 0,
-            zIndex: 35,
-            boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.45)',
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              padding: '14px 18px',
-              borderBottom: '1px solid var(--border-hairline)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'var(--surface-2)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Zap size={15} color="var(--accent-primary)" />
-              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Group Sprint Tasks
-              </span>
-              <span
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 800,
-                  background: 'rgba(245, 158, 11, 0.2)',
-                  color: 'var(--accent-primary)',
-                  borderRadius: '10px',
-                  padding: '1px 6px',
-                }}
-              >
-                {availableSprintTasks.length}
-              </span>
-            </div>
-            <button
-              onClick={() => setIsTasksListDrawerOpen(false)}
-              className="btn btn-ghost"
-              style={{ padding: '6px', color: 'var(--text-muted)' }}
-              title="Close"
-            >
-              <X size={15} />
-            </button>
-          </div>
-
-          {/* Subtitle */}
-          <div style={{ padding: '12px 18px', background: 'var(--surface-1)', borderBottom: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              Manager-assigned deliverables for this squad. Click any task to inspect details, log hours, or run the focus stopwatch.
-            </div>
-          </div>
-
-          {/* Task List */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {availableSprintTasks.map((task) => {
-              const status = taskStatusMap[task.id] || task.status;
-              const hours = taskHoursLogged[task.id] || 3.5;
-              const isUrgent = task.priority === 'urgent';
-              const progressPct = Math.min(100, Math.round((hours / 8.0) * 100));
-
-              return (
-                <div
-                  key={task.id}
-                  onClick={() => handleInspectTask(task)}
-                  style={{
-                    padding: '14px',
-                    background: 'var(--surface-2)',
-                    border: '1px solid var(--border-subtle)',
-                    borderLeft: `3px solid ${isUrgent ? '#f43f5e' : 'var(--accent-primary)'}`,
-                    borderRadius: '10px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.45)';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
-                      {task.key}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '9px',
-                        fontWeight: 700,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        background: isUrgent ? 'rgba(244, 63, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                        color: isUrgent ? '#f43f5e' : 'var(--accent-primary)',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {status.replace('_', ' ')}
-                    </span>
-                  </div>
-
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.35 }}>
-                    {task.title}
-                  </div>
-
-                  {/* Progress Mini-Bar */}
-                  <div style={{ marginTop: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)', marginBottom: '3px' }}>
-                      <span>{task.assignedByManager}</span>
-                      <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{hours}h / 8h ({progressPct}%)</span>
-                    </div>
-                    <div style={{ height: '3px', width: '100%', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div
-                        style={{
-                          height: '100%',
-                          width: `${progressPct}%`,
-                          background: 'linear-gradient(90deg, #f59e0b, #d97706)',
-                          borderRadius: '2px',
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontSize: '10px', color: 'var(--accent-primary)', fontWeight: 700, marginTop: '2px' }}>
-                    <span>Inspect Task &rarr;</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </aside>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 9. DEDICATED RIGHT-SIDE TASK INSPECTOR DRAWER                              */}
-      {/* ========================================================================= */}
-      {inspectedTask && (
-        <aside className="task-inspector-drawer">
-          {/* Top Bar with Key, Expand & Close */}
-          <div
-            style={{
-              padding: '14px 18px',
-              borderBottom: '1px solid var(--border-hairline)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'var(--surface-2)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                onClick={() => {
-                  setInspectedTask(null);
-                  setIsTasksListDrawerOpen(true);
-                }}
-                className="btn btn-ghost"
-                style={{ padding: '4px 6px', color: 'var(--text-muted)' }}
-                title="Back to Sprint Tasks list"
-              >
-                <ArrowLeft size={14} />
-              </button>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: 'rgba(245, 158, 11, 0.15)',
-                  border: '1px solid rgba(245, 158, 11, 0.35)',
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                }}
-              >
-                <Zap size={13} color="var(--accent-primary)" />
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '12px',
-                    fontWeight: 800,
-                    color: 'var(--accent-primary)',
-                  }}
-                >
-                  {inspectedTask.key}
-                </span>
-              </div>
-              <span
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  color: inspectedTask.priority === 'urgent' ? '#f43f5e' : 'var(--accent-primary)',
-                  background: inspectedTask.priority === 'urgent' ? 'rgba(244, 63, 94, 0.15)' : 'rgba(245, 158, 11, 0.1)',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                }}
-              >
-                {inspectedTask.priority}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <button
-                onClick={() => handleExpandToFullModal(inspectedTask)}
-                className="btn btn-ghost"
-                style={{ padding: '6px', color: 'var(--text-muted)' }}
-                title="Open in full Kanban Issue Drawer"
-              >
-                <Maximize2 size={14} />
-              </button>
-              <button
-                onClick={() => setInspectedTask(null)}
-                className="btn btn-ghost"
-                style={{ padding: '6px', color: 'var(--text-muted)' }}
-                title="Close Inspector"
-              >
-                <X size={15} />
-              </button>
-            </div>
-          </div>
-
-          {/* Tab Navigation (Overview, Timesheet Worklogs, Activity) */}
-          <div
-            style={{
-              display: 'flex',
-              borderBottom: '1px solid var(--border-hairline)',
-              background: 'var(--surface-1)',
-              padding: '0 12px',
-            }}
-          >
-            {[
-              { id: 'overview', label: 'Overview' },
-              { id: 'worklogs', label: 'Worklogs & Sync' },
-              { id: 'activity', label: 'Chat Context' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setTaskActiveTab(tab.id as any)}
-                style={{
-                  flex: 1,
-                  padding: '10px 0',
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: taskActiveTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
-                  color: taskActiveTab === tab.id ? 'var(--accent-primary)' : 'var(--text-muted)',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab 1: Overview */}
-          {taskActiveTab === 'overview' && (
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Status Selector Bar */}
-              <div>
-                <label style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
-                  Workflow Status
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
-                  {(['todo', 'in_progress', 'review', 'done'] as const).map((st) => {
-                    const currentStatus = taskStatusMap[inspectedTask.id] || inspectedTask.status;
-                    const isActive = currentStatus === st;
-                    return (
-                      <button
-                        key={st}
-                        onClick={() => handleUpdateTaskStatus(inspectedTask.id, st, inspectedTask.key)}
-                        className={`task-status-pill ${isActive ? 'active' : ''}`}
-                        style={{ justifyContent: 'center' }}
-                      >
-                        {isActive && <Check size={11} />}
-                        <span>{st === 'in_progress' ? 'Prog' : st.toUpperCase()}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Title & Description */}
-              <div style={{ background: 'var(--surface-2)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-                <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                  {inspectedTask.title}
-                </h3>
-                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  Sprint deliverable tagged in Team Pulse. Manager instructions require rigorous unit test coverage, zero biometric reconciliation variance, and compliance with statutory deduction rules.
-                </p>
-              </div>
-
-              {/* Manager & Assignee Matrix */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div style={{ background: 'var(--surface-2)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
-                    Assigned By Manager
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #f59e0b, #b45309)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '11px',
-                        fontWeight: 800,
-                        color: '#000000',
-                      }}
-                    >
-                      SJ
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {inspectedTask.assignedByManager}
-                      </div>
-                      <div style={{ fontSize: '10px', color: 'var(--accent-primary)', fontWeight: 600 }}>
-                        Sprint Lead
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ background: 'var(--surface-2)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>
-                    Assignee
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        background: 'var(--surface-4)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        color: 'var(--text-primary)',
-                      }}
-                    >
-                      {inspectedTask.assigneeName.charAt(0)}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {inspectedTask.assigneeName}
-                      </div>
-                      <div style={{ fontSize: '10px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }} />
-                        Online
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Biometric Attendance & Worklog Sync Meter */}
-              <div
-                style={{
-                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(20, 18, 15, 0.95) 100%)',
-                  border: '1px solid rgba(245, 158, 11, 0.28)',
-                  borderRadius: '10px',
-                  padding: '14px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Clock size={13} color="var(--accent-primary)" />
-                    <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-primary)' }}>
-                      Timesheet Worklog Sync
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
-                    {taskHoursLogged[inspectedTask.id] || 3.5}h / 8.0h ({Math.round(((taskHoursLogged[inspectedTask.id] || 3.5) / 8.0) * 100)}%)
-                  </span>
-                </div>
-
-                {/* Progress Bar */}
-                <div style={{ height: '6px', width: '100%', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '3px', overflow: 'hidden', marginBottom: '12px' }}>
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${Math.min(100, Math.round(((taskHoursLogged[inspectedTask.id] || 3.5) / 8.0) * 100))}%`,
-                      background: 'linear-gradient(90deg, #f59e0b, #d97706)',
-                      borderRadius: '3px',
-                      transition: 'width 0.3s ease',
-                    }}
-                  />
-                </div>
-
-                {/* Quick Log Action Buttons */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>Quick Log:</span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    {[
-                      { val: 0.25, label: '+15m' },
-                      { val: 0.5, label: '+30m' },
-                      { val: 1.0, label: '+1h' },
-                      { val: 2.0, label: '+2h' },
-                    ].map((btn) => (
-                      <button
-                        key={btn.label}
-                        onClick={() => handleQuickLogTime(inspectedTask.id, btn.val, inspectedTask.key)}
-                        className="task-quicklog-btn"
-                      >
-                        {btn.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Integrated Live Work Stopwatch */}
-              <div style={{ background: 'var(--surface-2)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <TrendingUp size={13} color="var(--accent-primary)" />
-                    <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-primary)' }}>
-                      Live Focus Stopwatch
-                    </span>
-                  </div>
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '14px',
-                      fontWeight: 800,
-                      color: taskStopwatchRunning ? '#10b981' : 'var(--text-primary)',
-                    }}
-                  >
-                    {formatSeconds(taskStopwatchSeconds)}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => setTaskStopwatchRunning((p) => !p)}
-                    className="btn btn-secondary"
-                    style={{ flex: 1, padding: '7px 10px', fontSize: '11px', fontWeight: 700, gap: '6px' }}
-                  >
-                    {taskStopwatchRunning ? <Pause size={13} /> : <Play size={13} />}
-                    <span>{taskStopwatchRunning ? 'Pause' : 'Start Timer'}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setTaskStopwatchRunning(false);
-                      setTaskStopwatchSeconds(0);
-                    }}
-                    className="btn btn-ghost"
-                    style={{ padding: '7px 10px', color: 'var(--text-muted)' }}
-                    title="Reset Stopwatch"
-                  >
-                    <RotateCcw size={13} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (taskStopwatchSeconds < 10) {
-                        addToast({ type: 'info', message: 'Run timer for at least 10s to log session.' });
-                        return;
-                      }
-                      const hrs = Math.max(0.1, parseFloat((taskStopwatchSeconds / 3600).toFixed(2)));
-                      handleQuickLogTime(inspectedTask.id, hrs, inspectedTask.key);
-                      setTaskStopwatchRunning(false);
-                      setTaskStopwatchSeconds(0);
-                    }}
-                    className="btn btn-primary"
-                    style={{ padding: '7px 12px', fontSize: '11px', fontWeight: 700 }}
-                  >
-                    Save Session
-                  </button>
-                </div>
-              </div>
-
-              {/* Agile Sprint Metrics */}
-              <div style={{ background: 'var(--surface-2)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Sprint:</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Sprint 42 • Payment Cutover</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Story Points:</span>
-                  <span style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{inspectedTask.storyPoints || 5} SP</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Due Target:</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Today at 18:00 IST</span>
-                </div>
-              </div>
-
-              {/* Action Buttons: Post Update to Chat & Open Full Modal */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                <button
-                  onClick={() => handlePostTaskUpdateToChat(inspectedTask)}
-                  className="btn btn-secondary"
-                  style={{ width: '100%', padding: '9px 14px', fontSize: '12px', fontWeight: 700, gap: '8px', color: 'var(--accent-primary)' }}
-                >
-                  <MessageSquare size={14} />
-                  <span>Post Live Update to Chat</span>
-                </button>
-                <button
-                  onClick={() => handleExpandToFullModal(inspectedTask)}
-                  className="btn btn-ghost"
-                  style={{ width: '100%', padding: '8px 14px', fontSize: '11px', color: 'var(--text-muted)', gap: '6px' }}
-                >
-                  <ExternalLink size={13} />
-                  <span>Open in Full Agile Issue Drawer</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Tab 2: Timesheet Worklogs */}
-          {taskActiveTab === 'worklogs' && (
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                Recorded Worklogs ({((taskWorklogEntries[inspectedTask.id] || []).length)})
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {(taskWorklogEntries[inspectedTask.id] || [
-                  { id: 'wl-default-1', time: '11:00 AM', hours: 2.0, desc: 'Sprint task implementation and reconciliation test', user: 'Rohan Deshmukh' },
-                  { id: 'wl-default-2', time: '02:30 PM', hours: 1.5, desc: 'Code review comments and edge-case verification', user: 'Rohan Deshmukh' },
-                ]).map((entry) => (
-                  <div
-                    key={entry.id}
-                    style={{
-                      background: 'var(--surface-2)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: '8px',
-                      padding: '10px 12px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {entry.user}
-                      </span>
-                      <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
-                        +{entry.hours}h
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                      {entry.desc}
-                    </div>
-                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
-                      Logged today at {entry.time} • Billable
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Tab 3: Chat Context */}
-          {taskActiveTab === 'activity' && (
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                Linked Team Pulse Conversations
-              </div>
-              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '12px' }}>
-                <div style={{ fontSize: '10px', color: 'var(--accent-primary)', fontWeight: 700, marginBottom: '4px' }}>
-                  TAGGED IN CHAT
-                </div>
-                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                  "Assigned by Sarah Jenkins in #{activeChannel?.name || 'sprint-war-room'} with priority {inspectedTask.priority}."
-                </p>
-              </div>
-              <button
-                onClick={() => handlePostTaskUpdateToChat(inspectedTask)}
-                className="btn btn-primary"
-                style={{ marginTop: '10px', padding: '8px 12px', fontSize: '11px' }}
-              >
-                Send Thread Check-In
-              </button>
-            </div>
-          )}
         </aside>
       )}
 

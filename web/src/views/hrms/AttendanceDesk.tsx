@@ -53,6 +53,17 @@ export const AttendanceDesk: React.FC = () => {
   } = useAppSelector((state) => state.hrms);
 
   const myRegularizations = rawMyRegularizations || [];
+  const activeShift = attendanceSession?.shift;
+
+  const formatShiftTiming = (s?: { name?: string; start_time?: string; end_time?: string } | null) => {
+    if (!s || !s.name) return 'No Shift Assigned';
+    const start = s.start_time ? s.start_time.slice(0, 5) : '';
+    const end = s.end_time ? s.end_time.slice(0, 5) : '';
+    if (start && end) {
+      return `${s.name} [ ${start} - ${end} ]`;
+    }
+    return s.name;
+  };
 
   // Top Tabs
   const [activeTab, setActiveTab] = useState<SubNavTab>('summary');
@@ -235,12 +246,21 @@ export const AttendanceDesk: React.FC = () => {
   };
 
   const handleShowShiftInfo = () => {
-    dispatch(
-      addToast({
-        type: 'info',
-        message: 'Shift: General [ 10:00 AM - 07:00 PM ] | Grace: 15 mins | Expected: 8h 00m daily.',
-      })
-    );
+    if (activeShift) {
+      dispatch(
+        addToast({
+          type: 'info',
+          message: `Shift: ${formatShiftTiming(activeShift)} | Grace: ${activeShift.grace_minutes ?? 0} mins | Expected: ${activeShift.full_day_hours ?? '—'}h daily.`,
+        })
+      );
+    } else {
+      dispatch(
+        addToast({
+          type: 'info',
+          message: 'No shift currently assigned to your profile. Please contact your administrator to assign a shift.',
+        })
+      );
+    }
     setIsMoreMenuOpen(false);
   };
 
@@ -278,28 +298,44 @@ export const AttendanceDesk: React.FC = () => {
       // Find from backend data if present
       const match = monthlyAttendance?.days?.find((d) => d.date.startsWith(dateStr));
 
-      // Compute mock/real timeline values for visual accuracy
-      let status: 'weekend' | 'absent' | 'present' | 'today' | 'future' = isWeekend
+      // Derive status strictly from real backend records
+      const isPast = date < new Date(new Date().setHours(0, 0, 0, 0));
+      let status: 'weekend' | 'absent' | 'present' | 'half_day' | 'leave' | 'holiday' | 'today' | 'future' = isWeekend
         ? 'weekend'
         : isToday
         ? 'today'
-        : date < new Date()
-        ? match?.status === 'present' || date.getDay() === 2
-          ? 'present'
-          : 'absent'
+        : match?.status
+        ? (match.status as any)
+        : isPast
+        ? 'absent'
         : 'future';
 
       let inTime = '';
       let outTime = '';
       let hoursWorked = '00:00';
 
-      if (status === 'present') {
-        inTime = '09:46 AM';
-        outTime = '07:00 PM';
-        hoursWorked = '08:29';
-      } else if (status === 'today') {
-        inTime = '09:42 AM';
-        hoursWorked = elapsedWorkTime;
+      if (match?.first_punch_in) {
+        inTime = new Date(match.first_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      if (match?.last_punch_out) {
+        outTime = new Date(match.last_punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      if (match?.work_hours) {
+        hoursWorked = `${match.work_hours.toFixed(1)}h`;
+      }
+
+      if (isToday) {
+        if (attendanceSession?.first_punch_in) {
+          inTime = new Date(attendanceSession.first_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          hoursWorked = elapsedWorkTime;
+          if (attendanceSession.last_punch_type === 'out' && attendanceSession.last_punch_time) {
+            outTime = new Date(attendanceSession.last_punch_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          }
+        } else {
+          inTime = '-';
+          outTime = '-';
+          hoursWorked = '00:00';
+        }
       }
 
       days.push({
@@ -317,7 +353,7 @@ export const AttendanceDesk: React.FC = () => {
       });
     }
     return days;
-  }, [currentWeekSunday, monthlyAttendance, elapsedWorkTime]);
+  }, [currentWeekSunday, monthlyAttendance, elapsedWorkTime, attendanceSession]);
 
   // Build the days of the active month for Calendar View
   const calendarMonthDays = useMemo(() => {
@@ -357,15 +393,26 @@ export const AttendanceDesk: React.FC = () => {
       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
       const match = monthlyAttendance?.days?.find((item) => item.date.startsWith(dateStr));
 
+      const isPast = d < new Date(new Date().setHours(0, 0, 0, 0));
       let status = isWeekend
         ? 'weekend'
         : isToday
-        ? 'today'
-        : match?.status || (d < new Date() ? (d.getDay() === 2 ? 'present' : 'absent') : 'scheduled');
+        ? (attendanceSession?.first_punch_in ? 'today' : (match?.status || 'today'))
+        : match?.status || (isPast ? 'absent' : 'scheduled');
 
-      let inTime = match?.first_punch_in ? new Date(match.first_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (status === 'present' ? '09:46 AM' : '');
-      let outTime = match?.last_punch_out ? new Date(match.last_punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (status === 'present' ? '07:00 PM' : '');
-      let hoursWorked = match?.work_hours ? `${match.work_hours.toFixed(1)}h` : (status === 'present' ? '08:29' : status === 'today' ? elapsedWorkTime : '');
+      let inTime = match?.first_punch_in
+        ? new Date(match.first_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : (isToday && attendanceSession?.first_punch_in
+            ? new Date(attendanceSession.first_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : '');
+      let outTime = match?.last_punch_out
+        ? new Date(match.last_punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : (isToday && attendanceSession?.last_punch_type === 'out' && attendanceSession?.last_punch_time
+            ? new Date(attendanceSession.last_punch_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : '');
+      let hoursWorked = match?.work_hours
+        ? `${match.work_hours.toFixed(1)}h`
+        : (isToday && attendanceSession?.first_punch_in ? elapsedWorkTime : '');
 
       days.push({
         date: d,
@@ -909,8 +956,15 @@ export const AttendanceDesk: React.FC = () => {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                General [ 10:00 AM - 7:00 PM ]
+              <div
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: activeShift ? 'var(--text-primary)' : 'var(--text-muted)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {formatShiftTiming(activeShift)}
               </div>
 
               <input
@@ -1212,9 +1266,9 @@ export const AttendanceDesk: React.FC = () => {
 
                     {/* Right Column: Hours Worked & Punch Out time */}
                     <div style={{ width: '130px', textAlign: 'right', flexShrink: 0 }}>
-                      {day.status === 'present' && (
+                      {day.outTime && day.outTime !== '-' && (
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '2px' }}>
-                          07:00 PM
+                          {day.outTime}
                         </div>
                       )}
                       <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'monospace' }}>
@@ -1354,7 +1408,7 @@ export const AttendanceDesk: React.FC = () => {
                             </span>
                           </td>
                           <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>
-                            General [ 10:00 - 19:00 ]
+                            {day.backendDay?.shift_name || formatShiftTiming(activeShift)}
                           </td>
                           <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>
                             {day.inTime || '-'}
@@ -1522,14 +1576,16 @@ export const AttendanceDesk: React.FC = () => {
                       </div>
 
                       <div style={{ marginTop: '6px' }}>
-                        {cDay.isCurrentMonth && (cDay.status === 'present' || cDay.status === 'today') ? (
+                        {cDay.isCurrentMonth && (cDay.status === 'present' || cDay.status === 'today') && cDay.hoursWorked ? (
                           <>
                             <div style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-primary)', fontWeight: 600 }}>
-                              {cDay.hoursWorked || '08:29 Hrs'}
+                              {cDay.hoursWorked}
                             </div>
-                            <div style={{ fontSize: '10px', fontFamily: 'monospace', color: 'var(--text-muted)', marginTop: '2px' }}>
-                              {cDay.inTime || '09:46 AM'}
-                            </div>
+                            {cDay.inTime && (
+                              <div style={{ fontSize: '10px', fontFamily: 'monospace', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                {cDay.inTime}
+                              </div>
+                            )}
                           </>
                         ) : cDay.isCurrentMonth && cDay.status === 'absent' ? (
                           <button
@@ -1655,8 +1711,8 @@ export const AttendanceDesk: React.FC = () => {
             </div>
 
             {/* Right: Assigned Shift */}
-            <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
-              General [ 10:00 AM - 7:00 PM ]
+            <div style={{ color: activeShift ? 'var(--text-muted)' : 'var(--accent-amber)', fontSize: '11px', fontWeight: activeShift ? 400 : 600 }}>
+              {formatShiftTiming(activeShift)}
             </div>
           </div>
         </div>

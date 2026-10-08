@@ -14,6 +14,8 @@ const (
 	AllowedOriginsEnv            = "ALLOWED_ORIGINS"
 	CookieDomainEnv              = "COOKIE_DOMAIN"
 	LogLevelEnv                  = "LOG_LEVEL"
+	ProxyHeaderEnv               = "PROXY_HEADER"
+	TrustedProxiesEnv            = "TRUSTED_PROXIES"
 
 	// Database keys
 	DbHostEnv                    = "DB_HOST"
@@ -59,6 +61,15 @@ const (
 
 	// Storage Driver ("minio", "s3")
 	StorageDriverEnv             = "STORAGE_DRIVER"
+
+	// OAuth Social Login keys
+	GoogleClientIDEnv        = "GOOGLE_CLIENT_ID"
+	GoogleClientSecretEnv    = "GOOGLE_CLIENT_SECRET"
+	GithubClientIDEnv        = "GITHUB_CLIENT_ID"
+	GithubClientSecretEnv    = "GITHUB_CLIENT_SECRET"
+	MicrosoftClientIDEnv     = "MICROSOFT_CLIENT_ID"
+	MicrosoftClientSecretEnv = "MICROSOFT_CLIENT_SECRET"
+	OAuthRedirectBaseURLEnv  = "OAUTH_REDIRECT_BASE_URL"
 )
 
 // LoadEnv loads the environment files depending on the ENV_FILE_PATH variable.

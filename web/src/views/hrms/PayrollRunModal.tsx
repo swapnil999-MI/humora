@@ -488,7 +488,7 @@ export const PayrollRunModal: React.FC<PayrollRunModalProps> = ({ isOpen, onClos
                 >
                   <span>Itemized Employee Attendance & Statutory Calculation</span>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 400 }}>
-                    Working Days: {previewData.employees?.[0]?.working_days || 22} Days
+                    Working Days: {previewData.employees?.[0]?.working_days ?? '—'}
                   </span>
                 </div>
 

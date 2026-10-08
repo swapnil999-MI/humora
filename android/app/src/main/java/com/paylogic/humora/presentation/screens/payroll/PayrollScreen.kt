@@ -2,6 +2,7 @@ package com.paylogic.humora.presentation.screens.payroll
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,11 +15,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.paylogic.humora.core.theme.*
+import com.paylogic.humora.presentation.components.ClayBadge
+import com.paylogic.humora.presentation.components.ClayButton
+import com.paylogic.humora.presentation.components.ClayCard
 import com.paylogic.humora.presentation.components.GlassCard
 import com.paylogic.humora.presentation.viewmodel.PayrollViewModel
 
@@ -29,9 +36,18 @@ fun PayrollScreen(
     val uiState by viewModel.uiState.collectAsState()
     val latestSlip = uiState.payslips.firstOrNull()
 
-    val netPayText = latestSlip?.formattedNetPay ?: "₹ %,d".format((uiState.compensation.monthlyGross * 0.85).toLong())
-    val grossPayText = latestSlip?.formattedGrossPay ?: "₹ %,d".format(uiState.compensation.monthlyGross.toLong())
-    val deductionsText = latestSlip?.let { "₹ %,d".format(it.totalDeductions.toLong()) } ?: "₹ %,d".format((uiState.compensation.monthlyGross * 0.15).toLong())
+    val netPayText = latestSlip?.formattedNetPay
+        ?: if (uiState.compensation.monthlyGross > 0)
+            "₹ %,d".format((uiState.compensation.monthlyGross * 0.85).toLong())
+        else "--"  // Issue #5 Fix: don't show fake salary when no data loaded
+    val grossPayText = latestSlip?.formattedGrossPay
+        ?: if (uiState.compensation.monthlyGross > 0)
+            "₹ %,d".format(uiState.compensation.monthlyGross.toLong())
+        else "--"
+    val deductionsText = latestSlip?.let { "₹ %,d".format(it.totalDeductions.toLong()) }
+        ?: if (uiState.compensation.monthlyGross > 0)
+            "₹ %,d".format((uiState.compensation.monthlyGross * 0.15).toLong())
+        else "--"
 
     LazyColumn(
         modifier = Modifier
@@ -49,11 +65,20 @@ fun PayrollScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Next Pay Date: 30 Sep 2026",
-                            color = TextMutedDark,
-                            fontSize = 12.sp
-                        )
+                        // Issue #4 Fix: Show next pay date from uiState or hide when not available
+                        if (uiState.nextPayDate.isNotBlank()) {
+                            Text(
+                                text = "Next Pay Date: ${uiState.nextPayDate}",
+                                color = TextMutedDark,
+                                fontSize = 12.sp
+                            )
+                        } else {
+                            Text(
+                                text = "Payroll data loaded from your HR system",
+                                color = TextMutedDark,
+                                fontSize = 12.sp
+                            )
+                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
@@ -63,7 +88,7 @@ fun PayrollScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Biometric Encrypted",
+                                text = "Private to you",
                                 color = EmeraldSuccess,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -106,7 +131,11 @@ fun PayrollScreen(
 
         // 2. EXPENSE REIMBURSEMENT QUICK ACTION
         item {
-            GlassCard {
+            ClayCard(
+                cornerRadius = 22.dp,
+                elevation = 8.dp,
+                contentPadding = PaddingValues(16.dp)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -126,13 +155,14 @@ fun PayrollScreen(
                             fontSize = 12.sp
                         )
                     }
-                    Button(
-                        onClick = {},
-                        colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Claim", fontWeight = FontWeight.Bold)
-                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    ClayButton(
+                        text = "Claim",
+                        brush = ClayAccentGradient,
+                        cornerRadius = 12.dp,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        onClick = {}
+                    )
                 }
             }
         }
@@ -148,39 +178,60 @@ fun PayrollScreen(
         }
 
         items(uiState.payslips) { item ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(DarkSurface)
-                    .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
-                    .padding(16.dp)
+            ClayCard(
+                cornerRadius = 20.dp,
+                elevation = 6.dp,
+                contentPadding = PaddingValues(16.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = item.monthYear,
+                                color = TextPrimaryDark,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            ClayBadge(
+                                text = item.status.uppercase(),
+                                brush = if (item.status.equals("paid", ignoreCase = true)) ClaySuccessGradient else ClayWarningGradient,
+                                textColor = Color.White
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = item.monthYear,
-                            color = TextPrimaryDark,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Net: ${item.formattedNetPay} • Status: ${item.status.uppercase()}",
+                            text = "Net In-Hand: ${item.formattedNetPay}",
                             color = TextSecondaryDark,
                             fontSize = 12.sp
                         )
                     }
 
-                    IconButton(onClick = {}) {
+                    Box(
+                        modifier = Modifier
+                            .shadow(4.dp, RoundedCornerShape(12.dp), ambientColor = Color(0x66000000))
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(ClaySurfaceElevated)
+                            .border(
+                                1.dp,
+                                Brush.verticalGradient(
+                                    listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.12f))
+                                ),
+                                RoundedCornerShape(12.dp)
+                            )
+                            .clickable {}
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Download,
                             contentDescription = "Download PDF",
-                            tint = BrandPrimary
+                            tint = BrandPrimary,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }

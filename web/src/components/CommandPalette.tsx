@@ -53,6 +53,10 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
   const { attendanceSummary } = useAppSelector((state) => state.hrms);
   const { kanbanBoard, backlog, projects } = useAppSelector((state) => state.work);
   const { employees } = useAppSelector((state) => state.hrms);
+  const { user } = useAppSelector((state) => state.auth);
+
+  const userRoles = user?.roles || [];
+  const isAdmin = userRoles.some((r) => ['superadmin', 'admin', 'hr_admin'].includes(r.toLowerCase()));
 
   // Focus input when opened
   useEffect(() => {
@@ -66,64 +70,93 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
   // Aggregate command items
   const allItems: CommandItem[] = [];
 
-  // 1. Core Actions & Navigation
-  allItems.push({
-    id: 'action-punch',
-    category: 'Attendance',
-    title: attendanceSummary?.punched_in ? 'Punch Out & Check Out' : 'Punch In & Start Workday',
-    subtitle: 'Logs geofenced attendance entry',
-    icon: attendanceSummary?.punched_in ? (
-      <LogOut size={16} color="var(--accent-rose)" />
-    ) : (
-      <LogIn size={16} color="var(--accent-emerald)" />
-    ),
-    action: () => {
-      dispatch(
-        recordPunch({
-          punch_type: attendanceSummary?.punched_in ? 'out' : 'in',
-          source: 'web',
-        })
-      );
-      onClose();
-    },
-  });
+  // 1. Employee-Specific Actions (Only for Employees)
+  if (!isAdmin) {
+    allItems.push({
+      id: 'action-punch',
+      category: 'Attendance',
+      title: attendanceSummary?.punched_in ? 'Punch Out & Check Out' : 'Punch In & Start Workday',
+      subtitle: 'Logs geofenced attendance entry',
+      icon: attendanceSummary?.punched_in ? (
+        <LogOut size={16} color="var(--accent-rose)" />
+      ) : (
+        <LogIn size={16} color="var(--accent-emerald)" />
+      ),
+      action: () => {
+        dispatch(
+          recordPunch({
+            punch_type: attendanceSummary?.punched_in ? 'out' : 'in',
+            source: 'web',
+          })
+        );
+        onClose();
+      },
+    });
 
-  allItems.push({
-    id: 'action-hub',
-    category: 'Navigation',
-    title: 'Go to My Workday Hub',
-    subtitle: 'Unified cockpit, quick punch & active sprint overview',
-    icon: <Compass size={16} color="var(--accent-primary)" />,
-    shortcut: 'Alt+0',
-    action: () => {
-      dispatch(navigateToPage('hub'));
-      onClose();
-    },
-  });
+    allItems.push({
+      id: 'action-hub',
+      category: 'Navigation',
+      title: 'Go to My Workday Hub',
+      subtitle: 'Unified cockpit, quick punch & active sprint overview',
+      icon: <Compass size={16} color="var(--accent-primary)" />,
+      shortcut: 'Alt+0',
+      action: () => {
+        dispatch(navigateToPage('hub'));
+        onClose();
+      },
+    });
 
-  allItems.push({
-    id: 'action-switch-attendance',
-    category: 'Navigation',
-    title: 'Go to Attendance & Time Desk',
-    subtitle: 'Live punch terminal, monthly calendar matrix, shift catalog & rostering',
-    icon: <Clock size={16} color="#34d399" />,
-    action: () => {
-      dispatch(navigateToPage('attendance'));
-      onClose();
-    },
-  });
+    allItems.push({
+      id: 'action-switch-attendance',
+      category: 'Navigation',
+      title: 'Go to Attendance & Time Desk',
+      subtitle: 'Live punch terminal, monthly calendar matrix, shift catalog & rostering',
+      icon: <Clock size={16} color="#34d399" />,
+      action: () => {
+        dispatch(navigateToPage('attendance'));
+        onClose();
+      },
+    });
 
-  allItems.push({
-    id: 'action-leaves',
-    category: 'Navigation',
-    title: 'Go to Leaves & Absence Desk',
-    subtitle: 'Leave balances, quota tracking, and time-off applications',
-    icon: <Calendar size={16} color="#fbbf24" />,
-    action: () => {
-      dispatch(navigateToPage('leaves'));
-      onClose();
-    },
-  });
+    allItems.push({
+      id: 'action-leaves',
+      category: 'Navigation',
+      title: 'Go to Leaves & Absence Desk',
+      subtitle: 'Leave balances, quota tracking, and time-off applications',
+      icon: <Calendar size={16} color="#fbbf24" />,
+      action: () => {
+        dispatch(navigateToPage('leaves'));
+        onClose();
+      },
+    });
+  }
+
+  // Management Console Actions (For Admin)
+  if (isAdmin) {
+    allItems.push({
+      id: 'action-company-settings',
+      category: 'Management',
+      title: 'Go to Company Settings & Setup',
+      subtitle: 'Corporate geofence, SMTP credentials, and company profile',
+      icon: <Building2 size={16} color="var(--accent-primary)" />,
+      action: () => {
+        dispatch(navigateToPage('company_settings'));
+        onClose();
+      },
+    });
+
+    allItems.push({
+      id: 'action-approvals',
+      category: 'Management',
+      title: 'Go to Approvals Desk',
+      subtitle: 'Review pending leaves and attendance regularizations',
+      icon: <ShieldCheck size={16} color="var(--accent-primary)" />,
+      action: () => {
+        dispatch(navigateToPage('approvals'));
+        onClose();
+      },
+    });
+  }
 
   allItems.push({
     id: 'action-capacity',

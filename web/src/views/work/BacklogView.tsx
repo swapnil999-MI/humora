@@ -85,8 +85,10 @@ export const BacklogView: React.FC = () => {
         status: 'closed',
         projectId: activeProject.id,
       })
-    );
-    dispatch(addToast({ type: 'success', message: 'Sprint completed! Velocity recorded.' }));
+    )
+      .unwrap()
+      .then(() => dispatch(addToast({ type: 'success', message: 'Sprint completed! Velocity recorded.' })))
+      .catch((err: any) => dispatch(addToast({ type: 'error', message: err?.message || String(err || 'Could not complete the sprint') })));
   };
 
   const handleStartSprint = (sprintId: string) => {
@@ -97,8 +99,10 @@ export const BacklogView: React.FC = () => {
         status: 'active',
         projectId: activeProject.id,
       })
-    );
-    dispatch(addToast({ type: 'success', message: 'Sprint started!' }));
+    )
+      .unwrap()
+      .then(() => dispatch(addToast({ type: 'success', message: 'Sprint started!' })))
+      .catch((err: any) => dispatch(addToast({ type: 'error', message: err?.message || String(err || 'Could not start the sprint') })));
   };
 
   if (!activeProject) {
@@ -110,13 +114,15 @@ export const BacklogView: React.FC = () => {
   }
 
   // Capacity metrics derived from live synergy engine
-  const grossHours = sprintCapacity?.gross_capacity_hours ?? 160;
+  // Without the server's capacity report nothing is assumed: hours show as "—".
+  const grossHours = sprintCapacity?.gross_capacity_hours ?? 0;
   const leaveDeductionHours = sprintCapacity?.leave_hours_deducted ?? 0;
-  const netHours = sprintCapacity?.net_capacity_hours ?? 160;
-  const committedHours = sprintCapacity?.committed_hours ?? (backlog?.active_sprint?.total_story_points ? backlog.active_sprint.total_story_points * 6 : 0);
+  const netHours = sprintCapacity?.net_capacity_hours ?? 0;
+  const committedHours = sprintCapacity?.committed_hours ?? 0;
   const committedPoints = sprintCapacity?.committed_points ?? (backlog?.active_sprint?.total_story_points || 0);
-  const utilizationPct = sprintCapacity?.capacity_utilization_pct ?? Math.round((committedHours / (netHours || 1)) * 100);
-  const isOvercommitted = sprintCapacity?.overcommitted || (committedHours > netHours);
+  const utilizationPct = sprintCapacity?.capacity_utilization_pct ?? 0;
+  const isOvercommitted = sprintCapacity?.overcommitted ?? false;
+  const hrs = (n: number) => (sprintCapacity ? `${n}h` : '—');
   const engineers = sprintCapacity?.engineers || [];
 
   return (
@@ -207,28 +213,28 @@ export const BacklogView: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '13px' }}>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Gross Capacity</span>
-              <strong>{grossHours}h</strong>
+              <strong>{hrs(grossHours)}</strong>
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Approved PTO</span>
               <strong style={{ color: 'var(--text-primary)' }}>
-                -{leaveDeductionHours}h
+                {sprintCapacity ? `-${leaveDeductionHours}h` : '—'}
               </strong>
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Net Available</span>
-              <strong style={{ color: 'var(--text-primary)' }}>{netHours}h</strong>
+              <strong style={{ color: 'var(--text-primary)' }}>{hrs(netHours)}</strong>
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Committed</span>
               <strong style={{ color: 'var(--text-primary)' }}>
-                {committedHours}h ({committedPoints} pts)
+                {hrs(committedHours)} ({committedPoints} pts)
               </strong>
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Utilization</span>
               <strong style={{ color: 'var(--text-primary)' }}>
-                {utilizationPct}%
+                {sprintCapacity ? `${utilizationPct}%` : '—'}
               </strong>
             </div>
             {engineers.length > 0 && (

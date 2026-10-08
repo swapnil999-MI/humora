@@ -78,10 +78,19 @@ func NewMinioStorageFromConfig(cfg *configs.MinioConfig) (*MinioStorage, error) 
 	storage := NewMinioStorage(client, cfg.DefaultBucket, location, cfg.PublicURL)
 
 	if cfg.PublicURL != "" {
-		storage.presignClient, _ = minio.New(cfg.PublicURL, &minio.Options{
+		// Presigned URLs are handed to browsers, so they must be signed for the
+		// public host rather than the internal endpoint. The client wants a bare
+		// host[:port]; the scheme only decides whether the URLs are https.
+		publicEndpoint, publicSSL := strings.TrimRight(strings.TrimSpace(cfg.PublicURL), "/"), cfg.UseSSL
+		if after, ok := strings.CutPrefix(publicEndpoint, "https://"); ok {
+			publicEndpoint, publicSSL = after, true
+		} else if after, ok := strings.CutPrefix(publicEndpoint, "http://"); ok {
+			publicEndpoint, publicSSL = after, false
+		}
+		storage.presignClient, _ = minio.New(publicEndpoint, &minio.Options{
 			Creds:  credentials.NewStaticV4(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
-			Secure: cfg.UseSSL,
-			Region: cfg.Region,
+			Secure: publicSSL,
+			Region: location,
 		})
 	}
 
@@ -131,6 +140,26 @@ func (m *MinioStorage) resolveBucket(bucketName string) (string, error) {
 	return target, nil
 }
 
+// EnsurePrivateBucket creates the bucket if it is missing, without granting
+// anonymous read access: objects are reachable only through presigned URLs.
+func (m *MinioStorage) EnsurePrivateBucket(ctx context.Context, bucketName string) error {
+	bucket := strings.TrimSpace(bucketName)
+	if bucket == "" {
+		return fmt.Errorf("bucket name cannot be empty")
+	}
+	exists, err := m.client.BucketExists(ctx, bucket)
+	if err != nil {
+		return fmt.Errorf("failed to check bucket %q: %w", bucket, err)
+	}
+	if exists {
+		return nil
+	}
+	if err := m.client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{Region: m.location}); err != nil {
+		return fmt.Errorf("failed to create bucket %q: %w", bucket, err)
+	}
+	return nil
+}
+
 // EnsureBucketExists checks if a bucket exists, creating it if necessary.
 func (m *MinioStorage) EnsureBucketExists(ctx context.Context, bucketName string) error {
 	bucket, err := m.resolveBucket(bucketName)
@@ -160,6 +189,7 @@ func (m *MinioStorage) EnsureBucketExists(ctx context.Context, bucketName string
 }
 
 // SetBucketPublicRead configures anonymous download access on the MinIO bucket for browser/media viewing.
+// Only GetObject is granted: anonymous ListBucket would let anyone enumerate every stored file.
 func (m *MinioStorage) SetBucketPublicRead(ctx context.Context, bucketName string) error {
 	bucket, err := m.resolveBucket(bucketName)
 	if err != nil {
@@ -171,17 +201,11 @@ func (m *MinioStorage) SetBucketPublicRead(ctx context.Context, bucketName strin
 			{
 				"Effect": "Allow",
 				"Principal": {"AWS": ["*"]},
-				"Action": ["s3:GetBucketLocation", "s3:ListBucket"],
-				"Resource": ["arn:aws:s3:::%s"]
-			},
-			{
-				"Effect": "Allow",
-				"Principal": {"AWS": ["*"]},
 				"Action": ["s3:GetObject"],
 				"Resource": ["arn:aws:s3:::%s/*"]
 			}
 		]
-	}`, bucket, bucket)
+	}`, bucket)
 	return m.client.SetBucketPolicy(ctx, bucket, policy)
 }
 
@@ -301,6 +325,50 @@ func (m *MinioStorage) GetPresignedURL(ctx context.Context, bucketName, objectNa
 	}
 
 	return presignedURL.String(), nil
+}
+
+// GetPresignedUpload generates a temporary form upload for exactly one object,
+// rejected by the storage backend if the body exceeds maxBytes.
+func (m *MinioStorage) GetPresignedUpload(ctx context.Context, bucketName, objectName string, expires time.Duration, maxBytes int64) (*PresignedUpload, error) {
+	bucket, err := m.resolveBucket(bucketName)
+	if err != nil {
+		return nil, err
+	}
+
+	objectName = strings.TrimSpace(objectName)
+	if objectName == "" {
+		return nil, fmt.Errorf("object name cannot be empty")
+	}
+
+	if expires <= 0 {
+		expires = 15 * time.Minute
+	}
+
+	policy := minio.NewPostPolicy()
+	if err := policy.SetBucket(bucket); err != nil {
+		return nil, err
+	}
+	if err := policy.SetKey(objectName); err != nil {
+		return nil, err
+	}
+	if err := policy.SetExpires(time.Now().UTC().Add(expires)); err != nil {
+		return nil, err
+	}
+	if err := policy.SetContentLengthRange(1, maxBytes); err != nil {
+		return nil, err
+	}
+
+	signingClient := m.client
+	if m.presignClient != nil {
+		signingClient = m.presignClient
+	}
+
+	u, fields, err := signingClient.PresignedPostPolicy(ctx, policy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate presigned upload for object %q in bucket %q: %w", objectName, bucket, err)
+	}
+
+	return &PresignedUpload{URL: u.String(), Fields: fields}, nil
 }
 
 // DeleteFile removes an object from MinIO storage.

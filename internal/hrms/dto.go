@@ -311,3 +311,25 @@ type ReviewRegularizationRequest struct {
 	Status string `json:"status"` // 'approved', 'rejected'
 }
 
+// CreateOfficeLocationRequest defines inputs for creating an office geofenced location.
+type CreateOfficeLocationRequest struct {
+	Name               string   `json:"name"`
+	Latitude           float64  `json:"latitude"`
+	Longitude          float64  `json:"longitude"`
+	RadiusMeters       int      `json:"radius_meters"`
+	PolygonCoordinates *string  `json:"polygon_coordinates,omitempty"`
+	AllowedIPRanges    []string `json:"allowed_ip_ranges,omitempty"`
+	AllowedWiFiBSSID   []string `json:"allowed_wifi_bssid,omitempty"`
+}
+
+// UpdateOfficeLocationRequest defines inputs for modifying an office geofenced location.
+type UpdateOfficeLocationRequest struct {
+	Name               *string  `json:"name,omitempty"`
+	Latitude           *float64 `json:"latitude,omitempty"`
+	Longitude          *float64 `json:"longitude,omitempty"`
+	RadiusMeters       *int     `json:"radius_meters,omitempty"`
+	PolygonCoordinates *string  `json:"polygon_coordinates,omitempty"`
+	AllowedIPRanges    []string `json:"allowed_ip_ranges,omitempty"`
+	AllowedWiFiBSSID   []string `json:"allowed_wifi_bssid,omitempty"`
+}
+

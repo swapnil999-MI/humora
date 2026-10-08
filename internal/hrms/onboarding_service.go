@@ -1,6 +1,7 @@
 package hrms
 
 import (
+	"humora-backend/internal/notify"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -10,7 +11,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
-	"os"
+	"humora-backend/configs"
 	"strings"
 	"time"
 
@@ -228,10 +229,7 @@ func (s *onboardingService) InviteCandidate(ctx context.Context, tenantID uuid.U
 				companyName = companyProfile.LegalName
 			}
 
-			frontendBase := os.Getenv("FRONTEND_URL")
-			if frontendBase == "" {
-				frontendBase = "http://localhost:3000"
-			}
+			frontendBase := configs.AppConfig.Server.FrontendBaseURL
 			inviteURL := fmt.Sprintf("%s/onboard/%s", strings.TrimRight(frontendBase, "/"), c.InviteToken)
 
 			if err := mailer.SendCandidateInviteEmail(mailerConfig, c.PersonalEmail, c.FirstName, companyName, inviteURL); err != nil {
@@ -400,6 +398,21 @@ func (s *onboardingService) SaveCandidateDossier(ctx context.Context, token stri
 			SET status = 'submitted', submitted_at = NOW()
 			WHERE id = $1
 		`, candidateID)
+		var cand struct {
+			TenantID  uuid.UUID `db:"tenant_id"`
+			FirstName string    `db:"first_name"`
+			LastName  string    `db:"last_name"`
+		}
+		if err := s.db.GetContext(ctx, &cand, `SELECT tenant_id, first_name, last_name FROM hrms_onboarding_candidates WHERE id = $1`, candidateID); err == nil {
+			notify.ToManagement(cand.TenantID, notify.Message{
+				Category:   notify.CategoryOnboarding,
+				Title:      fmt.Sprintf("%s %s submitted their onboarding documents", cand.FirstName, cand.LastName),
+				Body:       "Review the dossier and convert them to an employee.",
+				Link:       "onboarding",
+				EntityType: "candidate",
+				EntityID:   &candidateID,
+			})
+		}
 	} else {
 		_, _ = s.db.ExecContext(ctx, `
 			UPDATE hrms_onboarding_candidates
@@ -517,6 +530,15 @@ func (s *onboardingService) ApproveAndConvertCandidate(ctx context.Context, tena
 
 	if err := s.hrmsRepo.CreateEmployee(ctx, emp); err != nil {
 		return nil, fmt.Errorf("failed to create employee record: %w", err)
+	}
+
+	// Assign shift if specified during conversion
+	if req.ShiftID != nil && *req.ShiftID != uuid.Nil {
+		effDate := cand.ExpectedJoiningDate
+		if effDate.IsZero() {
+			effDate = time.Now().UTC()
+		}
+		_ = s.hrmsRepo.AssignShift(ctx, tenantID, newEmployeeID, *req.ShiftID, effDate)
 	}
 
 	// Copy dossier sections into hrms_employee_subforms

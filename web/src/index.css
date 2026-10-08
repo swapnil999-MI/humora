@@ -6,14 +6,14 @@
      CRED-Card Luxury Tiers · Graduated Tones Lighter to Darker · Zero Blue/Navy/Green
      ========================================================================== */
 
-  /* Dark Theme Surfaces (Deep Structural Smoky Velvet Obsidian Ladder) */
-  --surface-0: #121110; /* Base Canvas: Deep Smoky Obsidian */
-  --surface-1: #181715; /* App Rail, Header Base */
-  --surface-2: #201e1b; /* SubNav Pane, Side Drawers */
-  --surface-3: #292723; /* Clean Monolithic Cards */
-  --surface-4: #35322d; /* Elevated Menus, Popovers, Active Wells */
-  --surface-hover: rgba(245, 158, 11, 0.08);
-  --surface-active: rgba(245, 158, 11, 0.16);
+  /* Dark Theme Surfaces (Claymorphic Tactile Ladder) */
+  --surface-0: #0e0d0b; /* Base Canvas: Deep Rich Smoky Obsidian */
+  --surface-1: linear-gradient(145deg, #1d1a17 0%, #131210 100%); /* App Rail, Header Base */
+  --surface-2: linear-gradient(145deg, #27231e 0%, #181714 100%); /* SubNav Pane, Side Drawers, Recessed Wells */
+  --surface-3: linear-gradient(145deg, #322d26 0%, #1e1b17 100%); /* Tactile Clay Cards & Content Sections */
+  --surface-4: linear-gradient(145deg, #40392f 0%, #27231d 100%); /* Elevated Menus, Popovers, Active Overlays */
+  --surface-hover: rgba(245, 158, 11, 0.12);
+  --surface-active: rgba(245, 158, 11, 0.20);
 
   /* Compatibility Aliases */
   --bg-app: var(--surface-0);
@@ -24,9 +24,9 @@
   --bg-surface-active: var(--surface-active);
 
   /* Tonal Hairlines & Borders (Warm Metallic Transparencies) */
-  --border-hairline: rgba(255, 245, 230, 0.07);
-  --border-subtle: rgba(255, 245, 230, 0.13);
-  --border-strong: rgba(255, 245, 230, 0.24);
+  --border-hairline: rgba(255, 245, 230, 0.09);
+  --border-subtle: rgba(255, 245, 230, 0.16);
+  --border-strong: rgba(255, 245, 230, 0.28);
   --border-accent: #f59e0b;
 
   /* Tonal Typography Ladder (Dark Mode: Warm Silk Alabaster to Deep Mineral) */
@@ -69,19 +69,19 @@
   --accent-rose: #f43f5e;
   --accent-rose-subtle: rgba(244, 63, 94, 0.12);
 
-  /* Soft Multi-Layered Shadows (Dark Mode) */
-  --shadow-xs: 0 1px 2px rgba(18, 17, 16, 0.4);
-  --shadow-sm: 0 2px 5px rgba(18, 17, 16, 0.45);
-  --shadow-md: 0 6px 20px -2px rgba(18, 17, 16, 0.55);
-  --shadow-lg: 0 12px 36px -4px rgba(18, 17, 16, 0.70);
-  --shadow-popover: 0 20px 48px rgba(18, 17, 16, 0.85), 0 0 0 1px var(--border-subtle);
+  /* Claymorphic Tactile Multi-Layered Shadows (Dark Mode: Crisp Specular Rim + Luminous Amber Corona) */
+  --shadow-xs: 0 2px 6px rgba(0, 0, 0, 0.6), 0 0 8px -1px rgba(245, 158, 11, 0.05), inset 1px 1px 1.5px rgba(255, 255, 255, 0.22), inset -1.5px -1.5px 3px rgba(0, 0, 0, 0.7);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.65), 0 0 14px -2px rgba(245, 158, 11, 0.07), inset 1.5px 1.5px 2px rgba(255, 255, 255, 0.26), inset -2px -2px 5px rgba(0, 0, 0, 0.75);
+  --shadow-md: 8px 16px 32px -4px rgba(0, 0, 0, 0.75), 0 3px 8px -2px rgba(0, 0, 0, 0.5), 0 0 20px -3px rgba(245, 158, 11, 0.09), inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.28), inset -3px -3px 7px rgba(0, 0, 0, 0.85);
+  --shadow-lg: 14px 26px 48px -4px rgba(0, 0, 0, 0.85), 0 6px 18px -2px rgba(0, 0, 0, 0.6), 0 0 28px -4px rgba(245, 158, 11, 0.12), inset 2px 2px 4px rgba(255, 255, 255, 0.32), inset -4px -4px 9px rgba(0, 0, 0, 0.9);
+  --shadow-popover: 20px 40px 72px -8px rgba(0, 0, 0, 0.92), 0 8px 24px -2px rgba(0, 0, 0, 0.7), 0 0 36px -4px rgba(245, 158, 11, 0.15), inset 2px 2px 5px rgba(255, 255, 255, 0.36), inset -5px -5px 11px rgba(0, 0, 0, 0.92);
 
-  /* Soft Geometry */
-  --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  /* Soft Clay Geometry */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
   --radius-full: 9999px;
 
   /* Typography Stacks */
@@ -112,10 +112,37 @@
   --subnav-item-active-border: #f59e0b;
 
   /* Card Tokens (Dark Mode) */
-  --card-bg: var(--surface-3);
-  --card-border: var(--border-hairline);
-  --card-highlight: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.12) 50%, transparent 100%);
-  --card-shadow: 0 4px 20px -2px rgba(18, 17, 16, 0.4), inset 0 1px 0 rgba(245, 158, 11, 0.08);
+  --card-bg: linear-gradient(145deg, #322d26 0%, #1e1b17 100%);
+  --card-border: rgba(255, 245, 230, 0.14);
+  --card-highlight: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.25) 50%, transparent 100%);
+  --card-shadow: 8px 16px 32px -4px rgba(0, 0, 0, 0.7), 0 3px 8px -2px rgba(0, 0, 0, 0.5), 0 0 16px -2px rgba(245, 158, 11, 0.08), inset 1.5px 1.5px 2px rgba(255, 255, 255, 0.25), inset -3px -3px 7px rgba(0, 0, 0, 0.8);
+  --card-shadow-hover: 12px 24px 42px -4px rgba(0, 0, 0, 0.8), 0 6px 14px -2px rgba(0, 0, 0, 0.6), 0 0 24px -3px rgba(245, 158, 11, 0.14), inset 2px 2px 3px rgba(255, 255, 255, 0.32), inset -3px -3px 8px rgba(0, 0, 0, 0.85);
+
+  /* Claymorphic System Tokens (Dark Mode: Sculpted Obsidian & Burnished Amber) */
+  --clay-surface: linear-gradient(145deg, #322d26 0%, #1e1b17 100%);
+  --clay-surface-elevated: linear-gradient(145deg, #3e382f 0%, #25221d 100%);
+  --clay-surface-border: rgba(255, 245, 230, 0.16);
+  --clay-shadow-outer: 10px 20px 36px -4px rgba(0, 0, 0, 0.78), 0 4px 12px -2px rgba(0, 0, 0, 0.55), 0 0 20px -3px rgba(245, 158, 11, 0.09);
+  --clay-shadow-inset: inset 1.5px 1.5px 2px rgba(255, 255, 255, 0.28), inset 3px 3px 8px rgba(245, 158, 11, 0.10), inset -4px -4px 9px rgba(0, 0, 0, 0.88);
+  --clay-card-shadow: var(--clay-shadow-outer), var(--clay-shadow-inset);
+  --clay-card-shadow-hover: 14px 28px 48px -4px rgba(0, 0, 0, 0.88), 0 6px 18px -2px rgba(0, 0, 0, 0.65), 0 0 30px -4px rgba(245, 158, 11, 0.16), inset 2px 2px 3px rgba(255, 255, 255, 0.36), inset -4px -4px 10px rgba(0, 0, 0, 0.92);
+
+  --clay-btn-primary-bg: linear-gradient(145deg, #f59e0b 0%, #b45309 100%);
+  --clay-btn-primary-color: #ffffff;
+  --clay-btn-primary-shadow: 0 6px 20px rgba(245, 158, 11, 0.45), 0 0 16px -2px rgba(245, 158, 11, 0.3), inset 1.5px 1.5px 2px rgba(255, 255, 255, 0.6), inset -2px -2px 5px rgba(146, 64, 14, 0.8);
+  --clay-btn-primary-shadow-hover: 0 10px 26px rgba(245, 158, 11, 0.55), 0 0 22px -2px rgba(245, 158, 11, 0.45), inset 2px 2px 3px rgba(255, 255, 255, 0.75), inset -2px -2px 6px rgba(146, 64, 14, 0.9);
+  --clay-btn-primary-shadow-active: inset 2px 2px 6px rgba(146, 64, 14, 0.9), inset -2px -2px 4px rgba(255, 255, 255, 0.25), 0 2px 8px rgba(245, 158, 11, 0.3);
+
+  --clay-btn-secondary-bg: linear-gradient(145deg, #3b352c 0%, #24211a 100%);
+  --clay-btn-secondary-shadow: 0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px -2px rgba(245, 158, 11, 0.08), inset 1.5px 1.5px 2px rgba(255, 255, 255, 0.26), inset -2px -2px 5px rgba(0, 0, 0, 0.85);
+  --clay-btn-secondary-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.65), 0 0 14px -2px rgba(245, 158, 11, 0.14), inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.32), inset -2px -2px 6px rgba(0, 0, 0, 0.9);
+  --clay-btn-secondary-shadow-active: inset 2px 2px 5px rgba(0, 0, 0, 0.9), inset -1.5px -1.5px 3px rgba(255, 255, 255, 0.1), 0 1px 3px rgba(0, 0, 0, 0.4);
+
+  --clay-well-bg: linear-gradient(145deg, #13110f 0%, #1c1a16 100%);
+  --clay-well-shadow: inset 3px 3px 7px rgba(0, 0, 0, 0.9), inset -2px -2px 5px rgba(255, 245, 230, 0.08);
+
+  --clay-badge-bg: linear-gradient(145deg, rgba(245, 158, 11, 0.28) 0%, rgba(245, 158, 11, 0.12) 100%);
+  --clay-badge-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 0 8px rgba(245, 158, 11, 0.15), inset 1px 1px 2px rgba(255, 255, 255, 0.35), inset -1px -1px 3px rgba(0, 0, 0, 0.5);
 }
 
 /* ==========================================================================
@@ -124,13 +151,13 @@
    ========================================================================== */
 [data-theme="light"],
 .light {
-  --surface-0: #f7f5f0; /* Ergonomic Warm Cashmere Alabaster Canvas */
-  --surface-1: #fdfcf9; /* Elevated Soft Surface */
-  --surface-2: #ece8e1; /* SubNav Pane, Structural Containers */
-  --surface-3: #ffffff; /* Monolithic Crisp Surface */
-  --surface-4: #ded8cd; /* Elevated Floating Popovers */
-  --surface-hover: rgba(217, 119, 6, 0.07);
-  --surface-active: rgba(217, 119, 6, 0.14);
+  --surface-0: #f7f4ed; /* Ergonomic Warm Cashmere Alabaster Canvas */
+  --surface-1: linear-gradient(145deg, #ffffff 0%, #f4eee2 100%); /* Elevated Soft Clay Surface */
+  --surface-2: linear-gradient(145deg, #eee8dc 0%, #e1d8ca 100%); /* SubNav Pane, Structural Containers */
+  --surface-3: linear-gradient(145deg, #ffffff 0%, #f4ede0 100%); /* Monolithic Tactile Clay Surface */
+  --surface-4: linear-gradient(145deg, #ffffff 0%, #eae1d1 100%); /* Elevated Floating Popovers */
+  --surface-hover: rgba(217, 119, 6, 0.08);
+  --surface-active: rgba(217, 119, 6, 0.16);
 
   --border-hairline: #e6e0d6;
   --border-subtle: #d2c9bc;
@@ -176,12 +203,12 @@
   --accent-rose: #e11d48;
   --accent-rose-subtle: rgba(225, 29, 72, 0.08);
 
-  /* Soft Light Mode Shadows */
-  --shadow-xs: 0 1px 2px rgba(31, 26, 20, 0.04);
-  --shadow-sm: 0 1px 3px rgba(31, 26, 20, 0.06), 0 1px 2px rgba(31, 26, 20, 0.03);
-  --shadow-md: 0 4px 14px -2px rgba(31, 26, 20, 0.08);
-  --shadow-lg: 0 10px 24px -4px rgba(31, 26, 20, 0.10);
-  --shadow-popover: 0 16px 36px -4px rgba(31, 26, 20, 0.15), 0 0 0 1px #d2c9bc;
+  /* Claymorphic Tactile Multi-Layered Shadows (Light Mode) */
+  --shadow-xs: 0 2px 5px rgba(77, 66, 53, 0.08), inset 1px 1px 2px rgba(255, 255, 255, 0.9), inset -1.5px -1.5px 3px rgba(210, 201, 188, 0.45);
+  --shadow-sm: 0 4px 10px rgba(77, 66, 53, 0.1), inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.95), inset -2px -2px 4px rgba(210, 201, 188, 0.55);
+  --shadow-md: 6px 14px 26px -4px rgba(77, 66, 53, 0.15), 0 3px 8px -2px rgba(77, 66, 53, 0.08), inset 2px 2px 4px rgba(255, 255, 255, 1), inset -3px -3px 6px rgba(210, 201, 188, 0.6);
+  --shadow-lg: 12px 22px 38px -4px rgba(77, 66, 53, 0.2), 0 4px 12px -2px rgba(77, 66, 53, 0.12), inset 2px 2px 5px rgba(255, 255, 255, 1), inset -4px -4px 8px rgba(210, 201, 188, 0.7);
+  --shadow-popover: 18px 32px 56px -6px rgba(77, 66, 53, 0.25), 0 6px 18px -2px rgba(77, 66, 53, 0.15), inset 2px 2px 6px rgba(255, 255, 255, 1), inset -4px -4px 9px rgba(210, 201, 188, 0.75);
 
   /* App Rail Tokens (Light Mode) */
   --rail-bg: #fdfcf9;
@@ -202,10 +229,37 @@
   --subnav-item-active-border: #d97706;
 
   /* Card Tokens (Light Mode) */
-  --card-bg: #ffffff;
-  --card-border: #e6e0d6;
-  --card-highlight: linear-gradient(90deg, transparent 0%, rgba(217, 119, 6, 0.06) 50%, transparent 100%);
-  --card-shadow: 0 2px 8px rgba(31, 26, 20, 0.05), 0 1px 2px rgba(31, 26, 20, 0.03);
+  --card-bg: linear-gradient(145deg, #ffffff 0%, #f4eee3 100%);
+  --card-border: rgba(210, 201, 188, 0.6);
+  --card-highlight: linear-gradient(90deg, transparent 0%, rgba(217, 119, 6, 0.1) 50%, transparent 100%);
+  --card-shadow: 6px 12px 24px -4px rgba(77, 66, 53, 0.12), 0 2px 6px -2px rgba(77, 66, 53, 0.08), inset 1.5px 1.5px 3px rgba(255, 255, 255, 0.95), inset -2px -2px 5px rgba(210, 201, 188, 0.5);
+  --card-shadow-hover: 10px 18px 32px -4px rgba(77, 66, 53, 0.18), 0 4px 10px -2px rgba(77, 66, 53, 0.12), inset 2px 2px 4px rgba(255, 255, 255, 1), inset -2px -2px 6px rgba(210, 201, 188, 0.6);
+
+  /* Claymorphic System Tokens (Light Mode) */
+  --clay-surface: linear-gradient(145deg, #ffffff 0%, #f3ede2 100%);
+  --clay-surface-elevated: linear-gradient(145deg, #ffffff 0%, #e9e2d5 100%);
+  --clay-surface-border: rgba(210, 201, 188, 0.55);
+  --clay-shadow-outer: 8px 14px 28px -4px rgba(77, 66, 53, 0.14), 0 3px 8px -2px rgba(77, 66, 53, 0.08);
+  --clay-shadow-inset: inset 2px 2px 4px rgba(255, 255, 255, 0.95), inset -3px -3px 6px rgba(210, 201, 188, 0.6);
+  --clay-card-shadow: var(--clay-shadow-outer), var(--clay-shadow-inset);
+  --clay-card-shadow-hover: 12px 20px 36px -4px rgba(77, 66, 53, 0.2), 0 4px 12px -2px rgba(77, 66, 53, 0.12), inset 2px 2px 5px rgba(255, 255, 255, 1), inset -3px -3px 7px rgba(210, 201, 188, 0.7);
+
+  --clay-btn-primary-bg: linear-gradient(145deg, #f59e0b 0%, #d97706 100%);
+  --clay-btn-primary-color: #ffffff;
+  --clay-btn-primary-shadow: 0 4px 14px rgba(217, 119, 6, 0.32), inset 2px 2px 3px rgba(255, 255, 255, 0.55), inset -2px -2px 4px rgba(146, 64, 14, 0.5);
+  --clay-btn-primary-shadow-hover: 0 8px 20px rgba(217, 119, 6, 0.4), inset 2px 2px 4px rgba(255, 255, 255, 0.65), inset -2px -2px 5px rgba(146, 64, 14, 0.6);
+  --clay-btn-primary-shadow-active: inset 2px 2px 5px rgba(146, 64, 14, 0.7), inset -2px -2px 3px rgba(255, 255, 255, 0.3), 0 2px 4px rgba(217, 119, 6, 0.2);
+
+  --clay-btn-secondary-bg: linear-gradient(145deg, #ffffff 0%, #ede7dc 100%);
+  --clay-btn-secondary-shadow: 0 3px 10px rgba(77, 66, 53, 0.1), inset 1.5px 1.5px 2px rgba(255, 255, 255, 0.9), inset -2px -2px 4px rgba(210, 201, 188, 0.55);
+  --clay-btn-secondary-shadow-hover: 0 5px 14px rgba(77, 66, 53, 0.15), inset 1.5px 1.5px 3px rgba(255, 255, 255, 1), inset -2px -2px 5px rgba(210, 201, 188, 0.65);
+  --clay-btn-secondary-shadow-active: inset 2px 2px 4px rgba(210, 201, 188, 0.75), inset -1.5px -1.5px 2px rgba(255, 255, 255, 0.5), 0 1px 3px rgba(77, 66, 53, 0.08);
+
+  --clay-well-bg: #ece6dc;
+  --clay-well-shadow: inset 2px 2px 5px rgba(77, 66, 53, 0.18), inset -2px -2px 4px rgba(255, 255, 255, 0.9);
+
+  --clay-badge-bg: linear-gradient(145deg, rgba(217, 119, 6, 0.2) 0%, rgba(217, 119, 6, 0.08) 100%);
+  --clay-badge-shadow: 0 1px 4px rgba(77, 66, 53, 0.12), inset 1px 1px 2px rgba(255, 255, 255, 0.7), inset -1px -1px 2px rgba(210, 201, 188, 0.4);
 }
 
 /* ==========================================================================
@@ -285,26 +339,27 @@ p, span, div {
 }
 
 /* ==========================================================================
-   APP RAIL CHROME (MONOCHROMATIC DOCK)
+   APP RAIL CHROME (SCULPTED CLAY DOCK)
    ========================================================================== */
 .app-rail {
-  width: 60px;
+  width: 64px;
   background: var(--rail-bg);
-  border-right: 1px solid var(--border-hairline);
+  border-right: 1px solid var(--border-subtle);
+  box-shadow: 4px 0 20px rgba(10, 9, 8, 0.4), inset -1px 0 2px rgba(255, 245, 230, 0.06);
   display: flex;
   flex-direction: column;
   align-items: center;
   justifyContent: space-between;
-  padding: 14px 0;
+  padding: 16px 0;
   z-index: 60;
   user-select: none;
   flex-shrink: 0;
-  transition: background-color var(--transition-smooth), border-color var(--transition-smooth);
+  transition: background var(--transition-smooth), border-color var(--transition-smooth);
 }
 
 .app-rail-btn {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
@@ -314,20 +369,31 @@ p, span, div {
   border: 1px solid transparent;
   cursor: pointer;
   position: relative;
-  transition: all var(--transition-fast);
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.16s ease,
+              background 0.16s ease,
+              color 0.16s ease;
 }
 
 .app-rail-btn:hover {
-  background: var(--rail-btn-hover-bg);
+  background: var(--clay-surface);
   color: var(--rail-btn-hover-color);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--border-hairline);
+}
+
+.app-rail-btn:active {
+  transform: translateY(1px) scale(0.97);
+  box-shadow: var(--shadow-xs);
 }
 
 .app-rail-btn.active {
-  background: var(--rail-btn-active-bg);
-  color: var(--rail-btn-active-color);
-  border-color: var(--rail-btn-active-border);
-  box-shadow: var(--shadow-sm);
+  background: var(--clay-btn-primary-bg);
+  color: #121110;
+  border-color: rgba(245, 158, 11, 0.5);
+  box-shadow: var(--clay-btn-primary-shadow);
+  transform: scale(1.02);
 }
 
 .app-rail-indicator {
@@ -335,26 +401,28 @@ p, span, div {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 3.5px;
-  height: 20px;
-  background: var(--text-primary);
+  width: 4px;
+  height: 22px;
+  background: var(--accent-primary);
   border-radius: 0 4px 4px 0;
+  box-shadow: 2px 0 8px rgba(245, 158, 11, 0.5);
 }
 
 /* ==========================================================================
-   SUB-NAVIGATION PANE (CLEAN TONAL LIST)
+   SUB-NAVIGATION PANE (RECESSED SCULPTED CLAY BAY)
    ========================================================================== */
 .sub-nav-pane {
-  width: 240px;
+  width: 244px;
   background: var(--subnav-bg);
-  border-right: 1px solid var(--border-hairline);
+  border-right: 1px solid var(--border-subtle);
+  box-shadow: 3px 0 16px rgba(10, 9, 8, 0.3), inset -1px 0 2px rgba(255, 245, 230, 0.05);
   display: flex;
   flex-direction: column;
   justifyContent: space-between;
-  padding: 16px 12px;
+  padding: 18px 14px;
   user-select: none;
   flex-shrink: 0;
-  transition: background-color var(--transition-smooth), border-color var(--transition-smooth);
+  transition: background var(--transition-smooth), border-color var(--transition-smooth);
 }
 
 .sub-nav-header {
@@ -362,7 +430,7 @@ p, span, div {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 6px 10px 10px;
+  padding: 6px 12px 12px;
   color: var(--text-muted);
 }
 
@@ -370,43 +438,56 @@ p, span, div {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
-  font-size: 12.5px;
+  padding: 9px 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--subnav-item-idle-color);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.16s ease,
+              background 0.16s ease,
+              color 0.16s ease;
   text-align: left;
   width: 100%;
 }
 
 .sub-nav-item:hover {
-  background: var(--subnav-item-hover-bg);
+  background: var(--clay-surface);
   color: var(--subnav-item-hover-color);
+  transform: translateX(2px) translateY(-1px);
+  box-shadow: var(--shadow-xs);
+  border-color: var(--border-hairline);
+}
+
+.sub-nav-item:active {
+  transform: translateX(1px) scale(0.99);
 }
 
 .sub-nav-item.active {
-  background: var(--subnav-item-active-bg);
-  color: var(--subnav-item-active-color);
-  font-weight: 600;
-  border-color: var(--subnav-item-active-border);
+  background: var(--clay-surface-elevated);
+  color: var(--accent-primary);
+  font-weight: 700;
+  border-color: rgba(245, 158, 11, 0.35);
+  box-shadow: var(--clay-card-shadow);
+  transform: translateX(3px);
 }
 
 .nav-badge {
   font-size: 10px;
   font-weight: 700;
-  padding: 1px 6px;
-  border-radius: var(--radius-xs);
-  background: var(--surface-hover);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-hairline);
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--clay-badge-bg);
+  box-shadow: var(--clay-badge-shadow);
+  color: var(--accent-primary);
+  border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
 /* ==========================================================================
-   MONOCHROMATIC SOFT CARDS (.soft-card, .cred-card, .stat-card)
+   MONOCHROMATIC & CLAYMORPHIC TACTILE CARDS (.soft-card, .cred-card, .stat-card, .card)
    ========================================================================== */
 .soft-card,
 .cred-card,
@@ -417,7 +498,9 @@ p, span, div {
   box-shadow: var(--card-shadow);
   position: relative;
   overflow: hidden;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color var(--transition-fast);
 }
 
 .soft-card::before,
@@ -436,13 +519,15 @@ p, span, div {
 .soft-card:hover,
 .cred-card:hover,
 .card:hover {
+  transform: translateY(-2px);
   border-color: var(--border-subtle);
+  box-shadow: var(--card-shadow-hover);
 }
 
 .stat-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   padding: 20px 22px;
   display: flex;
   flex-direction: column;
@@ -450,6 +535,15 @@ p, span, div {
   box-shadow: var(--card-shadow);
   position: relative;
   overflow: hidden;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color var(--transition-fast);
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-subtle);
+  box-shadow: var(--card-shadow-hover);
 }
 
 .kpi-number {
@@ -501,57 +595,59 @@ p, span, div {
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
 }
 
-/* Primary Button: Soft Champagne Amber Gold (Tactile Soft UI) */
+/* Primary Button: Tactile Sculpted Champagne Amber Gold (Claymorphic) */
 .btn-primary {
-  background: linear-gradient(180deg, rgba(245, 158, 11, 0.18) 0%, rgba(245, 158, 11, 0.10) 100%), var(--surface-2);
-  color: var(--accent-primary) !important;
-  border: 1px solid rgba(245, 158, 11, 0.38);
-  box-shadow: 0 2px 8px -2px rgba(245, 158, 11, 0.22), inset 0 1px 0 rgba(255, 245, 230, 0.12);
+  background: var(--clay-btn-primary-bg) !important;
+  color: var(--clay-btn-primary-color) !important;
+  font-weight: 700 !important;
+  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--clay-btn-primary-shadow) !important;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.16s ease,
+              background 0.16s ease !important;
 }
 .btn-primary:hover {
-  background: linear-gradient(180deg, rgba(245, 158, 11, 0.28) 0%, rgba(245, 158, 11, 0.16) 100%), var(--surface-2);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary) !important;
-  box-shadow: 0 4px 14px -2px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255, 245, 230, 0.18);
-  transform: translateY(-1px);
+  transform: translateY(-2px) !important;
+  box-shadow: var(--clay-btn-primary-shadow-hover) !important;
+}
+.btn-primary:active {
+  transform: translateY(1px) scale(0.98) !important;
+  box-shadow: var(--clay-btn-primary-shadow-active) !important;
 }
 
 [data-theme="light"] .btn-primary {
-  background: linear-gradient(180deg, rgba(217, 119, 6, 0.14) 0%, rgba(217, 119, 6, 0.08) 100%), var(--surface-3);
-  color: #b45309 !important;
-  border: 1px solid rgba(217, 119, 6, 0.38);
-  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  background: var(--clay-btn-primary-bg) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(217, 119, 6, 0.5) !important;
+  box-shadow: var(--clay-btn-primary-shadow) !important;
 }
 [data-theme="light"] .btn-primary:hover {
-  background: linear-gradient(180deg, rgba(217, 119, 6, 0.22) 0%, rgba(217, 119, 6, 0.12) 100%), var(--surface-3);
-  border-color: var(--accent-primary);
-  color: #92400e !important;
-  box-shadow: 0 3px 10px rgba(217, 119, 6, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  box-shadow: var(--clay-btn-primary-shadow-hover) !important;
+}
+[data-theme="light"] .btn-primary:active {
+  box-shadow: var(--clay-btn-primary-shadow-active) !important;
 }
 
-/* Secondary Button: Clean Soft Mineral Theme */
+/* Secondary Button: Clean Soft Sculpted Mineral Theme (Claymorphic) */
 .btn-secondary {
-  background: linear-gradient(180deg, var(--surface-3) 0%, var(--surface-2) 100%);
+  background: var(--clay-btn-secondary-bg) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-subtle);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 245, 230, 0.05);
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--clay-btn-secondary-shadow) !important;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.16s ease,
+              border-color 0.16s ease !important;
 }
 .btn-secondary:hover {
-  background: var(--surface-hover);
-  border-color: var(--border-strong);
-  color: var(--text-primary) !important;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 245, 230, 0.08);
-  transform: translateY(-1px);
+  transform: translateY(-1.5px) !important;
+  border-color: var(--border-strong) !important;
+  box-shadow: var(--clay-btn-secondary-shadow-hover) !important;
 }
-
-[data-theme="light"] .btn-secondary {
-  background: linear-gradient(180deg, #ffffff 0%, var(--surface-1) 100%);
-  border-color: var(--border-subtle);
-  box-shadow: 0 1px 2px rgba(31, 26, 20, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-[data-theme="light"] .btn-secondary:hover {
-  background: var(--surface-hover);
-  border-color: var(--border-strong);
+.btn-secondary:active {
+  transform: translateY(1px) scale(0.98) !important;
+  box-shadow: var(--clay-btn-secondary-shadow-active) !important;
 }
 
 .btn-ghost {
@@ -621,34 +717,33 @@ p, span, div {
 }
 
 .google-search-bar {
-  height: 36px;
+  height: 38px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 14px;
-  background: var(--surface-2);
+  padding: 0 16px;
+  background: var(--clay-well-bg);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--clay-well-shadow);
   cursor: text;
-  transition: all var(--transition-fast);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .google-search-bar:hover {
-  background: var(--surface-3);
   border-color: var(--border-strong);
 }
 
 .google-search-bar.expanded {
-  background: var(--surface-1);
+  background: var(--clay-surface-elevated);
   border-color: var(--accent-primary);
-  border-radius: 18px 18px 0 0;
+  border-radius: 20px 20px 0 0;
   border-bottom: 1px solid var(--border-hairline);
-  box-shadow: 0 8px 24px -4px rgba(18, 17, 16, 0.45);
+  box-shadow: var(--clay-card-shadow-hover);
 }
 
 [data-theme="light"] .google-search-bar.expanded {
-  box-shadow: 0 8px 24px -4px rgba(31, 26, 20, 0.12);
+  box-shadow: var(--clay-card-shadow-hover);
 }
 
 .google-search-input {
@@ -1028,16 +1123,17 @@ p, span, div {
 .input-field,
 .select-field,
 .textarea-field {
-  height: 35px;
+  height: 38px;
   width: 100%;
-  padding: 0 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--radius-sm);
+  padding: 0 14px;
+  background: var(--clay-well-bg);
+  box-shadow: var(--clay-well-shadow);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   font-family: var(--font-family);
   font-size: 13px;
-  transition: all var(--transition-fast);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   outline: none;
 }
 
@@ -1049,15 +1145,15 @@ p, span, div {
 .input-field:hover,
 .select-field:hover,
 .textarea-field:hover {
-  border-color: var(--border-subtle);
+  border-color: var(--border-strong);
 }
 
 .input-field:focus,
 .select-field:focus,
 .textarea-field:focus {
-  border-color: var(--border-strong);
-  box-shadow: 0 0 0 2px var(--border-subtle);
-  background: var(--surface-3);
+  border-color: var(--accent-primary);
+  box-shadow: var(--clay-well-shadow), 0 0 0 2px var(--accent-ring);
+  background: var(--clay-well-bg);
 }
 
 /* ==========================================================================
@@ -1321,6 +1417,19 @@ p, span, div {
   background-position: 0 0, 8px 8px;
 }
 
+/* ==========================================================================
+   CLAYMORPHIC CHAT SYSTEM (WHATSAPP & TEAM PULSE)
+   Plump, tactile sculpted bubbles with double-inset highlights & soft shadows
+   ========================================================================== */
+.whatsapp-chat-canvas {
+  background-color: var(--surface-0);
+  background-image: 
+    radial-gradient(rgba(245, 158, 11, 0.05) 1.5px, transparent 1.5px),
+    radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 32px 32px, 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+
 /* Light Mode Chat Canvas: Authentic Warm Linen Wallpaper */
 [data-theme="light"] .whatsapp-chat-canvas,
 .light .whatsapp-chat-canvas {
@@ -1330,20 +1439,30 @@ p, span, div {
     radial-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 1px) !important;
 }
 
+/* 1. Outgoing Sent Bubble (Burnished Champagne Amber Gold Claymorphism) */
 .whatsapp-bubble-out {
   align-self: flex-end;
   position: relative;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(217, 119, 6, 0.13) 100%);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  border-radius: 10px 0px 10px 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  background: linear-gradient(145deg, #442a0e 0%, #281705 100%) !important;
+  border: 1px solid rgba(245, 158, 11, 0.55) !important;
+  border-radius: 18px 4px 18px 18px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65),
+              0 0 16px -2px rgba(245, 158, 11, 0.28),
+              inset 1.5px 1.5px 2px rgba(255, 255, 255, 0.45),
+              inset 3px 3px 8px rgba(251, 191, 36, 0.22),
+              inset -3px -3px 7px rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease !important;
 }
 
 .whatsapp-bubble-out:hover {
-  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.12), 0 2px 10px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px) scale(1.006) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75),
+              0 0 24px -2px rgba(245, 158, 11, 0.42),
+              inset 1.5px 1.5px 2px rgba(255, 255, 255, 0.65),
+              inset 3px 3px 10px rgba(251, 191, 36, 0.35),
+              inset -3px -3px 8px rgba(0, 0, 0, 0.9) !important;
 }
 
 /* WhatsApp Sent Top-Right Triangular Tail */
@@ -1358,48 +1477,68 @@ p, span, div {
 }
 
 .whatsapp-tail-out .tail-fill {
-  fill: #362712;
+  fill: #442a0e;
 }
 
 .whatsapp-tail-out .tail-stroke {
-  stroke: rgba(245, 158, 11, 0.35);
+  stroke: rgba(245, 158, 11, 0.55);
   stroke-width: 1px;
   stroke-linecap: square;
 }
 
-/* Light Mode Sent Bubble: Warm Champagne Gold / Cream */
+/* Light Mode Sent Bubble: Warm Sculpted Butter/Gold Clay */
 [data-theme="light"] .whatsapp-bubble-out,
 .light .whatsapp-bubble-out {
-  background: #fdf5e6 !important;
-  border: 1px solid rgba(217, 119, 6, 0.3) !important;
-  color: var(--text-primary) !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  background: linear-gradient(145deg, #fffbeb 0%, #fef3c7 100%) !important;
+  border: 1px solid rgba(217, 119, 6, 0.4) !important;
+  color: #1f1a14 !important;
+  box-shadow: 0 4px 14px rgba(77, 66, 53, 0.12),
+              inset 2px 2px 4px rgba(255, 255, 255, 0.95),
+              inset -2px -2px 4px rgba(217, 119, 6, 0.25) !important;
+}
+
+[data-theme="light"] .whatsapp-bubble-out:hover,
+.light .whatsapp-bubble-out:hover {
+  transform: translateY(-2px) scale(1.006) !important;
+  box-shadow: 0 8px 20px rgba(217, 119, 6, 0.2),
+              inset 2px 2px 5px rgba(255, 255, 255, 1),
+              inset -2px -2px 5px rgba(217, 119, 6, 0.35) !important;
 }
 
 [data-theme="light"] .whatsapp-tail-out .tail-fill,
 .light .whatsapp-tail-out .tail-fill {
-  fill: #fdf5e6 !important;
+  fill: #fffbeb !important;
 }
 
 [data-theme="light"] .whatsapp-tail-out .tail-stroke,
 .light .whatsapp-tail-out .tail-stroke {
-  stroke: rgba(217, 119, 6, 0.3) !important;
+  stroke: rgba(217, 119, 6, 0.4) !important;
 }
 
+/* 2. Incoming Received Bubble (Smoky Obsidian Sculpted Clay) */
 .whatsapp-bubble-in {
   align-self: flex-start;
   position: relative;
-  background: linear-gradient(135deg, #1c1b18 0%, #171614 100%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0px 10px 10px 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  background: linear-gradient(145deg, #322d26 0%, #1e1b17 100%) !important;
+  border: 1px solid rgba(255, 245, 230, 0.18) !important;
+  border-radius: 4px 18px 18px 18px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7),
+              0 0 14px -3px rgba(245, 158, 11, 0.08),
+              inset 1.5px 1.5px 2px rgba(255, 255, 255, 0.3),
+              inset 3px 3px 8px rgba(255, 245, 230, 0.10),
+              inset -3px -3px 8px rgba(0, 0, 0, 0.88) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease !important;
 }
 
 .whatsapp-bubble-in:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  transform: translateY(-2px) scale(1.006) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.8),
+              0 0 18px -2px rgba(245, 158, 11, 0.14),
+              inset 1.5px 1.5px 2px rgba(255, 255, 255, 0.4),
+              inset 3px 3px 10px rgba(255, 245, 230, 0.14),
+              inset -4px -4px 9px rgba(0, 0, 0, 0.92) !important;
 }
 
 /* WhatsApp Received Top-Left Triangular Tail */
@@ -1414,22 +1553,32 @@ p, span, div {
 }
 
 .whatsapp-tail-in .tail-fill {
-  fill: #1c1b18;
+  fill: #322d26;
 }
 
 .whatsapp-tail-in .tail-stroke {
-  stroke: rgba(255, 255, 255, 0.12);
+  stroke: rgba(255, 245, 230, 0.18);
   stroke-width: 1px;
   stroke-linecap: square;
 }
 
-/* Light Mode Received Bubble: Crisp Clean White */
+/* Light Mode Received Bubble: Pristine Soft Ceramic Clay */
 [data-theme="light"] .whatsapp-bubble-in,
 .light .whatsapp-bubble-in {
-  background: #ffffff !important;
-  border: 1px solid #ded8cd !important;
-  color: var(--text-primary) !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  background: linear-gradient(145deg, #ffffff 0%, #f4ede1 100%) !important;
+  border: 1px solid rgba(210, 201, 188, 0.6) !important;
+  color: #1f1a14 !important;
+  box-shadow: 0 4px 14px rgba(77, 66, 53, 0.1),
+              inset 2px 2px 4px rgba(255, 255, 255, 1),
+              inset -2px -2px 4px rgba(210, 201, 188, 0.5) !important;
+}
+
+[data-theme="light"] .whatsapp-bubble-in:hover,
+.light .whatsapp-bubble-in:hover {
+  transform: translateY(-2px) scale(1.006) !important;
+  box-shadow: 0 8px 20px rgba(77, 66, 53, 0.15),
+              inset 2px 2px 5px rgba(255, 255, 255, 1),
+              inset -2px -2px 5px rgba(210, 201, 188, 0.6) !important;
 }
 
 [data-theme="light"] .whatsapp-tail-in .tail-fill,
@@ -1439,51 +1588,57 @@ p, span, div {
 
 [data-theme="light"] .whatsapp-tail-in .tail-stroke,
 .light .whatsapp-tail-in .tail-stroke {
-  stroke: #ded8cd !important;
+  stroke: rgba(210, 201, 188, 0.6) !important;
 }
 
+/* 3. Clay Date Divider Pill */
 .whatsapp-date-pill {
   align-self: center;
-  background: rgba(30, 28, 25, 0.9);
+  background: var(--clay-surface-elevated) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  padding: 4px 14px;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--accent-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  margin: 10px 0;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+  padding: 6px 18px !important;
+  border-radius: var(--radius-full) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: var(--accent-primary) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.09em !important;
+  box-shadow: var(--shadow-sm) !important;
+  margin: 14px 0 !important;
+  transition: transform 0.16s ease !important;
+}
+
+.whatsapp-date-pill:hover {
+  transform: scale(1.04) !important;
 }
 
 /* Light Mode Date Pill */
 [data-theme="light"] .whatsapp-date-pill,
 .light .whatsapp-date-pill {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid rgba(217, 119, 6, 0.25) !important;
-  color: #b45309 !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
+  background: linear-gradient(145deg, #ffffff 0%, #f4ede1 100%) !important;
+  border: 1px solid rgba(217, 119, 6, 0.35) !important;
+  color: #92400e !important;
+  box-shadow: 0 2px 6px rgba(77, 66, 53, 0.12), inset 1px 1px 2px rgba(255, 255, 255, 0.9) !important;
 }
 
-/* Embedded Sprint Task Card in Chat Bubbles */
+/* 4. Embedded Sprint Task Card in Chat Bubbles (High Clay Contrast) */
 .whatsapp-task-card {
-  background: rgba(22, 20, 18, 0.85);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-left: 3px solid var(--accent-primary);
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-top: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--clay-well-bg) !important;
+  border: 1px solid rgba(245, 158, 11, 0.35) !important;
+  border-left: 4px solid var(--accent-primary) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 14px 16px !important;
+  margin-top: 10px !important;
+  box-shadow: var(--clay-well-shadow) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .whatsapp-task-card:hover {
-  border-color: rgba(245, 158, 11, 0.55);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.65) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), var(--clay-well-shadow) !important;
 }
 
 /* Light Mode Task Card */
@@ -1491,29 +1646,432 @@ p, span, div {
 .light .whatsapp-task-card {
   background: #ffffff !important;
   border: 1px solid #d2c9bc !important;
-  border-left: 3px solid var(--accent-primary) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  border-left: 4px solid var(--accent-primary) !important;
+  box-shadow: 0 3px 10px rgba(77, 66, 53, 0.08), inset 1px 1px 2px rgba(255, 255, 255, 0.9) !important;
+}
+
+/* 5. Chat Composer Bottom Bar & Sculpted Input Pill */
+.pulse-desk footer {
+  background: var(--surface-1) !important;
+  border-top: 1px solid var(--border-subtle) !important;
+  box-shadow: 0 -4px 20px rgba(10, 9, 8, 0.35), inset 0 1px 2px rgba(255, 245, 230, 0.05) !important;
+}
+
+.pulse-desk footer div[style*="borderRadius: '24px'"],
+.pulse-desk footer div[style*="border-radius: 24px"],
+.pulse-desk footer div[style*="border-radius:24px"] {
+  background: var(--clay-well-bg) !important;
+  box-shadow: var(--clay-well-shadow) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: 26px !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.pulse-desk footer div[style*="borderRadius: '24px'"]:focus-within {
+  border-color: var(--accent-primary) !important;
+  box-shadow: var(--clay-well-shadow), 0 0 0 2px var(--accent-ring) !important;
+}
+
+/* 6. Left Pulse Channels/DMs Sidebar & Items */
+.pulse-desk aside {
+  background: var(--surface-1) !important;
+  box-shadow: 4px 0 20px rgba(10, 9, 8, 0.35) !important;
+  border-right: 1px solid var(--border-subtle) !important;
+}
+
+.pulse-desk aside div[style*="cursor: 'pointer'"],
+.pulse-desk aside div[style*="cursor: pointer"] {
+  border-radius: var(--radius-md) !important;
+  margin: 2px 8px !important;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.16s ease,
+              background 0.16s ease !important;
+}
+
+.pulse-desk aside div[style*="cursor: 'pointer'"]:hover,
+.pulse-desk aside div[style*="cursor: pointer"]:hover {
+  background: var(--clay-surface) !important;
+  box-shadow: var(--shadow-xs) !important;
+  transform: translateX(3px) !important;
+}
+
+/* 7. Chat Top Header Bar */
+.pulse-desk header,
+.pulse-desk div[style*="height: '62px'"],
+.pulse-desk div[style*="height: 62px"] {
+  background: var(--surface-1) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  box-shadow: 0 4px 18px rgba(10, 9, 8, 0.3) !important;
+}
+
+/* 8. WhatsApp Filter Pills Claymorphism */
+.pulse-desk div[style*="padding: '4px 12px 10px'"] button,
+.pulse-desk div[style*="padding: 4px 12px 10px"] button {
+  border-radius: var(--radius-full) !important;
+  box-shadow: var(--shadow-xs) !important;
+  transition: all 0.16s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+.pulse-desk div[style*="padding: '4px 12px 10px'"] button:hover,
+.pulse-desk div[style*="padding: 4px 12px 10px"] button:hover {
+  transform: translateY(-1.5px) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* 9. Floating Emoji Hover Bar */
+.pulse-desk div[style*="top: '-18px'"],
+.pulse-desk div[style*="top: -18px"],
+.whatsapp-reaction-bar {
+  background: var(--clay-surface-elevated) !important;
+  border: 1px solid rgba(245, 158, 11, 0.35) !important;
+  border-radius: 18px !important;
+  padding: 3px 8px !important;
+  box-shadow: 0 8px 20px rgba(10, 9, 8, 0.6), inset 1px 1px 2px rgba(255, 255, 255, 0.18) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  animation: reactionBarSpring 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both !important;
+  transform-origin: bottom center;
+}
+
+@keyframes reactionBarSpring {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.65);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.reaction-emoji-btn {
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.18s ease !important;
+}
+
+.reaction-emoji-btn:hover {
+  transform: scale(1.42) translateY(-3px) !important;
+  filter: drop-shadow(0 4px 6px rgba(245, 158, 11, 0.45)) !important;
+}
+
+.reaction-emoji-btn:active {
+  transform: scale(0.92) !important;
+}
+
+/* 10. Reactions Pill with Pop Animation */
+.pulse-desk div[style*="bottom: '-8px'"],
+.pulse-desk div[style*="bottom: -8px"],
+.whatsapp-reaction-pill {
+  background: var(--clay-surface-elevated) !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3), inset 1px 1px 2px rgba(255, 255, 255, 0.2) !important;
+  border-radius: 14px !important;
+  color: var(--accent-primary) !important;
+  animation: reactionPillPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both !important;
+}
+
+@keyframes reactionPillPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  70% {
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 11. Attachment File Cards in Bubbles */
+.pulse-desk div[style*="padding: '6px 10px'"][style*="borderRadius: '6px'"],
+.pulse-desk div[style*="padding: 6px 10px"][style*="border-radius: 6px"] {
+  background: var(--clay-well-bg) !important;
+  border: 1px solid rgba(245, 158, 11, 0.25) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--clay-well-shadow) !important;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease !important;
+}
+.pulse-desk div[style*="padding: '6px 10px'"][style*="borderRadius: '6px'"]:hover,
+.pulse-desk div[style*="padding: 6px 10px"][style*="border-radius: 6px"]:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), var(--clay-well-shadow) !important;
+}
+
+/* 12. Voice Note Waveform Player & Animated Equalizer */
+.pulse-desk div[style*="minWidth: '240px'"],
+.pulse-desk div[style*="min-width: 240px"] {
+  background: var(--clay-well-bg) !important;
+  border: 1px solid rgba(245, 158, 11, 0.2) !important;
+  border-radius: 14px !important;
+  padding: 6px 12px !important;
+  box-shadow: var(--clay-well-shadow) !important;
+}
+
+.pulse-desk div[style*="minWidth: '240px'"] button,
+.pulse-desk div[style*="min-width: 240px"] button,
+.voice-play-btn {
+  box-shadow: 0 3px 8px rgba(245, 158, 11, 0.4), inset 1px 1px 2px rgba(255, 255, 255, 0.4) !important;
+  transition: transform 0.16s ease !important;
+}
+.pulse-desk div[style*="minWidth: '240px'"] button:hover,
+.pulse-desk div[style*="min-width: 240px"] button:hover,
+.voice-play-btn:hover {
+  transform: scale(1.08) !important;
+}
+
+@keyframes playButtonPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5), inset 1px 1px 2px rgba(255, 255, 255, 0.5) !important;
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0), inset 1px 1px 2px rgba(255, 255, 255, 0.5) !important;
+  }
+}
+
+.voice-play-btn.is-active {
+  animation: playButtonPulse 1.6s infinite ease-out !important;
+}
+
+@keyframes soundWaveDancing {
+  0%, 100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1.2);
+  }
+}
+
+.waveform-bar.is-playing {
+  animation: soundWaveDancing 0.65s ease-in-out infinite alternate !important;
+  transform-origin: bottom center !important;
+}
+.waveform-bar.is-playing:nth-child(2n) {
+  animation-delay: -0.2s !important;
+  animation-duration: 0.52s !important;
+}
+.waveform-bar.is-playing:nth-child(3n) {
+  animation-delay: -0.4s !important;
+  animation-duration: 0.72s !important;
+}
+.waveform-bar.is-playing:nth-child(4n) {
+  animation-delay: -0.15s !important;
+  animation-duration: 0.58s !important;
+}
+
+/* 13. Audio Memo Mic Radar Pulse & Send Launch Animation */
+.pulse-desk footer button[title*="audio voice memo"],
+.pulse-mic-btn {
+  background: var(--clay-btn-secondary-bg) !important;
+  box-shadow: var(--clay-btn-secondary-shadow) !important;
+  border: 1px solid rgba(245, 158, 11, 0.35) !important;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s ease !important;
+  animation: micRadarPulse 2.4s infinite cubic-bezier(0.24, 0, 0.38, 1) !important;
+}
+.pulse-desk footer button[title*="audio voice memo"]:hover,
+.pulse-mic-btn:hover {
+  transform: translateY(-2px) scale(1.08) !important;
+  box-shadow: var(--clay-btn-secondary-shadow-hover) !important;
+}
+
+@keyframes micRadarPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+}
+
+@keyframes sendBtnPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) rotate(-30deg);
+  }
+  70% {
+    transform: scale(1.15) rotate(6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.pulse-send-btn {
+  animation: sendBtnPop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both !important;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease !important;
+}
+.pulse-send-btn:hover {
+  transform: translateY(-2px) scale(1.08) rotate(-6deg) !important;
+}
+.pulse-send-btn:active {
+  transform: translateY(1px) scale(0.95) rotate(0deg) !important;
+}
+
+/* 14. Popover Attach Menu Slide Up */
+.pulse-desk footer div[style*="bottom: '70px'"],
+.pulse-desk footer div[style*="bottom: 70px"],
+.pulse-attach-popover {
+  background: var(--clay-surface-elevated) !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--shadow-popover), var(--clay-shadow-inset) !important;
+  backdrop-filter: blur(14px) !important;
+  animation: attachMenuSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}
+
+@keyframes attachMenuSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 15. Message Entrance & Slide-in Fluid Animations */
+@keyframes messageSlideInRight {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.008);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes messageSlideInLeft {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.008);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pulse-msg-row.msg-out {
+  animation: messageSlideInRight 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.pulse-msg-row.msg-in {
+  animation: messageSlideInLeft 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* 16. WhatsApp Read Receipt Double Checkmark Pop */
+@keyframes checkmarkPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(-20deg);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(1.22) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+.receipt-checkmarks {
+  display: inline-flex;
+  align-items: center;
+  animation: checkmarkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* 17. Real-time Animated Typing Indicator Pill */
+@keyframes typingBubbleSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pulse-typing-indicator {
+  animation: typingBubbleSlide 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* 18. Task Progress Shimmer Animation */
+@keyframes shimmerSweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.task-progress-fill {
+  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 35%, #fffbeb 50%, #fbbf24 65%, #f59e0b 100%) !important;
+  background-size: 200% 100% !important;
+  animation: shimmerSweep 2.8s infinite linear !important;
+}
+
+/* 19. Channel Roster Active Transition & Hover */
+.pulse-channel-item {
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background 0.18s ease,
+              box-shadow 0.18s ease !important;
+}
+.pulse-channel-item:hover {
+  transform: translateX(4px) !important;
+}
+.pulse-channel-item.active {
+  animation: activeChannelPulse 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes activeChannelPulse {
+  0% {
+    transform: scale(0.98);
+  }
+  60% {
+    transform: scale(1.01);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* Task Inspector Right-Side Drawer */
 .task-inspector-drawer {
   width: 420px;
-  border-left: 1px solid var(--border-hairline);
+  border-left: 1px solid var(--border-subtle);
   background: var(--surface-1);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   z-index: 35;
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.45);
+  box-shadow: -6px 0 28px rgba(10, 9, 8, 0.5), inset 1px 0 2px rgba(255, 245, 230, 0.05);
   animation: slideInRight 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Light Mode Task Inspector Drawer */
 [data-theme="light"] .task-inspector-drawer,
 .light .task-inspector-drawer {
   background: var(--surface-1) !important;
   border-left: 1px solid var(--border-subtle) !important;
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12) !important;
+  box-shadow: -4px 0 24px rgba(77, 66, 53, 0.15) !important;
 }
 
 @keyframes slideInRight {
@@ -1809,5 +2367,681 @@ p, span, div {
   }
 }
 
+/* ==========================================================================
+   HUMORA CLAYMORPHISM DESIGN SYSTEM (CLAY UI SUITE)
+   Plump, tactile 3D matte surfaces with double-inset highlights & soft shadows
+   ========================================================================== */
 
+/* 1. Primary Clay Card Surface */
+.clay-card {
+  background: var(--clay-surface);
+  border: 1px solid var(--clay-surface-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--clay-card-shadow);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color var(--transition-fast);
+}
 
+.clay-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.25) 50%, transparent 100%);
+  pointer-events: none;
+}
+
+.clay-card:hover,
+.clay-card-interactive:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-subtle);
+  box-shadow: var(--clay-card-shadow-hover);
+}
+
+/* 2. Clay Elevated Surface */
+.clay-card-elevated {
+  background: var(--clay-surface-elevated);
+  border: 1px solid var(--clay-surface-border);
+  border-radius: 22px;
+  box-shadow: 14px 22px 40px -4px rgba(10, 9, 8, 0.7),
+              0 6px 16px -2px rgba(10, 9, 8, 0.5),
+              var(--clay-shadow-inset);
+}
+
+/* 3. Clay Stat KPI Card */
+.clay-stat-card {
+  background: var(--clay-surface);
+  border: 1px solid var(--clay-surface-border);
+  border-radius: var(--radius-xl);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  justifyContent: space-between;
+  box-shadow: var(--clay-card-shadow);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.clay-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--clay-card-shadow-hover);
+}
+
+/* 4. Clay Sculpted Recessed Well (Inverted Inner Shadow) */
+.clay-well {
+  background: var(--clay-well-bg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--clay-well-shadow);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+/* 5. Clay Input & Select Controls */
+.clay-input,
+.input-field.clay {
+  background: var(--clay-well-bg) !important;
+  box-shadow: var(--clay-well-shadow) !important;
+  border: 1px solid rgba(255, 245, 230, 0.06) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--text-primary) !important;
+  padding: 8px 14px !important;
+  transition: all 0.18s ease !important;
+}
+
+.clay-input:focus,
+.input-field.clay:focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: var(--clay-well-shadow), 0 0 0 2px var(--accent-ring) !important;
+}
+
+/* 6. Clay Pill / 3D Badge */
+.clay-badge,
+.clay-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  background: var(--clay-badge-bg);
+  box-shadow: var(--clay-badge-shadow);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+}
+
+/* 7. Clay Dialog / Modal Window */
+.clay-modal {
+  background: var(--clay-surface-elevated);
+  border: 1px solid var(--clay-surface-border);
+  border-radius: 24px;
+  box-shadow: 20px 32px 64px -8px rgba(10, 9, 8, 0.85),
+              0 8px 24px -2px rgba(10, 9, 8, 0.6),
+              var(--clay-shadow-inset);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 8. Clay Button Suite */
+.clay-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--clay-surface-border);
+  background: var(--clay-btn-secondary-bg);
+  color: var(--text-primary);
+  box-shadow: var(--clay-btn-secondary-shadow);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.16s ease,
+              border-color 0.16s ease;
+}
+
+.clay-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--clay-btn-secondary-shadow-hover);
+  border-color: var(--border-strong);
+}
+
+.clay-btn:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: var(--clay-btn-secondary-shadow-active);
+}
+
+.clay-btn-primary {
+  background: var(--clay-btn-primary-bg) !important;
+  color: var(--clay-btn-primary-color) !important;
+  border: 1px solid rgba(245, 158, 11, 0.5) !important;
+  box-shadow: var(--clay-btn-primary-shadow) !important;
+}
+
+.clay-btn-primary:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: var(--clay-btn-primary-shadow-hover) !important;
+}
+
+.clay-btn-primary:active {
+  transform: translateY(1px) scale(0.98) !important;
+  box-shadow: var(--clay-btn-primary-shadow-active) !important;
+}
+
+[data-theme="light"] .clay-badge,
+.light .clay-badge,
+[data-theme="light"] .clay-pill,
+.light .clay-pill {
+  border-color: rgba(217, 119, 6, 0.35);
+  color: #92400e;
+}
+
+/* ==========================================================================
+   GLOBAL CLAYMORPHISM THEME OVERHAUL
+   Universal propagation across all pages, layouts, desks, tables & modals
+   ========================================================================== */
+
+/* 1. Header Bar Sculpting */
+header {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.65), 0 0 16px -2px rgba(245, 158, 11, 0.08), inset 0 -1px 2px rgba(255, 245, 230, 0.14) !important;
+  background: var(--surface-1) !important;
+}
+
+/* 2. Universal Inline-Styled Container Elevation */
+.main-content div[style*="background: var(--surface-3)"],
+.main-content div[style*="background: var(--surface-2)"],
+.main-content div[style*="background: var(--surface-1)"] {
+  box-shadow: var(--clay-card-shadow) !important;
+  border-radius: var(--radius-xl) !important;
+  border: 1px solid var(--border-hairline) !important;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.22s ease,
+              border-color var(--transition-fast) !important;
+}
+
+.main-content div[style*="background: var(--surface-3)"]:hover,
+.main-content div[style*="background: var(--surface-2)"]:hover {
+  box-shadow: var(--clay-card-shadow-hover) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+/* 3. Claymorphic High-Density & Linear Tables */
+table {
+  border-collapse: separate !important;
+  border-spacing: 0 6px !important;
+  width: 100%;
+}
+
+table thead th {
+  padding: 10px 14px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  color: var(--text-muted) !important;
+  border-bottom: none !important;
+}
+
+table tbody tr {
+  background: var(--clay-surface) !important;
+  box-shadow: var(--shadow-xs) !important;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.16s ease,
+              background 0.16s ease !important;
+}
+
+table tbody tr:hover {
+  transform: translateY(-2px) scale(1.002) !important;
+  box-shadow: var(--shadow-sm) !important;
+  background: var(--clay-surface-elevated) !important;
+}
+
+table tbody tr td {
+  padding: 12px 14px !important;
+  border: none !important;
+  vertical-align: middle !important;
+}
+
+table tbody tr td:first-child {
+  border-top-left-radius: var(--radius-md) !important;
+  border-bottom-left-radius: var(--radius-md) !important;
+  border-left: 1px solid var(--border-hairline) !important;
+}
+
+table tbody tr td:last-child {
+  border-top-right-radius: var(--radius-md) !important;
+  border-bottom-right-radius: var(--radius-md) !important;
+  border-right: 1px solid var(--border-hairline) !important;
+}
+
+/* 4. Kanban Lanes & Draggable Issue Cards */
+.kanban-column {
+  background: var(--surface-2) !important;
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--clay-well-shadow) !important;
+  border: 1px solid var(--border-subtle) !important;
+  padding: 12px !important;
+}
+
+.kanban-card {
+  background: var(--clay-surface) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--clay-card-shadow) !important;
+  border: 1px solid var(--border-hairline) !important;
+  padding: 14px !important;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.2s ease !important;
+  cursor: grab !important;
+}
+
+.kanban-card:hover {
+  transform: translateY(-3px) scale(1.01) !important;
+  box-shadow: var(--clay-card-shadow-hover) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+.kanban-card:active {
+  cursor: grabbing !important;
+  transform: scale(0.98) !important;
+}
+
+/* 5. Modals, Popovers & Slide-over Drawers */
+div[style*="position: fixed"][style*="zIndex: 1100"],
+div[style*="position: fixed"][style*="zIndex: 1000"],
+.modal-backdrop {
+  backdrop-filter: blur(12px) saturate(130%) !important;
+}
+
+div[style*="position: fixed"] > div[style*="background: var(--surface-1)"],
+div[style*="position: fixed"] > div[style*="background: var(--surface-2)"],
+div[style*="position: fixed"] > div[style*="background: var(--surface-3)"],
+.modal-card {
+  border-radius: 24px !important;
+  box-shadow: var(--shadow-popover) !important;
+  background: var(--clay-surface-elevated) !important;
+  border: 1px solid var(--border-subtle) !important;
+}
+
+/* 6. Tabs & Segmented Filters */
+.tab,
+.tab-btn,
+.filter-btn,
+.nav-tab {
+  border-radius: var(--radius-md) !important;
+  padding: 7px 16px !important;
+  font-weight: 600 !important;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.16s ease,
+              background 0.16s ease !important;
+  border: 1px solid transparent !important;
+  background: transparent;
+}
+
+.tab:hover,
+.tab-btn:hover,
+.filter-btn:hover {
+  background: var(--clay-surface) !important;
+  box-shadow: var(--shadow-xs) !important;
+  transform: translateY(-1px) !important;
+  border-color: var(--border-hairline) !important;
+}
+
+.tab.active,
+.tab-btn.active,
+.filter-btn.active {
+  background: var(--clay-btn-primary-bg) !important;
+  color: #121110 !important;
+  box-shadow: var(--clay-btn-primary-shadow) !important;
+  transform: translateY(-1px) !important;
+  font-weight: 700 !important;
+  border-color: rgba(245, 158, 11, 0.45) !important;
+}
+
+/* 7. Notification Cards & Activity Feeds */
+.notification-item-card,
+.whatsapp-task-card,
+.company-settings-card {
+  background: var(--clay-surface) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--clay-card-shadow) !important;
+  border: 1px solid var(--border-hairline) !important;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.2s ease !important;
+}
+
+.notification-item-card:hover,
+.whatsapp-task-card:hover,
+.company-settings-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: var(--clay-card-shadow-hover) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+/* 8. Breadcrumb Navigation & Stopwatch Pills */
+.breadcrumb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--clay-surface);
+  box-shadow: var(--shadow-xs);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.breadcrumb-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--border-subtle);
+}
+
+/* ==========================================================================
+   BIOMETRIC AUTHENTICATION & GEOFENCING DESIGN SYSTEM
+   Claymorphic In-Display Fingerprint Sensor, Facial Reticle & GPS Radar
+   ========================================================================== */
+
+/* 1. In-Display Ultrasonic Fingerprint Scanner Pad */
+.clay-fingerprint-pad {
+  width: 96px;
+  height: 96px;
+  margin: 12px auto;
+  border-radius: 50%;
+  background: var(--clay-well-bg);
+  box-shadow: var(--clay-well-shadow), 0 0 20px -4px rgba(245, 158, 11, 0.15);
+  border: 2px solid rgba(245, 158, 11, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+.clay-fingerprint-pad:hover {
+  transform: scale(1.05);
+  border-color: var(--accent-primary);
+  box-shadow: var(--clay-well-shadow), 0 0 24px -2px rgba(245, 158, 11, 0.3);
+}
+
+.clay-fingerprint-pad:active,
+.clay-fingerprint-pad.scanning {
+  transform: scale(0.98);
+  border-color: #fbbf24;
+  box-shadow: var(--clay-well-shadow), 0 0 32px rgba(245, 158, 11, 0.5);
+}
+
+@keyframes fingerprintScanLaser {
+  0% {
+    top: -10%;
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 110%;
+    opacity: 0.2;
+  }
+}
+
+.fingerprint-laser-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #fbbf24, #ffffff, #fbbf24, transparent);
+  box-shadow: 0 0 12px #fbbf24, 0 0 24px #f59e0b;
+  animation: fingerprintScanLaser 1.5s infinite ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes fingerprintRipple {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.fingerprint-ripple-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent-primary);
+  animation: fingerprintRipple 1.8s infinite cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+/* 2. Corporate Geo-Fence Radar Pill Card */
+.clay-geofence-card {
+  background: var(--clay-surface);
+  border: 1px solid var(--clay-surface-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--clay-card-shadow);
+  padding: 12px 14px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.clay-geofence-card.allowed {
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: var(--clay-card-shadow), 0 0 16px -4px rgba(16, 185, 129, 0.15);
+}
+
+.clay-geofence-card.restricted {
+  border-color: rgba(244, 63, 94, 0.45);
+  box-shadow: var(--clay-card-shadow), 0 0 20px -4px rgba(244, 63, 94, 0.2);
+}
+
+/* 3. Facial Recognition Reticle */
+.face-scanner-reticle {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 10px auto;
+  border-radius: 50%;
+  border: 2px dashed rgba(245, 158, 11, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--clay-well-bg);
+  box-shadow: var(--clay-well-shadow);
+}
+
+@keyframes reticleRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.reticle-spin-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--accent-primary);
+  border-right-color: rgba(245, 158, 11, 0.4);
+  animation: reticleRotate 3s linear infinite;
+  pointer-events: none;
+}
+
+/* 4. Corporate Geofencing Admin & Radar Styles */
+.clay-radar-visualizer {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  background: radial-gradient(circle at center, #0f172a 0%, #030712 100%);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: inset 0 2px 14px rgba(0, 0, 0, 0.8), 0 4px 20px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radar-grid-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px dashed rgba(245, 158, 11, 0.22);
+  pointer-events: none;
+}
+
+.radar-crosshair-x {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.35), transparent);
+  pointer-events: none;
+}
+
+.radar-crosshair-y {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(245, 158, 11, 0.35), transparent);
+  pointer-events: none;
+}
+
+.radar-sweep-beam {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg at 50% 50%, rgba(245, 158, 11, 0.35) 0deg, rgba(245, 158, 11, 0.05) 45deg, transparent 90deg, transparent 360deg);
+  animation: radarSweep 4s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes radarSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.radar-center-blip {
+  position: relative;
+  z-index: 5;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  box-shadow: 0 0 18px var(--accent-primary);
+}
+
+.radar-center-ripple {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid var(--accent-primary);
+  animation: radarRipple 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes radarRipple {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(3.5);
+    opacity: 0;
+  }
+}
+
+.clay-preset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 12px;
+  background: var(--clay-btn-bg);
+  border: 1px solid var(--clay-surface-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--clay-btn-shadow);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-bounce);
+  text-align: left;
+}
+
+.clay-preset-btn:hover {
+  transform: translateY(-2px);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.clay-preset-btn.active {
+  background: var(--clay-btn-primary-bg);
+  border-color: var(--accent-primary);
+  box-shadow: var(--clay-btn-primary-shadow);
+  color: #000000;
+}
+
+.clay-radius-pill {
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  background: var(--clay-btn-bg);
+  border: 1px solid var(--clay-surface-border);
+  box-shadow: var(--clay-btn-shadow);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.clay-radius-pill:hover {
+  transform: translateY(-1px);
+  color: var(--text-primary);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.clay-radius-pill.active {
+  background: var(--accent-subtle);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  font-weight: 700;
+  box-shadow: var(--clay-btn-active-shadow);
+}

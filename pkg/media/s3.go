@@ -161,6 +161,26 @@ func (s *S3Storage) resolveBucket(bucketName string) (string, error) {
 	return target, nil
 }
 
+// EnsurePrivateBucket creates the bucket if it is missing, without granting
+// anonymous read access: objects are reachable only through presigned URLs.
+func (s *S3Storage) EnsurePrivateBucket(ctx context.Context, bucketName string) error {
+	bucket := strings.TrimSpace(bucketName)
+	if bucket == "" {
+		return fmt.Errorf("bucket name cannot be empty")
+	}
+	exists, err := s.client.BucketExists(ctx, bucket)
+	if err != nil {
+		return fmt.Errorf("failed to check bucket %q: %w", bucket, err)
+	}
+	if exists {
+		return nil
+	}
+	if err := s.client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{Region: s.region}); err != nil {
+		return fmt.Errorf("failed to create bucket %q: %w", bucket, err)
+	}
+	return nil
+}
+
 // EnsureBucketExists checks if the S3 bucket exists, creating it if necessary.
 func (s *S3Storage) EnsureBucketExists(ctx context.Context, bucketName string) error {
 	bucket, err := s.resolveBucket(bucketName)
@@ -307,6 +327,50 @@ func (s *S3Storage) GetPresignedURL(ctx context.Context, bucketName, objectName 
 	}
 
 	return presignedURL.String(), nil
+}
+
+// GetPresignedUpload generates a temporary form upload for exactly one object,
+// rejected by the storage backend if the body exceeds maxBytes.
+func (s *S3Storage) GetPresignedUpload(ctx context.Context, bucketName, objectName string, expires time.Duration, maxBytes int64) (*PresignedUpload, error) {
+	bucket, err := s.resolveBucket(bucketName)
+	if err != nil {
+		return nil, err
+	}
+
+	objectName = strings.TrimSpace(objectName)
+	if objectName == "" {
+		return nil, fmt.Errorf("object name cannot be empty")
+	}
+
+	if expires <= 0 {
+		expires = 15 * time.Minute
+	}
+
+	policy := minio.NewPostPolicy()
+	if err := policy.SetBucket(bucket); err != nil {
+		return nil, err
+	}
+	if err := policy.SetKey(objectName); err != nil {
+		return nil, err
+	}
+	if err := policy.SetExpires(time.Now().UTC().Add(expires)); err != nil {
+		return nil, err
+	}
+	if err := policy.SetContentLengthRange(1, maxBytes); err != nil {
+		return nil, err
+	}
+
+	signingClient := s.client
+	if s.presignClient != nil {
+		signingClient = s.presignClient
+	}
+
+	u, fields, err := signingClient.PresignedPostPolicy(ctx, policy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate presigned upload for object %q in bucket %q: %w", objectName, bucket, err)
+	}
+
+	return &PresignedUpload{URL: u.String(), Fields: fields}, nil
 }
 
 // DeleteFile removes an object from AWS S3 storage.

@@ -113,6 +113,15 @@ func GetPresignedURL(ctx context.Context, bucketName, objectName string, expires
 	return s.GetPresignedURL(ctx, bucketName, objectName, expires)
 }
 
+// GetPresignedUpload generates a temporary, size-capped form upload using the default storage instance.
+func GetPresignedUpload(ctx context.Context, bucketName, objectName string, expires time.Duration, maxBytes int64) (*PresignedUpload, error) {
+	s := GetDefaultStorage()
+	if s == nil {
+		return nil, fmt.Errorf("media storage is not initialized; call media.Init() or media.SetDefaultStorage()")
+	}
+	return s.GetPresignedUpload(ctx, bucketName, objectName, expires, maxBytes)
+}
+
 // DeleteFile removes a file object from storage using the default storage instance.
 func DeleteFile(ctx context.Context, bucketName, objectName string) error {
 	s := GetDefaultStorage()

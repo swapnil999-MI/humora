@@ -1,36 +1,57 @@
 package com.paylogic.humora.presentation.components
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.paylogic.humora.core.theme.DarkBorder
-import com.paylogic.humora.core.theme.DarkSurface
+import com.paylogic.humora.core.theme.ClayBorderGradient
+import com.paylogic.humora.core.theme.ClaySurfaceGradient
 
+/**
+ * Compatibility modifier mapped to Claymorphism 3D effect.
+ */
+fun Modifier.glassEffect(
+    shape: Shape = RoundedCornerShape(24.dp),
+    borderWidth: Dp = 1.2.dp,
+    borderBrush: Brush = ClayBorderGradient,
+    backgroundBrush: Brush = ClaySurfaceGradient
+): Modifier = this.clayEffect(
+    shape = shape,
+    elevation = 10.dp,
+    borderWidth = borderWidth,
+    borderBrush = borderBrush,
+    backgroundBrush = backgroundBrush
+)
+
+/**
+ * Card mapped directly to 3D ClayCard.
+ */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 16.dp,
-    borderColor: Color = DarkBorder,
-    backgroundColor: Color = DarkSurface,
+    cornerRadius: Dp = 24.dp,
+    borderBrush: Brush = ClayBorderGradient,
+    backgroundBrush: Brush = ClaySurfaceGradient,
+    borderColor: Color? = null,
+    backgroundColor: Color? = null,
+    showTopGlare: Boolean = false,
+    contentPadding: PaddingValues = PaddingValues(18.dp),
     content: @Composable BoxScope.() -> Unit
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(cornerRadius),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        border = BorderStroke(1.dp, borderColor)
-    ) {
-        Box(modifier = Modifier.padding(16.dp), content = content)
-    }
+    ClayCard(
+        modifier = modifier,
+        cornerRadius = cornerRadius,
+        elevation = 10.dp,
+        borderBrush = borderBrush,
+        backgroundBrush = backgroundBrush,
+        borderColor = borderColor,
+        backgroundColor = backgroundColor,
+        contentPadding = contentPadding,
+        content = content
+    )
 }

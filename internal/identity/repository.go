@@ -24,6 +24,7 @@ type Repository interface {
 	CreateTenant(ctx context.Context, tenant *Tenant) error
 	GetTenantBySlug(ctx context.Context, slug string) (*Tenant, error)
 	GetTenantByID(ctx context.Context, id uuid.UUID) (*Tenant, error)
+	GetFirstTenant(ctx context.Context) (*Tenant, error)
 
 	CreateUser(ctx context.Context, user *User) error
 	GetUserByEmail(ctx context.Context, email string) (*User, *Tenant, error)
@@ -34,6 +35,7 @@ type Repository interface {
 	RegisterDevicePublicKey(ctx context.Context, id uuid.UUID, publicKey string) error
 
 	CreateDefaultRoles(ctx context.Context, tenantID uuid.UUID) error
+	SeedDefaultTenantData(ctx context.Context, tenantID uuid.UUID, orgName, adminEmail, adminName string) error
 	GetRolesForUser(ctx context.Context, tenantID uuid.UUID, userID uuid.UUID) ([]string, []string, error)
 	CreateDefaultHRMSEmployee(ctx context.Context, tenantID uuid.UUID, userID uuid.UUID, email, firstName, lastName string) error
 	CheckEmailConflict(ctx context.Context, email string) (bool, string, error)
@@ -88,6 +90,19 @@ func (r *repository) GetTenantByID(ctx context.Context, id uuid.UUID) (*Tenant, 
 	var tenant Tenant
 	query := `SELECT id, slug, name, domain, subscription_tier, created_at, updated_at FROM tenants WHERE id = $1 LIMIT 1`
 	err := r.db.GetContext(ctx, &tenant, query, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &tenant, nil
+}
+
+func (r *repository) GetFirstTenant(ctx context.Context) (*Tenant, error) {
+	var tenant Tenant
+	query := `SELECT id, slug, name, domain, subscription_tier, created_at, updated_at FROM tenants ORDER BY created_at ASC LIMIT 1`
+	err := r.db.GetContext(ctx, &tenant, query)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -208,7 +223,9 @@ func (r *repository) CreateDefaultRoles(ctx context.Context, tenantID uuid.UUID)
 		Perms []string
 	}{
 		{Name: "superadmin", Perms: []string{"*"}},
+		{Name: "admin", Perms: []string{"*"}},
 		{Name: "hr_admin", Perms: []string{"hrms:*", "work:read"}},
+		{Name: "manager", Perms: []string{"hrms:team", "hrms:read", "work:team"}},
 		{Name: "project_lead", Perms: []string{"work:*", "hrms:read"}},
 		{Name: "employee", Perms: []string{"hrms:self", "work:self"}},
 	}
@@ -224,6 +241,92 @@ func (r *repository) CreateDefaultRoles(ctx context.Context, tenantID uuid.UUID)
 			return err
 		}
 	}
+	return nil
+}
+
+func (r *repository) SeedDefaultTenantData(ctx context.Context, tenantID uuid.UUID, orgName, adminEmail, adminName string) error {
+	// 1. Company profile
+	queryProfile := `
+		INSERT INTO company_profiles (tenant_id, name, legal_name, country, signatory_name, contact_email, pay_cycle_start_day, created_at, updated_at)
+		VALUES ($1, $2, $2, 'India', $3, $4, 1, NOW(), NOW())
+		ON CONFLICT (tenant_id) DO NOTHING
+	`
+	_, _ = r.db.ExecContext(ctx, queryProfile, tenantID, orgName, adminName, adminEmail)
+
+	// 2. Default departments
+	deptQuery := `
+		INSERT INTO hrms_departments (id, tenant_id, name)
+		VALUES 
+			($1, $2, 'Engineering'),
+			($3, $2, 'Product & Design'),
+			($4, $2, 'Human Resources'),
+			($5, $2, 'Operations'),
+			($6, $2, 'Finance')
+		ON CONFLICT (tenant_id, name) DO NOTHING
+	`
+	_, _ = r.db.ExecContext(ctx, deptQuery, uuid.New(), tenantID, uuid.New(), uuid.New(), uuid.New(), uuid.New())
+
+	// 3. Default designations
+	desigQuery := `
+		INSERT INTO hrms_designations (id, tenant_id, title, grade_level)
+		VALUES
+			($1, $2, 'Managing Director', 'L7'),
+			($3, $2, 'Engineering Lead', 'L6'),
+			($4, $2, 'Staff Software Engineer', 'L5'),
+			($5, $2, 'HR Specialist', 'L4'),
+			($6, $2, 'Operations Associate', 'L3')
+		ON CONFLICT (tenant_id, title) DO NOTHING
+	`
+	_, _ = r.db.ExecContext(ctx, desigQuery, uuid.New(), tenantID, uuid.New(), uuid.New(), uuid.New(), uuid.New())
+
+	// 4. Default Office Location (Org HQ)
+	locQuery := `
+		INSERT INTO hrms_office_locations (id, tenant_id, name, latitude, longitude, radius_meters)
+		VALUES ($1, $2, $3, 12.9715987, 77.5945627, 250)
+		ON CONFLICT DO NOTHING
+	`
+	locName := strings.TrimSpace(orgName) + " HQ"
+	_, _ = r.db.ExecContext(ctx, locQuery, uuid.New(), tenantID, locName)
+
+	// 5. Default Shift
+	shiftQuery := `
+		INSERT INTO hrms_shifts (id, tenant_id, name, start_time, end_time, grace_minutes, half_day_hours, full_day_hours)
+		VALUES ($1, $2, 'General Shift', '09:00:00', '18:00:00', 15, 4.5, 8.0)
+		ON CONFLICT DO NOTHING
+	`
+	_, _ = r.db.ExecContext(ctx, shiftQuery, uuid.New(), tenantID)
+
+	// 6. Default Leave Types
+	leaveQuery := `
+		INSERT INTO hrms_leave_types (id, tenant_id, name, code, annual_quota, accrual_frequency, is_carry_forward, max_carry_forward, is_sandwich_rule_enabled)
+		VALUES
+			($1, $2, 'Privilege Leave', 'PL', 18.0, 'monthly', TRUE, 12.0, FALSE),
+			($3, $2, 'Sick Leave', 'SL', 12.0, 'monthly', FALSE, 0.0, FALSE),
+			($4, $2, 'Casual Leave', 'CL', 8.0, 'monthly', FALSE, 0.0, FALSE)
+		ON CONFLICT (tenant_id, code) DO NOTHING
+	`
+	_, _ = r.db.ExecContext(ctx, leaveQuery, uuid.New(), tenantID, uuid.New(), uuid.New())
+
+	// 7. Default Work Workflow & Statuses
+	wfID := uuid.New()
+	wfQuery := `
+		INSERT INTO work_workflows (id, tenant_id, name, description)
+		VALUES ($1, $2, 'Standard Agile Workflow', 'Standard 4-stage Kanban/Scrum agile workflow')
+		ON CONFLICT DO NOTHING
+	`
+	if _, err := r.db.ExecContext(ctx, wfQuery, wfID, tenantID); err == nil {
+		statQuery := `
+			INSERT INTO work_workflow_statuses (id, workflow_id, name, category, position)
+			VALUES
+				($1, $5, 'To Do', 'todo', 0),
+				($2, $5, 'In Progress', 'in_progress', 1),
+				($3, $5, 'In Review', 'in_progress', 2),
+				($4, $5, 'Done', 'done', 3)
+			ON CONFLICT DO NOTHING
+		`
+		_, _ = r.db.ExecContext(ctx, statQuery, uuid.New(), uuid.New(), uuid.New(), uuid.New(), wfID)
+	}
+
 	return nil
 }
 

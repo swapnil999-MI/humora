@@ -29,26 +29,52 @@ class SessionManager(context: Context) {
             prefs.edit().putString(KEY_REFRESH_TOKEN, value).apply()
         }
 
+    /** The signed-in user's id (UUID), needed for end-to-end encrypted chat. */
+    var userId: String
+        get() = prefs.getString(KEY_USER_ID, "") ?: ""
+        set(value) {
+            prefs.edit().putString(KEY_USER_ID, value).apply()
+        }
+
+    /** Replaces the token pair after a refresh, keeping the rest of the session. */
+    fun updateTokens(access: String, refresh: String) {
+        prefs.edit().putString(KEY_ACCESS_TOKEN, access).putString(KEY_REFRESH_TOKEN, refresh).commit()
+        _isLoggedIn.value = access.isNotBlank()
+    }
+
     var tenantSlug: String
-        get() = prefs.getString(KEY_TENANT_SLUG, "humora-corp") ?: "humora-corp"
+        get() = prefs.getString(KEY_TENANT_SLUG, "") ?: ""
         set(value) {
             prefs.edit().putString(KEY_TENANT_SLUG, value).apply()
         }
 
     var userEmail: String
-        get() = prefs.getString(KEY_USER_EMAIL, "admin@humora.internal") ?: "admin@humora.internal"
+        get() = prefs.getString(KEY_USER_EMAIL, "") ?: ""
         set(value) {
             prefs.edit().putString(KEY_USER_EMAIL, value).apply()
         }
 
     var userRole: String
-        get() = prefs.getString(KEY_USER_ROLE, "superadmin") ?: "superadmin"
+        get() = prefs.getString(KEY_USER_ROLE, "employee") ?: "employee"
         set(value) {
             prefs.edit().putString(KEY_USER_ROLE, value).apply()
         }
 
+    val isAdmin: Boolean
+        get() = userRole.equals("superadmin", ignoreCase = true) ||
+                userRole.equals("admin", ignoreCase = true) ||
+                userRole.equals("hr_admin", ignoreCase = true)
+
+    fun isFingerprintEnrolledFor(employeeId: String): Boolean {
+        return prefs.getBoolean("fp_enrolled_$employeeId", false)
+    }
+
+    fun setFingerprintEnrolledFor(employeeId: String, enrolled: Boolean) {
+        prefs.edit().putBoolean("fp_enrolled_$employeeId", enrolled).apply()
+    }
+
     private val userNameStored: String
-        get() = prefs.getString(KEY_USER_NAME, "Swapnil") ?: "Swapnil"
+        get() = prefs.getString(KEY_USER_NAME, "") ?: ""
 
     fun updateUserData(name: String, email: String, role: String) {
         prefs.edit()
@@ -65,9 +91,11 @@ class SessionManager(context: Context) {
         email: String,
         role: String,
         tenant: String,
-        name: String = "Swapnil"
+        name: String = "",
+        userId: String = ""
     ) {
         prefs.edit()
+            .putString(KEY_USER_ID, userId)
             .putString(KEY_ACCESS_TOKEN, access)
             .putString(KEY_REFRESH_TOKEN, refresh)
             .putString(KEY_USER_EMAIL, email)
@@ -84,6 +112,7 @@ class SessionManager(context: Context) {
         prefs.edit()
             .remove(KEY_ACCESS_TOKEN)
             .remove(KEY_REFRESH_TOKEN)
+            .remove(KEY_USER_ID)
             .apply()
         _isLoggedIn.value = false
     }
@@ -95,5 +124,6 @@ class SessionManager(context: Context) {
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_USER_ROLE = "user_role"
         private const val KEY_USER_NAME = "user_name"
+        private const val KEY_USER_ID = "user_id"
     }
 }

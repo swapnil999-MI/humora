@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 data class WorkdayUiState(
     val isPunchedIn: Boolean = false,
     val punchStatusText: String = "Shift Not Started",
-    val shiftName: String = "General: 09:00 - 18:00",
+    val shiftName: String = "",   // blank until API responds — avoid showing wrong shift
     val sessionTimerSeconds: Long = 0L,
     val teamMembers: List<TeamMemberPresence> = emptyList(),
     val quickTasks: List<SprintTaskItem> = emptyList(),
@@ -76,17 +76,8 @@ class WorkdayViewModel(
                     _uiState.value = _uiState.value.copy(teamMembers = radarRes.data)
                 }
                 else -> {
-                    // Fallback to sample team members if backend has no colleagues yet
-                    if (_uiState.value.teamMembers.isEmpty()) {
-                        _uiState.value = _uiState.value.copy(
-                            teamMembers = listOf(
-                                TeamMemberPresence("1", "Swapnil", "P.", "swapnil@humora.internal", "Engineering", "working", 14400, "General Shift", 0xFF6366F1),
-                                TeamMemberPresence("2", "Ananya", "S.", "ananya@humora.internal", "Product", "working", 12600, "General Shift", 0xFF10B981),
-                                TeamMemberPresence("3", "Rahul", "K.", "rahul@humora.internal", "Engineering", "on_break", 7200, "General Shift", 0xFF3B82F6),
-                                TeamMemberPresence("4", "Priya", "M.", "priya@humora.internal", "Design", "on_leave", 0, "General Shift", 0xFFF59E0B)
-                            )
-                        )
-                    }
+                    // Issue #7 Fix: No fake fallback team members — show empty list if API unavailable
+                    // This prevents developer names (Swapnil, Ananya, etc.) from leaking to real users
                 }
             }
 
@@ -102,15 +93,7 @@ class WorkdayViewModel(
                     }
                 }
                 else -> {
-                    if (_uiState.value.quickTasks.isEmpty()) {
-                        _uiState.value = _uiState.value.copy(
-                            quickTasks = listOf(
-                                SprintTaskItem("1", "HUM-204", "Geofence Mock Detection Engine", "high", "in_progress", "In Progress", 14400, 7200),
-                                SprintTaskItem("2", "HUM-189", "Sandwich Leave Rule Calculator", "medium", "todo", "To Do", 10800, 10800),
-                                SprintTaskItem("3", "HUM-156", "Statutory Tax Deductions preview", "low", "todo", "To Do", 7200, 7200)
-                            )
-                        )
-                    }
+                    // Issue #9 Fix: No fake fallback tasks — leave quickTasks empty if API unavailable
                 }
             }
         }
@@ -138,11 +121,14 @@ class WorkdayViewModel(
             _uiState.value = _uiState.value.copy(isActionLoading = true)
             val punchType = if (targetPunchIn) "in" else "out"
 
-            // Default mock Bangalore HQ location if device has no GPS fix yet
-            val effectiveLocation = location ?: Location("default").apply {
-                latitude = attendanceRepo.officeLatitude
-                longitude = attendanceRepo.officeLongitude
-                accuracy = 5.0f
+            val effectiveLocation = location ?: com.paylogic.humora.core.location.LocationProvider.getLastKnownLocation(HumoraApp.instance)
+            if (effectiveLocation == null) {
+                _uiState.value = _uiState.value.copy(
+                    isActionLoading = false,
+                    bannerMessage = "Location check failed: GPS coordinates are required for attendance check-in/check-out. Please turn on GPS."
+                )
+                onComplete("Location check failed: GPS coordinates required.")
+                return@launch
             }
 
             val result = attendanceRepo.recordPunch(punchType, effectiveLocation)

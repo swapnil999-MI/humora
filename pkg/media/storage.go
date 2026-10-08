@@ -17,13 +17,22 @@ type ObjectInfo struct {
 	UserMetadata map[string]string `json:"userMetadata,omitempty"`
 }
 
+// PresignedUpload is a browser form upload (POST policy) that the storage
+// backend accepts only for one object key and up to a maximum size.
+type PresignedUpload struct {
+	URL    string            `json:"url"`
+	Fields map[string]string `json:"fields"`
+}
+
 // Storage defines the contract for abstract object and file storage backends (e.g. MinIO, S3).
 type Storage interface {
 	EnsureBucketExists(ctx context.Context, bucketName string) error
+	EnsurePrivateBucket(ctx context.Context, bucketName string) error
 	UploadFile(ctx context.Context, bucketName, objectName string, reader io.Reader, objectSize int64, contentType string) (string, error)
 	UploadMultipartFile(ctx context.Context, bucketName string, fileHeader *multipart.FileHeader, subdir string) (string, error)
 	DownloadFile(ctx context.Context, bucketName, objectName string) (io.ReadCloser, error)
 	GetPresignedURL(ctx context.Context, bucketName, objectName string, expires time.Duration) (string, error)
+	GetPresignedUpload(ctx context.Context, bucketName, objectName string, expires time.Duration, maxBytes int64) (*PresignedUpload, error)
 	DeleteFile(ctx context.Context, bucketName, objectName string) error
 	FileExists(ctx context.Context, bucketName, objectName string) (bool, error)
 	GetFileMetadata(ctx context.Context, bucketName, objectName string) (*ObjectInfo, error)

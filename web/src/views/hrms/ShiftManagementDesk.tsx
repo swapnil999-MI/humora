@@ -58,6 +58,7 @@ export const ShiftManagementDesk: React.FC = () => {
   const [selectedShiftId, setSelectedShiftId] = useState('');
   const [selectedEmpIds, setSelectedEmpIds] = useState<string[]>([]);
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
+  const [searchAssignEmp, setSearchAssignEmp] = useState('');
 
   useEffect(() => {
     dispatch(fetchShifts());
@@ -214,26 +215,36 @@ export const ShiftManagementDesk: React.FC = () => {
           </div>
 
           <button
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '13px' }}
+            onClick={() => {
+              if (shifts.length > 0 && !selectedShiftId) {
+                setSelectedShiftId(shifts[0].id);
+              }
+              setIsAssignShiftOpen(true);
+            }}
+          >
+            <Users size={15} />
+            <span>Assign Shift</span>
+          </button>
+
+          <button
             className="btn btn-primary"
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '13px' }}
             onClick={() => {
-              if (activeTab === 'catalog') {
-                setEditingShift(null);
-                setShiftName('');
-                setShiftCode('');
-                setStartTime('09:00:00');
-                setEndTime('18:00:00');
-                setGraceMinutes(15);
-                setHalfDayThresholdHours(4.0);
-                setIsNightShift(false);
-                setIsCreateShiftOpen(true);
-              } else {
-                setIsAssignShiftOpen(true);
-              }
+              setEditingShift(null);
+              setShiftName('');
+              setShiftCode('');
+              setStartTime('09:00:00');
+              setEndTime('18:00:00');
+              setGraceMinutes(15);
+              setHalfDayThresholdHours(4.0);
+              setIsNightShift(false);
+              setIsCreateShiftOpen(true);
             }}
           >
             <Plus size={15} />
-            <span>{activeTab === 'catalog' ? 'Create Shift' : 'Assign Shift'}</span>
+            <span>Create Shift</span>
           </button>
         </div>
       </div>
@@ -315,31 +326,45 @@ export const ShiftManagementDesk: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid var(--border-hairline)', paddingTop: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', borderTop: '1px solid var(--border-hairline)', paddingTop: '12px' }}>
                   <button
-                    className="btn-ghost"
-                    style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '4px' }}
+                    className="btn btn-secondary"
+                    style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}
                     onClick={() => {
-                      setEditingShift(s);
-                      setShiftName(s.name);
-                      setShiftCode(s.name.slice(0, 3).toUpperCase());
-                      setStartTime(s.start_time);
-                      setEndTime(s.end_time);
-                      setGraceMinutes(s.grace_minutes);
-                      setHalfDayThresholdHours(s.half_day_hours);
-                      setIsNightShift(s.is_night_shift);
-                      setIsCreateShiftOpen(true);
+                      setSelectedShiftId(s.id);
+                      setSelectedEmpIds([]);
+                      setIsAssignShiftOpen(true);
                     }}
                   >
-                    Edit
+                    <Users size={13} />
+                    <span>Assign to Employees</span>
                   </button>
-                  <button
-                    className="btn-ghost"
-                    style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '4px', color: '#f87171' }}
-                    onClick={() => handleDeleteShift(s.id)}
-                  >
-                    Delete
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      className="btn-ghost"
+                      style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '4px' }}
+                      onClick={() => {
+                        setEditingShift(s);
+                        setShiftName(s.name);
+                        setShiftCode(s.name.slice(0, 3).toUpperCase());
+                        setStartTime(s.start_time);
+                        setEndTime(s.end_time);
+                        setGraceMinutes(s.grace_minutes);
+                        setHalfDayThresholdHours(s.half_day_hours);
+                        setIsNightShift(s.is_night_shift);
+                        setIsCreateShiftOpen(true);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn-ghost"
+                      style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '4px', color: '#f87171' }}
+                      onClick={() => handleDeleteShift(s.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -430,40 +455,73 @@ export const ShiftManagementDesk: React.FC = () => {
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
-                        {r.department_name || 'Engineering'}
+                        {r.department_name || 'No department'}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
-                        <span
-                          style={{
-                            background: 'rgba(99, 102, 241, 0.12)',
-                            color: '#a5b4fc',
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            fontWeight: 600,
-                            fontSize: '11px',
-                          }}
-                        >
-                          {r.shift_name || 'General Day Shift'}
-                        </span>
+                        {r.shift_id && r.shift_name ? (
+                          <span
+                            style={{
+                              background: 'rgba(99, 102, 241, 0.12)',
+                              color: '#a5b4fc',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontWeight: 600,
+                              fontSize: '11px',
+                            }}
+                          >
+                            {r.shift_name}
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              color: '#f87171',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontWeight: 600,
+                              fontSize: '11px',
+                            }}
+                          >
+                            Unassigned
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
-                        {r.start_time ? `${r.start_time.slice(0, 5)} - ${r.end_time?.slice(0, 5)}` : '09:00 - 18:00'}
+                        {r.shift_id && r.start_time ? (
+                          `${r.start_time.slice(0, 5)} - ${r.end_time?.slice(0, 5)}`
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>&mdash;</span>
+                        )}
                       </td>
                       <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>
-                        {r.effective_date ? new Date(r.effective_date).toLocaleDateString() : 'Default'}
+                        {r.shift_id && r.effective_date ? new Date(r.effective_date).toLocaleDateString() : <span style={{ color: 'var(--text-muted)' }}>&mdash;</span>}
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                        <button
-                          className="btn-ghost"
-                          style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-hairline)' }}
-                          onClick={() => {
-                            setSelectedEmpIds([r.employee_id]);
-                            setSelectedShiftId(r.shift_id || (shifts[0]?.id || ''));
-                            setIsAssignShiftOpen(true);
-                          }}
-                        >
-                          Reassign
-                        </button>
+                        {r.shift_id ? (
+                          <button
+                            className="btn-ghost"
+                            style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-hairline)' }}
+                            onClick={() => {
+                              setSelectedEmpIds([r.employee_id]);
+                              setSelectedShiftId(r.shift_id || (shifts[0]?.id || ''));
+                              setIsAssignShiftOpen(true);
+                            }}
+                          >
+                            Reassign
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-primary"
+                            style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '4px' }}
+                            onClick={() => {
+                              setSelectedEmpIds([r.employee_id]);
+                              setSelectedShiftId(shifts[0]?.id || '');
+                              setIsAssignShiftOpen(true);
+                            }}
+                          >
+                            Assign Shift
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -670,12 +728,29 @@ export const ShiftManagementDesk: React.FC = () => {
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                  Select Employee(s) ({selectedEmpIds.length} selected)
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                    Select Employee(s) ({selectedEmpIds.length} selected)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Search employees..."
+                    value={searchAssignEmp}
+                    onChange={(e) => setSearchAssignEmp(e.target.value)}
+                    style={{
+                      fontSize: '11px',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid var(--border-hairline)',
+                      background: 'var(--surface-3)',
+                      color: 'var(--text-primary)',
+                      width: '150px',
+                    }}
+                  />
+                </div>
                 <div
                   style={{
-                    maxHeight: '160px',
+                    maxHeight: '180px',
                     overflowY: 'auto',
                     border: '1px solid var(--border-hairline)',
                     borderRadius: '6px',
@@ -704,36 +779,54 @@ export const ShiftManagementDesk: React.FC = () => {
                       Clear
                     </button>
                   </div>
-                  {employees.map((emp) => (
-                    <label
-                      key={emp.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        padding: '4px 6px',
-                        borderRadius: '4px',
-                        background: selectedEmpIds.includes(emp.id) ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedEmpIds.includes(emp.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedEmpIds((prev) => [...prev, emp.id]);
-                          } else {
-                            setSelectedEmpIds((prev) => prev.filter((id) => id !== emp.id));
-                          }
-                        }}
-                      />
-                      <span>
-                        {emp.first_name} {emp.last_name} ({emp.employee_code})
-                      </span>
-                    </label>
-                  ))}
+                  {employees
+                    .filter((emp) => {
+                      const q = searchAssignEmp.toLowerCase();
+                      return (
+                        (emp.first_name || '').toLowerCase().includes(q) ||
+                        (emp.last_name || '').toLowerCase().includes(q) ||
+                        (emp.employee_code || '').toLowerCase().includes(q) ||
+                        (emp.work_email || '').toLowerCase().includes(q)
+                      );
+                    })
+                    .map((emp) => {
+                      const currentRoster = shiftRosters.find((r) => r.employee_id === emp.id);
+                      return (
+                        <label
+                          key={emp.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            padding: '4px 6px',
+                            borderRadius: '4px',
+                            background: selectedEmpIds.includes(emp.id) ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedEmpIds.includes(emp.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedEmpIds((prev) => [...prev, emp.id]);
+                                } else {
+                                  setSelectedEmpIds((prev) => prev.filter((id) => id !== emp.id));
+                                }
+                              }}
+                            />
+                            <span>
+                              {emp.first_name} {emp.last_name} ({emp.employee_code})
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '11px', color: currentRoster?.shift_id ? 'var(--text-muted)' : '#f87171' }}>
+                            {currentRoster?.shift_name || 'Unassigned'}
+                          </span>
+                        </label>
+                      );
+                    })}
                 </div>
               </div>
 

@@ -22,6 +22,8 @@ import {
   Payslip,
   ITDeclaration,
   ReimbursementClaim,
+  Department,
+  Designation,
 } from '../types';
 import { api } from '../api/client';
 import { numberToWordsINR } from '../utils/numberToWords';
@@ -50,10 +52,14 @@ export interface HrmsState {
   payslips: Payslip[];
   itDeclaration: ITDeclaration | null;
   reimbursementClaims: ReimbursementClaim[];
+  departments: Department[];
+  designations: Designation[];
   isLoading: boolean;
   isPunching: boolean;
   isLoadingAttendance: boolean;
   isLoadingShifts: boolean;
+  isLoadingDepartments: boolean;
+  isLoadingDesignations: boolean;
   isLoadingProfile: boolean;
   isLoadingOnboarding: boolean;
   isLoadingPayroll: boolean;
@@ -113,6 +119,10 @@ export interface HrmsState {
   previewPayrollRun: (month: number, year: number) => Promise<any>;
   executePayrollRun: (month: number, year: number) => Promise<any>;
   fetchPayrollRuns: () => Promise<any[]>;
+  fetchDepartments: () => Promise<Department[]>;
+  createDepartment: (name: string, description?: string) => Promise<Department>;
+  fetchDesignations: () => Promise<Designation[]>;
+  createDesignation: (title: string, description?: string) => Promise<Designation>;
   resetHrmsStore: () => void;
 }
 
@@ -173,209 +183,6 @@ export const saveStoredCompanyProfile = (profile: CompanyProfile) => {
   }
 };
 
-export const DEFAULT_COMPENSATION: CompensationStructure = {
-  id: 'comp_marcus_01',
-  employee_id: 'emp-001',
-  annual_ctc: 1800000,
-  monthly_gross: 150000,
-  basic: 75000, // 50% of monthly gross
-  hra: 30000,   // 20% of monthly gross
-  conveyance: 3200,
-  medical_allowance: 2500,
-  special_allowance: 39300,
-  provident_fund: 9000, // 12% of basic
-  professional_tax: 200,
-  employer_pf: 9000,
-  gratuity: 3607,
-  net_take_home: 128300,
-  effective_date: '2026-04-01',
-};
-
-export const INITIAL_PAYSLIPS: Payslip[] = [
-  {
-    id: 'ps_2026_08',
-    tenant_id: 'tenant-acme',
-    employee_id: 'emp-001',
-    employee_name: 'Marcus Vance',
-    employee_code: 'EMP-0104',
-    designation_title: 'Lead Systems Architect',
-    department_name: 'Core Platform Engineering',
-    date_of_joining: '2024-03-15',
-    bank_name: 'HDFC Bank Ltd',
-    bank_account_masked: '•••• •••• 8842',
-    bank_ifsc: 'HDFC0001248',
-    pan: 'ABCDE1234F',
-    uan: '101294829102',
-    month: 8,
-    year: 2026,
-    pay_period: 'August 2026',
-    payment_date: '2026-08-31',
-    status: 'paid',
-    total_days: 31,
-    payable_days: 31,
-    lop_days: 0,
-    basic: 75000,
-    hra: 30000,
-    conveyance: 3200,
-    medical_allowance: 2500,
-    special_allowance: 39300,
-    bonus: 0,
-    gross_earnings: 150000,
-    provident_fund: 9000,
-    professional_tax: 200,
-    tds: 12500,
-    lop_deduction: 0,
-    other_deductions: 0,
-    total_deductions: 21700,
-    net_pay: 128300,
-    net_pay_in_words: numberToWordsINR(128300),
-    company_snapshot: { ...getStoredCompanyProfile() },
-  },
-  {
-    id: 'ps_2026_07',
-    tenant_id: 'tenant-acme',
-    employee_id: 'emp-001',
-    employee_name: 'Marcus Vance',
-    employee_code: 'EMP-0104',
-    designation_title: 'Lead Systems Architect',
-    department_name: 'Core Platform Engineering',
-    date_of_joining: '2024-03-15',
-    bank_name: 'HDFC Bank Ltd',
-    bank_account_masked: '•••• •••• 8842',
-    bank_ifsc: 'HDFC0001248',
-    pan: 'ABCDE1234F',
-    uan: '101294829102',
-    month: 7,
-    year: 2026,
-    pay_period: 'July 2026',
-    payment_date: '2026-07-31',
-    status: 'paid',
-    total_days: 31,
-    payable_days: 30,
-    lop_days: 1,
-    basic: 75000,
-    hra: 30000,
-    conveyance: 3200,
-    medical_allowance: 2500,
-    special_allowance: 39300,
-    bonus: 0,
-    gross_earnings: 150000,
-    provident_fund: 9000,
-    professional_tax: 200,
-    tds: 12500,
-    lop_deduction: 4839, // (150000 / 31) * 1 LOP day
-    other_deductions: 0,
-    total_deductions: 26539,
-    net_pay: 123461,
-    net_pay_in_words: numberToWordsINR(123461),
-    company_snapshot: { ...getStoredCompanyProfile() },
-  },
-  {
-    id: 'ps_2026_06',
-    tenant_id: 'tenant-acme',
-    employee_id: 'emp-001',
-    employee_name: 'Marcus Vance',
-    employee_code: 'EMP-0104',
-    designation_title: 'Lead Systems Architect',
-    department_name: 'Core Platform Engineering',
-    date_of_joining: '2024-03-15',
-    bank_name: 'HDFC Bank Ltd',
-    bank_account_masked: '•••• •••• 8842',
-    bank_ifsc: 'HDFC0001248',
-    pan: 'ABCDE1234F',
-    uan: '101294829102',
-    month: 6,
-    year: 2026,
-    pay_period: 'June 2026',
-    payment_date: '2026-06-30',
-    status: 'paid',
-    total_days: 30,
-    payable_days: 30,
-    lop_days: 0,
-    basic: 75000,
-    hra: 30000,
-    conveyance: 3200,
-    medical_allowance: 2500,
-    special_allowance: 39300,
-    bonus: 10000,
-    gross_earnings: 160000,
-    provident_fund: 9000,
-    professional_tax: 200,
-    tds: 14500,
-    lop_deduction: 0,
-    other_deductions: 0,
-    total_deductions: 23700,
-    net_pay: 136300,
-    net_pay_in_words: numberToWordsINR(136300),
-    company_snapshot: { ...getStoredCompanyProfile() },
-  },
-];
-
-export const DEFAULT_IT_DECLARATION: ITDeclaration = {
-  regime: 'new',
-  financial_year: '2026-2027',
-  sec_80c_total: 150000,
-  sec_80d_health_insurance: 25000,
-  sec_80d_parents: 50000,
-  hra_annual_rent_paid: 360000,
-  hra_landlord_pan: 'AAAPL9821K',
-  home_loan_interest: 0,
-  nps_contribution: 50000,
-  projected_annual_tax: 150000,
-  monthly_tds: 12500,
-  regime_comparison: {
-    old_regime_tax: 162400,
-    new_regime_tax: 150000,
-    recommended_regime: 'new',
-    annual_savings: 12400,
-  },
-};
-
-export const DEFAULT_REIMBURSEMENTS: ReimbursementClaim[] = [
-  {
-    id: 'claim-101',
-    employee_id: 'emp-001',
-    category: 'broadband',
-    category_name: 'High-Speed Broadband Internet',
-    amount: 2399,
-    bill_number: 'ACT-BLR-2026-9921',
-    bill_date: '2026-08-28',
-    merchant_name: 'ACT Fibernet Gigabit',
-    description: 'Monthly Fiber broadband reimbursement for remote development and cloud cluster sync.',
-    status: 'reimbursed',
-    reviewer_name: 'Priya Sharma (Finance)',
-    created_at: '2026-08-29',
-  },
-  {
-    id: 'claim-102',
-    employee_id: 'emp-001',
-    category: 'learning',
-    category_name: 'Professional Skill Development',
-    amount: 14999,
-    bill_number: 'AMZN-AWS-49210',
-    bill_date: '2026-08-15',
-    merchant_name: 'Amazon Web Services Training & Certification',
-    description: 'AWS Certified Solutions Architect - Professional exam voucher and specialized workshop.',
-    status: 'approved',
-    reviewer_name: 'Marcus Vance (HOD)',
-    created_at: '2026-08-16',
-  },
-  {
-    id: 'claim-103',
-    employee_id: 'emp-001',
-    category: 'wellness',
-    category_name: 'Ergonomic & Wellness Support',
-    amount: 4500,
-    bill_number: 'FEAT-ERG-8812',
-    bill_date: '2026-09-02',
-    merchant_name: 'Featherlite Orthopedic Back Support',
-    description: 'Ergonomic lumbar chair support and wrist-rest pad for home workstation.',
-    status: 'pending',
-    reviewer_name: 'Pending Operations Approval',
-    created_at: '2026-09-03',
-  },
-];
-
 export const useHrmsStore = create<HrmsState>((set, get) => ({
   attendanceSummary: null,
   attendanceSession: null,
@@ -396,14 +203,18 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
   onboardingPipeline: [],
   activeCandidateView: null,
   companyProfile: null,
-  compensationStructure: DEFAULT_COMPENSATION,
-  payslips: INITIAL_PAYSLIPS,
-  itDeclaration: DEFAULT_IT_DECLARATION,
-  reimbursementClaims: DEFAULT_REIMBURSEMENTS,
+  compensationStructure: null,
+  payslips: [],
+  itDeclaration: null,
+  reimbursementClaims: [],
+  departments: [],
+  designations: [],
   isLoading: false,
   isPunching: false,
   isLoadingAttendance: false,
   isLoadingShifts: false,
+  isLoadingDepartments: false,
+  isLoadingDesignations: false,
   isLoadingProfile: false,
   isLoadingOnboarding: false,
   isLoadingPayroll: false,
@@ -417,6 +228,8 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
       teamRadar: [],
       shifts: [],
       shiftRosters: [],
+      departments: [],
+      designations: [],
       myRegularizations: [],
       teamRegularizations: [],
       employees: [],
@@ -430,6 +243,10 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
       onboardingPipeline: [],
       activeCandidateView: null,
       companyProfile: null,
+      compensationStructure: null,
+      payslips: [],
+      itDeclaration: null,
+      reimbursementClaims: [],
       error: null,
     });
   },
@@ -923,10 +740,9 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
       set({ compensationStructure: data, isLoadingPayroll: false });
       return data;
     } catch (err: any) {
-      console.warn('Falling back to default compensation structure:', err);
-      const current = get().compensationStructure || DEFAULT_COMPENSATION;
-      set({ compensationStructure: current, isLoadingPayroll: false });
-      return current;
+      console.warn('No active compensation structure found:', err);
+      set({ compensationStructure: null, isLoadingPayroll: false });
+      return null;
     }
   },
 
@@ -934,14 +750,13 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
     try {
       set({ isLoadingPayroll: true });
       const data = await api.get<Payslip[]>('/hrms/payroll/payslips/mine');
-      const current = (data && data.length > 0) ? data : (get().payslips.length > 0 ? get().payslips : INITIAL_PAYSLIPS);
-      set({ payslips: current, isLoadingPayroll: false });
-      return current;
+      const list = Array.isArray(data) ? data : [];
+      set({ payslips: list, isLoadingPayroll: false });
+      return list;
     } catch (err: any) {
-      console.warn('Falling back to initial payslips:', err);
-      const current = get().payslips.length > 0 ? get().payslips : INITIAL_PAYSLIPS;
-      set({ payslips: current, isLoadingPayroll: false });
-      return current;
+      console.warn('No payslips found or error fetching:', err);
+      set({ payslips: [], isLoadingPayroll: false });
+      return [];
     }
   },
 
@@ -952,10 +767,9 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
       set({ itDeclaration: data, isLoadingPayroll: false });
       return data;
     } catch (err: any) {
-      console.warn('Falling back to default IT declaration:', err);
-      const current = get().itDeclaration || DEFAULT_IT_DECLARATION;
-      set({ itDeclaration: current, isLoadingPayroll: false });
-      return current;
+      console.warn('No IT declaration found:', err);
+      set({ itDeclaration: null, isLoadingPayroll: false });
+      return null;
     }
   },
 
@@ -975,14 +789,13 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
     try {
       set({ isLoadingPayroll: true });
       const data = await api.get<ReimbursementClaim[]>('/hrms/payroll/reimbursements');
-      const current = (data && data.length > 0) ? data : (get().reimbursementClaims.length > 0 ? get().reimbursementClaims : DEFAULT_REIMBURSEMENTS);
-      set({ reimbursementClaims: current, isLoadingPayroll: false });
-      return current;
+      const list = Array.isArray(data) ? data : [];
+      set({ reimbursementClaims: list, isLoadingPayroll: false });
+      return list;
     } catch (err: any) {
-      console.warn('Falling back to default reimbursements:', err);
-      const current = get().reimbursementClaims.length > 0 ? get().reimbursementClaims : DEFAULT_REIMBURSEMENTS;
-      set({ reimbursementClaims: current, isLoadingPayroll: false });
-      return current;
+      console.warn('No reimbursements found:', err);
+      set({ reimbursementClaims: [], isLoadingPayroll: false });
+      return [];
     }
   },
 
@@ -990,12 +803,15 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
     try {
       set({ isLoadingPayroll: true });
       const res = await api.post<ReimbursementClaim>('/hrms/payroll/reimbursements', {
-        claim_type: payload.category || 'broadband',
+        category: payload.category || 'broadband',
         category_name: payload.category_name || 'Business Expense',
         amount: Number(payload.amount) || 0,
+        bill_number: payload.bill_number || undefined,
+        // The server expects a full timestamp; the form gives a calendar date.
+        bill_date: payload.bill_date ? new Date(`${payload.bill_date.slice(0, 10)}T00:00:00Z`).toISOString() : new Date().toISOString(),
         description: payload.description || '',
         merchant_name: payload.merchant_name || '',
-        receipt_url: payload.receipt_url || '',
+        receipt_url: payload.receipt_url || undefined,
       });
       const updated = [res, ...get().reimbursementClaims];
       set({ reimbursementClaims: updated, isLoadingPayroll: false });
@@ -1018,6 +834,44 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
 
   fetchPayrollRuns: async () => {
     return await api.get<any[]>('/hrms/payroll/runs');
+  },
+
+  fetchDepartments: async () => {
+    try {
+      set({ isLoadingDepartments: true });
+      const res = await api.get<Department[]>('/hrms/departments');
+      set({ departments: res || [], isLoadingDepartments: false });
+      return res || [];
+    } catch (err: any) {
+      console.warn('Failed to fetch departments:', err);
+      set({ departments: [], isLoadingDepartments: false });
+      return [];
+    }
+  },
+
+  createDepartment: async (name: string, description?: string) => {
+    const res = await api.post<Department>('/hrms/departments', { name, description });
+    set({ departments: [...get().departments, res] });
+    return res;
+  },
+
+  fetchDesignations: async () => {
+    try {
+      set({ isLoadingDesignations: true });
+      const res = await api.get<Designation[]>('/hrms/designations');
+      set({ designations: res || [], isLoadingDesignations: false });
+      return res || [];
+    } catch (err: any) {
+      console.warn('Failed to fetch designations:', err);
+      set({ designations: [], isLoadingDesignations: false });
+      return [];
+    }
+  },
+
+  createDesignation: async (title: string, description?: string) => {
+    const res = await api.post<Designation>('/hrms/designations', { title, description });
+    set({ designations: [...get().designations, res] });
+    return res;
   },
 }));
 
@@ -1072,6 +926,10 @@ export const submitReimbursementClaim = (p: any) => () => withUnwrap(useHrmsStor
 export const previewPayrollRun = (month: number, year: number) => () => withUnwrap(useHrmsStore.getState().previewPayrollRun(month, year));
 export const executePayrollRun = (month: number, year: number) => () => withUnwrap(useHrmsStore.getState().executePayrollRun(month, year));
 export const fetchPayrollRuns = () => () => withUnwrap(useHrmsStore.getState().fetchPayrollRuns());
+export const fetchDepartments = () => () => withUnwrap(useHrmsStore.getState().fetchDepartments());
+export const createDepartment = (name: string, desc?: string) => () => withUnwrap(useHrmsStore.getState().createDepartment(name, desc));
+export const fetchDesignations = () => () => withUnwrap(useHrmsStore.getState().fetchDesignations());
+export const createDesignation = (title: string, desc?: string) => () => withUnwrap(useHrmsStore.getState().createDesignation(title, desc));
 export const resetHrmsStore = () => () => useHrmsStore.getState().resetHrmsStore();
 
 export default useHrmsStore;

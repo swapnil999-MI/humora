@@ -10,6 +10,34 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Token audiences separate short-lived access tokens from long-lived refresh tokens,
+// so a refresh token can never be presented as an access token (and vice versa).
+const (
+	TokenIssuer          = "humora-auth"
+	AccessTokenAudience  = "humora-access"
+	RefreshTokenAudience = "humora-refresh"
+)
+
+// ParseToken verifies an HS256 token signed by Humora and issued for the given audience.
+func ParseToken(tokenString, audience string) (*UserClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(configs.AppConfig.Server.JWTSecret), nil
+	},
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithIssuer(TokenIssuer),
+		jwt.WithAudience(audience),
+		jwt.WithExpirationRequired(),
+	)
+	if err != nil || !token.Valid {
+		return nil, fmt.Errorf("invalid token: %w", err)
+	}
+	claims, ok := token.Claims.(*UserClaims)
+	if !ok {
+		return nil, fmt.Errorf("malformed token claims")
+	}
+	return claims, nil
+}
+
 // UserClaims defines JWT token payload claims for Humora users.
 type UserClaims struct {
 	UserID   string   `json:"user_id"`
@@ -38,20 +66,9 @@ func AuthMiddleware() fiber.Handler {
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-		token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-			}
-			return []byte(configs.AppConfig.Server.JWTSecret), nil
-		})
-
-		if err != nil || !token.Valid {
+		claims, err := ParseToken(tokenString, AccessTokenAudience)
+		if err != nil {
 			return response.Error(c, fiber.StatusUnauthorized, "Invalid or expired session token")
-		}
-
-		claims, ok := token.Claims.(*UserClaims)
-		if !ok {
-			return response.Error(c, fiber.StatusUnauthorized, "Malformed token claims")
 		}
 
 		// Inject claims into Fiber Locals

@@ -8,12 +8,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,22 +30,32 @@ import com.paylogic.humora.presentation.viewmodel.AuthViewModel
 fun BackendSettingsDialog(
     authViewModel: AuthViewModel,
     uiState: AuthUiState,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpenQrScanner: (() -> Unit)? = null
 ) {
     var baseUrlInput by remember { mutableStateOf(uiState.currentBaseUrl) }
     var tenantSlugInput by remember { mutableStateOf(uiState.tenantSlug) }
     var emailInput by remember { mutableStateOf(uiState.userEmail) }
     var passwordInput by remember { mutableStateOf("Password@123") }
     var showAuthTab by remember { mutableStateOf(false) }
+    var showQrSheet by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(DarkSurface)
-                .border(1.dp, DarkBorder, RoundedCornerShape(20.dp))
-                .padding(20.dp)
+                .glassEffect(
+                    shape = RoundedCornerShape(24.dp),
+                    borderWidth = 1.dp,
+                    borderBrush = GlassBorderGradient,
+                    backgroundBrush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF1E2B45).copy(alpha = 0.94f),
+                            Color(0xFF0F172A).copy(alpha = 0.90f)
+                        )
+                    )
+                )
+                .padding(22.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 // Header
@@ -217,6 +229,26 @@ fun BackendSettingsDialog(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Button(
+                            onClick = {
+                                if (onOpenQrScanner != null) {
+                                    onDismiss()
+                                    onOpenQrScanner()
+                                } else {
+                                    showQrSheet = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Link Web Device (Scan QR)", fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Button(
                             onClick = { authViewModel.logout() },
                             colors = ButtonDefaults.buttonColors(containerColor = RoseError),
                             modifier = Modifier.fillMaxWidth(),
@@ -310,5 +342,12 @@ fun BackendSettingsDialog(
                 }
             }
         }
+    }
+
+    if (showQrSheet) {
+        WebQRScannerSheet(
+            authViewModel = authViewModel,
+            onDismiss = { showQrSheet = false }
+        )
     }
 }

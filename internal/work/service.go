@@ -1,6 +1,7 @@
 package work
 
 import (
+	"humora-backend/internal/notify"
 	"context"
 	"errors"
 	"fmt"
@@ -230,6 +231,9 @@ func (s *service) CreateIssue(ctx context.Context, tenantID, reporterUserID uuid
 	if err := s.repo.CreateIssue(ctx, issue); err != nil {
 		return nil, fmt.Errorf("failed to create issue: %w", err)
 	}
+	if issue.AssigneeID != nil && *issue.AssigneeID != reporterEmployeeID {
+		notifyAssigned(tenantID, *issue.AssigneeID, issue)
+	}
 
 	return s.repo.GetIssueByID(ctx, tenantID, issue.ID)
 }
@@ -280,6 +284,7 @@ func (s *service) UpdateIssue(ctx context.Context, tenantID, issueID uuid.UUID, 
 	if req.Priority != nil && *req.Priority != "" {
 		issue.Priority = *req.Priority
 	}
+	previousAssignee := issue.AssigneeID
 	if req.AssigneeID != nil {
 		if *req.AssigneeID == "" {
 			issue.AssigneeID = nil
@@ -303,6 +308,9 @@ func (s *service) UpdateIssue(ctx context.Context, tenantID, issueID uuid.UUID, 
 
 	if err := s.repo.UpdateIssue(ctx, issue); err != nil {
 		return nil, fmt.Errorf("failed to update issue: %w", err)
+	}
+	if issue.AssigneeID != nil && (previousAssignee == nil || *previousAssignee != *issue.AssigneeID) {
+		notifyAssigned(tenantID, *issue.AssigneeID, issue)
 	}
 
 	return s.repo.GetIssueByID(ctx, tenantID, issueID)
@@ -461,4 +469,16 @@ func (s *service) CreateWorklog(ctx context.Context, tenantID, issueID, employee
 
 func (s *service) ListWorklogs(ctx context.Context, tenantID, issueID uuid.UUID) ([]Worklog, error) {
 	return s.repo.ListWorklogsByIssue(ctx, tenantID, issueID)
+}
+
+// notifyAssigned tells an employee that a task is now theirs.
+func notifyAssigned(tenantID, assigneeEmployeeID uuid.UUID, issue *Issue) {
+	notify.ToEmployee(tenantID, assigneeEmployeeID, notify.Message{
+		Category:   notify.CategoryWork,
+		Title:      issue.IssueKey + " was assigned to you",
+		Body:       issue.Title,
+		Link:       "kanban",
+		EntityType: "issue",
+		EntityID:   &issue.ID,
+	})
 }

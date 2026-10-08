@@ -138,11 +138,12 @@ fun BiometricFacePunchSheet(
         biometricResult = null
 
         scope.launch {
-            // Provide current location or Office HQ coordinates
-            val location = Location("device_gps").apply {
-                latitude = attendanceRepo.officeLatitude
-                longitude = attendanceRepo.officeLongitude
-                accuracy = 3.5f
+            // Obtain authentic device location
+            val location = com.paylogic.humora.core.location.LocationProvider.getCurrentLocation(context)
+            if (location == null) {
+                isVerifying = false
+                errorMessage = "Location unavailable: Please enable GPS and grant location permission to punch."
+                return@launch
             }
 
             val result = attendanceRepo.recordPunchWithFace(punchType, base64Image, location)
@@ -330,15 +331,21 @@ fun BiometricFacePunchSheet(
                         .background(DarkSurfaceVariant)
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
+                    val fence by attendanceRepo.geofence.collectAsState()
                     Icon(
                         imageVector = Icons.Default.GpsFixed,
                         contentDescription = "GPS",
-                        tint = EmeraldSuccess,
+                        tint = when (fence?.isInside) { true -> EmeraldSuccess; false -> RoseError; null -> TextMutedDark },
                         modifier = Modifier.size(13.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "18m from Corporate HQ • Geofence Verified",
+                        // The server checks the geofence again on every punch.
+                        text = when (fence?.isInside) {
+                            true -> "Inside ${fence!!.officeName}"
+                            false -> "Outside ${fence!!.officeName} \u2022 ${fence!!.distanceMeters.toInt()}m away"
+                            null -> "Your location is checked when you punch"
+                        },
                         color = TextSecondaryDark,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium

@@ -164,7 +164,7 @@ export const EmployeeDirectory: React.FC = () => {
                         {emp.first_name} {emp.last_name}
                       </h3>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                        {emp.designation_title || 'Lead Architect'} &bull;{' '}
+                        {emp.designation_title || 'No Designation'} &bull;{' '}
                         <span className="mono-tag" style={{ color: 'var(--accent-primary)' }}>
                           {emp.employee_code}
                         </span>
@@ -191,7 +191,7 @@ export const EmployeeDirectory: React.FC = () => {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Briefcase size={13} color="var(--text-muted)" />
-                      <span>{emp.department_name || 'Engineering & Product'}</span>
+                      <span>{emp.department_name || 'No department'}</span>
                     </div>
                     {emp.manager_name && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -650,7 +650,7 @@ const OrgNodeCanvas: React.FC<{ node: OrgNode; level: number }> = ({ node, level
             {node.employee.first_name} {node.employee.last_name}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-            {node.employee.designation_title || 'Leader'} &bull; {node.employee.work_email}
+            {node.employee.designation_title || 'Employee'} &bull; {node.employee.work_email}
           </div>
         </div>
 

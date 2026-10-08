@@ -23,6 +23,9 @@ type PayrollRepository interface {
 	GetITDeclaration(ctx context.Context, tenantID, employeeID uuid.UUID, financialYear string) (*ITDeclaration, error)
 	CreateReimbursementClaim(ctx context.Context, claim *ReimbursementClaim) error
 	ListReimbursementClaims(ctx context.Context, tenantID uuid.UUID, employeeID *uuid.UUID) ([]ReimbursementClaim, error)
+	ListTeamReimbursementClaims(ctx context.Context, tenantID uuid.UUID, status string) ([]ReimbursementClaim, error)
+	ReviewReimbursementClaim(ctx context.Context, tenantID, claimID, reviewerID uuid.UUID, reviewerName, status string) (*ReimbursementClaim, error)
+	ReimbursementClaimOwner(ctx context.Context, tenantID, claimID uuid.UUID) (uuid.UUID, error)
 }
 
 type payrollRepository struct {
@@ -324,4 +327,42 @@ func (r *payrollRepository) ListReimbursementClaims(ctx context.Context, tenantI
 	baseQuery += " ORDER BY bill_date DESC, created_at DESC"
 	err := r.db.SelectContext(ctx, &claims, baseQuery, args...)
 	return claims, err
+}
+
+// ListTeamReimbursementClaims lists the tenant's claims with the claimant's name, optionally by status.
+func (r *payrollRepository) ListTeamReimbursementClaims(ctx context.Context, tenantID uuid.UUID, status string) ([]ReimbursementClaim, error) {
+	claims := []ReimbursementClaim{}
+	query := `
+		SELECT c.id, c.tenant_id, c.employee_id, c.category, c.category_name, c.amount, c.bill_number, c.bill_date,
+		       c.merchant_name, c.description, c.receipt_url, c.status, c.reviewer_name, c.reviewed_by, c.created_at,
+		       TRIM(e.first_name || ' ' || e.last_name) AS employee_name
+		FROM hrms_reimbursement_claims c
+		JOIN hrms_employees e ON e.id = c.employee_id
+		WHERE c.tenant_id = $1 AND ($2 = '' OR c.status = $2)
+		ORDER BY c.created_at ASC`
+	err := r.db.SelectContext(ctx, &claims, query, tenantID, status)
+	return claims, err
+}
+
+// ReviewReimbursementClaim approves or rejects a pending claim. Already-decided claims are left
+// untouched (sql.ErrNoRows), so two reviewers cannot both decide the same claim.
+func (r *payrollRepository) ReviewReimbursementClaim(ctx context.Context, tenantID, claimID, reviewerID uuid.UUID, reviewerName, status string) (*ReimbursementClaim, error) {
+	var claim ReimbursementClaim
+	query := `
+		UPDATE hrms_reimbursement_claims
+		SET status = $1, reviewed_by = $2, reviewer_name = $3
+		WHERE tenant_id = $4 AND id = $5 AND status = 'pending'
+		RETURNING id, tenant_id, employee_id, category, category_name, amount, bill_number, bill_date,
+		          merchant_name, description, receipt_url, status, reviewer_name, reviewed_by, created_at`
+	if err := r.db.GetContext(ctx, &claim, query, status, reviewerID, reviewerName, tenantID, claimID); err != nil {
+		return nil, err
+	}
+	return &claim, nil
+}
+
+// ReimbursementClaimOwner returns the employee who submitted the claim.
+func (r *payrollRepository) ReimbursementClaimOwner(ctx context.Context, tenantID, claimID uuid.UUID) (uuid.UUID, error) {
+	var owner uuid.UUID
+	err := r.db.GetContext(ctx, &owner, `SELECT employee_id FROM hrms_reimbursement_claims WHERE tenant_id = $1 AND id = $2`, tenantID, claimID)
+	return owner, err
 }

@@ -71,6 +71,26 @@ export const PayrollDesk: React.FC = () => {
   useEffect(() => {
     if (itDeclaration) {
       setDeclarationForm(itDeclaration);
+    } else {
+      setDeclarationForm({
+        financial_year: '2026-2027',
+        regime: 'new',
+        sec_80c_total: 0,
+        sec_80d_health_insurance: 0,
+        sec_80d_parents: 0,
+        hra_annual_rent_paid: 0,
+        hra_landlord_pan: '',
+        home_loan_interest: 0,
+        nps_contribution: 0,
+        projected_annual_tax: 0,
+        monthly_tds: 0,
+        regime_comparison: {
+          old_regime_tax: 0,
+          new_regime_tax: 0,
+          recommended_regime: 'new',
+          annual_savings: 0,
+        },
+      });
     }
   }, [itDeclaration]);
 
@@ -125,8 +145,8 @@ export const PayrollDesk: React.FC = () => {
           category: claimCategory,
           category_name: categoryNames[claimCategory] || 'Business Expense',
           amount: parseFloat(claimAmount),
-          merchant_name: claimMerchant || 'Vendor Receipt',
-          bill_number: claimBillNumber || `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+          merchant_name: claimMerchant.trim() || 'Not specified',
+          bill_number: claimBillNumber.trim() || undefined,
           bill_date: claimBillDate,
           description: claimDescription,
         }) as any
@@ -330,7 +350,7 @@ export const PayrollDesk: React.FC = () => {
           </div>
           <div style={{ marginTop: '12px' }}>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontFamily: 'var(--font-mono)' }}>
-              {formatINR(latestPayslip ? latestPayslip.net_pay : 128300)}
+              {latestPayslip ? formatINR(latestPayslip.net_pay) : '—'}
             </div>
             <div
               style={{
@@ -338,13 +358,13 @@ export const PayrollDesk: React.FC = () => {
                 alignItems: 'center',
                 gap: '5px',
                 fontSize: '11px',
-                color: 'var(--accent-primary)',
+                color: latestPayslip ? 'var(--accent-primary)' : 'var(--text-muted)',
                 marginTop: '4px',
                 fontWeight: 500,
               }}
             >
               <CheckCircle2 size={13} />
-              <span>Direct deposit to {latestPayslip?.bank_name || 'HDFC Bank'}</span>
+              <span>{latestPayslip ? `Direct deposit to ${latestPayslip.bank_name || 'Bank'}` : 'No disbursements on record'}</span>
             </div>
           </div>
         </div>
@@ -384,10 +404,10 @@ export const PayrollDesk: React.FC = () => {
           </div>
           <div style={{ marginTop: '12px' }}>
             <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontFamily: 'var(--font-mono)' }}>
-              {formatINR(compensationStructure?.annual_ctc || 1800000)}
+              {compensationStructure?.annual_ctc ? formatINR(compensationStructure.annual_ctc) : '—'}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Monthly Gross: <strong style={{ color: 'var(--text-primary)' }}>{formatINR(compensationStructure?.monthly_gross || 150000)}</strong>
+              Monthly Gross: <strong style={{ color: 'var(--text-primary)' }}>{compensationStructure?.monthly_gross ? formatINR(compensationStructure.monthly_gross) : '—'}</strong>
             </div>
           </div>
         </div>
@@ -427,10 +447,10 @@ export const PayrollDesk: React.FC = () => {
           </div>
           <div style={{ marginTop: '12px' }}>
             <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
-              {declarationForm?.regime || 'new'} Regime
+              {declarationForm?.regime ? `${declarationForm.regime} Regime` : '—'}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px', fontWeight: 500 }}>
-              Monthly TDS: <strong style={{ fontFamily: 'var(--font-mono)' }}>{formatINR(declarationForm?.monthly_tds || 12500)}</strong>
+              Monthly TDS: <strong style={{ fontFamily: 'var(--font-mono)' }}>{declarationForm?.monthly_tds != null && declarationForm.monthly_tds > 0 ? formatINR(declarationForm.monthly_tds) : '₹0'}</strong>
             </div>
           </div>
         </div>
@@ -473,7 +493,7 @@ export const PayrollDesk: React.FC = () => {
               {formatINR(
                 reimbursementClaims
                   ?.filter((c) => c.status === 'approved' || c.status === 'reimbursed')
-                  .reduce((sum, c) => sum + c.amount, 0) || 17398
+                  .reduce((sum, c) => sum + c.amount, 0) || 0
               )}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '4px', fontWeight: 500 }}>
@@ -591,146 +611,180 @@ export const PayrollDesk: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {payslips?.map((ps) => (
+            {(!payslips || payslips.length === 0) ? (
               <div
-                key={ps.id}
                 style={{
                   background: 'var(--surface-1)',
-                  border: '1px solid var(--border-hairline)',
+                  border: '1px dashed var(--border-subtle)',
                   borderRadius: '12px',
-                  padding: '20px 24px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '16px',
+                  padding: '48px 24px',
+                  textAlign: 'center',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div
-                    style={{
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '10px',
-                      background: 'rgba(245, 158, 11, 0.12)',
-                      border: '1px solid rgba(245, 158, 11, 0.25)',
-                      color: 'var(--accent-primary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <FileText size={22} />
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {ps.pay_period}
-                      </h3>
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          background: 'rgba(245, 158, 11, 0.12)',
-                          color: 'var(--accent-primary)',
-                          border: '1px solid rgba(245, 158, 11, 0.25)',
-                        }}
-                      >
-                        {ps.status}
-                      </span>
-                    </div>
-
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        fontSize: '12px',
-                        color: 'var(--text-muted)',
-                        marginTop: '6px',
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <span>Payment Date: <strong style={{ color: 'var(--text-secondary)' }}>{ps.payment_date}</strong></span>
-                      <span>•</span>
-                      <span>Total Days: <strong style={{ color: 'var(--text-secondary)' }}>{ps.total_days}</strong></span>
-                      <span>•</span>
-                      <span>Payable: <strong style={{ color: 'var(--accent-primary)' }}>{ps.payable_days} Days</strong></span>
-                      {ps.lop_days > 0 ? (
-                        <>
-                          <span>•</span>
-                          <span style={{ color: 'var(--accent-rose)', fontWeight: 600 }}>
-                            {ps.lop_days} Day LOP ({formatINR(ps.lop_deduction)} deducted)
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span>•</span>
-                          <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>0 LOP Days</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
                 <div
                   style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '12px',
+                    background: 'rgba(245, 158, 11, 0.1)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '24px',
-                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px',
+                    color: 'var(--accent-primary)',
                   }}
                 >
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Net Pay</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-                      {formatINR(ps.net_pay)}
+                  <FileText size={24} />
+                </div>
+                <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  No Payslips Generated Yet
+                </h3>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', maxWidth: '420px', marginInline: 'auto' }}>
+                  Official monthly payslips will appear here once payroll has been processed and finalized for your account.
+                </p>
+              </div>
+            ) : (
+              payslips.map((ps) => (
+                <div
+                  key={ps.id}
+                  style={{
+                    background: 'var(--surface-1)',
+                    border: '1px solid var(--border-hairline)',
+                    borderRadius: '12px',
+                    padding: '20px 24px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '10px',
+                        background: 'rgba(245, 158, 11, 0.12)',
+                        border: '1px solid rgba(245, 158, 11, 0.25)',
+                        color: 'var(--accent-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <FileText size={22} />
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-                      Gross: {formatINR(ps.gross_earnings)}
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {ps.pay_period}
+                        </h3>
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            background: 'rgba(245, 158, 11, 0.12)',
+                            color: 'var(--accent-primary)',
+                            border: '1px solid rgba(245, 158, 11, 0.25)',
+                          }}
+                        >
+                          {ps.status}
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          fontSize: '12px',
+                          color: 'var(--text-muted)',
+                          marginTop: '6px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span>Payment Date: <strong style={{ color: 'var(--text-secondary)' }}>{ps.payment_date}</strong></span>
+                        <span>•</span>
+                        <span>Total Days: <strong style={{ color: 'var(--text-secondary)' }}>{ps.total_days}</strong></span>
+                        <span>•</span>
+                        <span>Payable: <strong style={{ color: 'var(--accent-primary)' }}>{ps.payable_days} Days</strong></span>
+                        {ps.lop_days > 0 ? (
+                          <>
+                            <span>•</span>
+                            <span style={{ color: 'var(--accent-rose)', fontWeight: 600 }}>
+                              {ps.lop_days} Day LOP ({formatINR(ps.lop_deduction)} deducted)
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span>•</span>
+                            <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>0 LOP Days</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => handleOpenPayslip(ps)}
-                      className="btn btn-ghost"
-                      style={{
-                        padding: '8px 14px',
-                        fontSize: '12px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: '6px',
-                      }}
-                    >
-                      <Eye size={14} color="var(--accent-primary)" />
-                      <span>View</span>
-                    </button>
-                    <button
-                      onClick={() => handleOpenPayslip(ps)}
-                      className="btn btn-primary"
-                      style={{
-                        padding: '8px 14px',
-                        fontSize: '12px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        borderRadius: '6px',
-                      }}
-                    >
-                      <Download size={14} />
-                      <span>Download PDF</span>
-                    </button>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '24px',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Net Pay</div>
+                      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                        {formatINR(ps.net_pay)}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                        Gross: {formatINR(ps.gross_earnings)}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => handleOpenPayslip(ps)}
+                        className="btn btn-ghost"
+                        style={{
+                          padding: '8px 14px',
+                          fontSize: '12px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        <Eye size={14} color="var(--accent-primary)" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        onClick={() => handleOpenPayslip(ps)}
+                        className="btn btn-primary"
+                        style={{
+                          padding: '8px 14px',
+                          fontSize: '12px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        <Download size={14} />
+                        <span>Download PDF</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* Calculation Engine Explainer */}
@@ -809,144 +863,178 @@ export const PayrollDesk: React.FC = () => {
 
       {/* 5. TAB 2 CONTENT: Salary Structure & CTC */}
       {activeTab === 'ctc' && (
-        <div
-          style={{
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border-hairline)',
-            borderRadius: '14px',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 4px', color: 'var(--text-primary)' }}>
-                Cost to Company (CTC) Structure
-              </h2>
-              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
-                Annual compensation schedule effective from {compensationStructure?.effective_date || '2026-04-01'}.
-              </p>
-            </div>
-
+        !compensationStructure ? (
+          <div
+            style={{
+              background: 'var(--surface-1)',
+              border: '1px dashed var(--border-subtle)',
+              borderRadius: '12px',
+              padding: '48px 24px',
+              textAlign: 'center',
+            }}
+          >
             <div
               style={{
-                padding: '6px 14px',
-                borderRadius: '20px',
-                background: 'var(--accent-primary-subtle)',
-                border: '1px solid rgba(245, 158, 11, 0.25)',
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                background: 'rgba(245, 158, 11, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
                 color: 'var(--accent-primary)',
-                fontSize: '12px',
-                fontWeight: 700,
               }}
             >
-              Total CTC: {formatINR(compensationStructure?.annual_ctc || 1800000)} / year
+              <TrendingUp size={24} />
+            </div>
+            <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Compensation Structure Not Assigned
+            </h3>
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', maxWidth: '420px', marginInline: 'auto' }}>
+              Your official CTC package breakdown has not been configured in the system yet. Please contact your HR administrator.
+            </p>
+          </div>
+        ) : (
+          <div
+            style={{
+              background: 'var(--surface-1)',
+              border: '1px solid var(--border-hairline)',
+              borderRadius: '14px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 4px', color: 'var(--text-primary)' }}>
+                  Cost to Company (CTC) Structure
+                </h2>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Annual compensation schedule effective from {compensationStructure.effective_date || 'N/A'}.
+                </p>
+              </div>
+
+              <div
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  background: 'var(--accent-primary-subtle)',
+                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                  color: 'var(--accent-primary)',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                }}
+              >
+                Total CTC: {formatINR(compensationStructure.annual_ctc)} / year
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '12px 16px' }}>Component</th>
+                    <th style={{ padding: '12px 16px' }}>Calculation Basis</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Monthly (₹)</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Annual (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Part A Header */}
+                  <tr style={{ background: 'rgba(245, 158, 11, 0.06)', borderBottom: '1px solid var(--border-hairline)' }}>
+                    <td colSpan={4} style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--accent-primary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Part A: Fixed Monthly Earnings
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Basic Salary</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>50% of Monthly Gross</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.basic)}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.basic * 12)}</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>House Rent Allowance (HRA)</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>20% of Monthly Gross</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.hra)}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.hra * 12)}</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Conveyance Allowance</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Standard Travel Exemption</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.conveyance || 0)}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure.conveyance || 0) * 12)}</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Medical Allowance</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Medical Expense Allowance</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.medical_allowance || 0)}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure.medical_allowance || 0) * 12)}</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Special Allowance</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Flexible Gross Balancing</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.special_allowance)}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.special_allowance * 12)}</td>
+                  </tr>
+                  <tr style={{ background: 'var(--surface-2)', borderBottom: '2px solid var(--border-subtle)', fontWeight: 700 }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>Total Gross Earnings (A)</td>
+                    <td style={{ padding: '12px 16px' }}></td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.monthly_gross)}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.monthly_gross * 12)}</td>
+                  </tr>
+
+                  {/* Part B Header */}
+                  <tr style={{ background: 'rgba(245, 158, 11, 0.06)', borderBottom: '1px solid var(--border-hairline)' }}>
+                    <td colSpan={4} style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--accent-primary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Part B: Retiral & Statutory Contributions
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Employer Provident Fund (PF)</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>12% of Basic</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.employer_pf || compensationStructure.provident_fund)}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure.employer_pf || compensationStructure.provident_fund) * 12)}</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Employee Provident Fund (PF)</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>12% of Basic</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.provident_fund)}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.provident_fund * 12)}</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Gratuity</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>4.81% of Basic</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.gratuity || 0)}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure.gratuity || 0) * 12)}</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Professional Tax (PT)</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Statutory State Levy</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure.professional_tax || 0)}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure.professional_tax || 0) * 12)}</td>
+                  </tr>
+
+                  {/* Net Take-Home Highlight */}
+                  <tr style={{ background: 'rgba(245, 158, 11, 0.1)', borderTop: '2px solid rgba(245, 158, 11, 0.35)' }}>
+                    <td style={{ padding: '16px', color: 'var(--text-primary)', fontWeight: 700, fontSize: '13px' }}>
+                      Estimated Monthly Take-Home (Pre-TDS)
+                    </td>
+                    <td style={{ padding: '16px' }}></td>
+                    <td style={{ padding: '16px', textAlign: 'right', color: 'var(--accent-primary)', fontWeight: 700, fontSize: '15px', fontFamily: 'var(--font-mono)' }}>
+                      {formatINR(compensationStructure.net_take_home || (compensationStructure.monthly_gross - compensationStructure.provident_fund - (compensationStructure.professional_tax || 0)))}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right', color: 'var(--accent-primary)', fontWeight: 700, fontSize: '15px', fontFamily: 'var(--font-mono)' }}>
+                      {formatINR((compensationStructure.net_take_home || (compensationStructure.monthly_gross - compensationStructure.provident_fund - (compensationStructure.professional_tax || 0))) * 12)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
-
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '12px 16px' }}>Component</th>
-                  <th style={{ padding: '12px 16px' }}>Calculation Basis</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Monthly (₹)</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Annual (₹)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Part A Header */}
-                <tr style={{ background: 'rgba(245, 158, 11, 0.06)', borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td colSpan={4} style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--accent-primary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Part A: Fixed Monthly Earnings
-                  </td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Basic Salary</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>50% of Monthly Gross</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.basic || 75000)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.basic || 75000) * 12)}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>House Rent Allowance (HRA)</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>20% of Monthly Gross</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.hra || 30000)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.hra || 30000) * 12)}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Conveyance Allowance</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Standard Travel Exemption</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.conveyance || 3200)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.conveyance || 3200) * 12)}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Medical Allowance</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Medical Expense Allowance</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.medical_allowance || 2500)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.medical_allowance || 2500) * 12)}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Special Allowance</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Flexible Gross Balancing</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.special_allowance || 39300)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.special_allowance || 39300) * 12)}</td>
-                </tr>
-                <tr style={{ background: 'var(--surface-2)', borderBottom: '2px solid var(--border-subtle)', fontWeight: 700 }}>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>Total Gross Earnings (A)</td>
-                  <td style={{ padding: '12px 16px' }}></td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.monthly_gross || 150000)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.monthly_gross || 150000) * 12)}</td>
-                </tr>
-
-                {/* Part B Header */}
-                <tr style={{ background: 'rgba(245, 158, 11, 0.06)', borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td colSpan={4} style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--accent-primary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Part B: Retiral & Statutory Contributions
-                  </td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Employer Provident Fund (PF)</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>12% of Basic</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.employer_pf || 9000)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.employer_pf || 9000) * 12)}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Employee Provident Fund (PF)</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>12% of Basic</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.provident_fund || 9000)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.provident_fund || 9000) * 12)}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Gratuity</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>4.81% of Basic</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.gratuity || 3607)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.gratuity || 3607) * 12)}</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-hairline)' }}>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>Professional Tax (PT)</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>Statutory State Levy</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR(compensationStructure?.professional_tax || 200)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatINR((compensationStructure?.professional_tax || 200) * 12)}</td>
-                </tr>
-
-                {/* Net Take-Home Highlight */}
-                <tr style={{ background: 'rgba(245, 158, 11, 0.1)', borderTop: '2px solid rgba(245, 158, 11, 0.35)' }}>
-                  <td style={{ padding: '16px', color: 'var(--text-primary)', fontWeight: 700, fontSize: '13px' }}>
-                    Estimated Monthly Take-Home (Pre-TDS)
-                  </td>
-                  <td style={{ padding: '16px' }}></td>
-                  <td style={{ padding: '16px', textAlign: 'right', color: 'var(--accent-primary)', fontWeight: 700, fontSize: '15px', fontFamily: 'var(--font-mono)' }}>
-                    {formatINR(128300)}
-                  </td>
-                  <td style={{ padding: '16px', textAlign: 'right', color: 'var(--accent-primary)', fontWeight: 700, fontSize: '15px', fontFamily: 'var(--font-mono)' }}>
-                    {formatINR(128300 * 12)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        )
       )}
 
       {/* 6. TAB 3 CONTENT: IT Declaration & Regime Planner */}
@@ -1233,113 +1321,147 @@ export const PayrollDesk: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {reimbursementClaims?.map((claim) => (
+            {(!reimbursementClaims || reimbursementClaims.length === 0) ? (
               <div
-                key={claim.id}
                 style={{
                   background: 'var(--surface-1)',
-                  border: '1px solid var(--border-hairline)',
+                  border: '1px dashed var(--border-subtle)',
                   borderRadius: '12px',
-                  padding: '18px 24px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '16px',
+                  padding: '48px 24px',
+                  textAlign: 'center',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div
-                    style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '10px',
-                      background: 'var(--accent-primary-subtle)',
-                      border: '1px solid rgba(245, 158, 11, 0.25)',
-                      color: 'var(--accent-primary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Receipt size={20} />
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {claim.category_name}
-                      </h4>
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          background:
-                            claim.status === 'reimbursed'
-                              ? 'rgba(245, 158, 11, 0.15)'
-                              : claim.status === 'approved'
-                              ? 'rgba(245, 158, 11, 0.08)'
-                              : 'rgba(245, 158, 11, 0.05)',
-                          color:
-                            claim.status === 'reimbursed'
-                              ? 'var(--accent-primary)'
-                              : claim.status === 'approved'
-                              ? 'var(--text-secondary)'
-                              : 'var(--text-muted)',
-                          border: `1px solid ${
-                            claim.status === 'reimbursed'
-                              ? 'rgba(245, 158, 11, 0.3)'
-                              : claim.status === 'approved'
-                              ? 'var(--border-subtle)'
-                              : 'var(--border-hairline)'
-                          }`,
-                        }}
-                      >
-                        {claim.status}
-                      </span>
-                    </div>
-
-                    <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '600px', lineHeight: 1.4 }}>
-                      {claim.description}
-                    </p>
-
+                <div
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '12px',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px',
+                    color: 'var(--accent-primary)',
+                  }}
+                >
+                  <Receipt size={24} />
+                </div>
+                <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  No Reimbursement Claims
+                </h3>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', maxWidth: '420px', marginInline: 'auto' }}>
+                  You haven't submitted any flexible benefit or business reimbursement claims yet.
+                </p>
+              </div>
+            ) : (
+              reimbursementClaims.map((claim) => (
+                <div
+                  key={claim.id}
+                  style={{
+                    background: 'var(--surface-1)',
+                    border: '1px solid var(--border-hairline)',
+                    borderRadius: '12px',
+                    padding: '18px 24px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <div
                       style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '10px',
+                        background: 'var(--accent-primary-subtle)',
+                        border: '1px solid rgba(245, 158, 11, 0.25)',
+                        color: 'var(--accent-primary)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '12px',
-                        fontSize: '11px',
-                        color: 'var(--text-muted)',
-                        marginTop: '6px',
-                        flexWrap: 'wrap',
+                        justifyContent: 'center',
                       }}
                     >
-                      <span>Merchant: <strong style={{ color: 'var(--text-secondary)' }}>{claim.merchant_name}</strong></span>
-                      <span>•</span>
-                      <span>Bill #: <strong style={{ color: 'var(--text-secondary)' }}>{claim.bill_number}</strong></span>
-                      <span>•</span>
-                      <span>Date: <strong style={{ color: 'var(--text-secondary)' }}>{claim.bill_date}</strong></span>
-                      {claim.reviewer_name && (
-                        <>
-                          <span>•</span>
-                          <span>Reviewer: <strong style={{ color: 'var(--accent-primary)' }}>{claim.reviewer_name}</strong></span>
-                        </>
-                      )}
+                      <Receipt size={20} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {claim.category_name}
+                        </h4>
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            background:
+                              claim.status === 'reimbursed'
+                                ? 'rgba(245, 158, 11, 0.15)'
+                                : claim.status === 'approved'
+                                ? 'rgba(245, 158, 11, 0.08)'
+                                : 'rgba(245, 158, 11, 0.05)',
+                            color:
+                              claim.status === 'reimbursed'
+                                ? 'var(--accent-primary)'
+                                : claim.status === 'approved'
+                                ? 'var(--text-secondary)'
+                                : 'var(--text-muted)',
+                            border: `1px solid ${
+                              claim.status === 'reimbursed'
+                                ? 'rgba(245, 158, 11, 0.3)'
+                                : claim.status === 'approved'
+                                ? 'var(--border-subtle)'
+                                : 'var(--border-hairline)'
+                            }`,
+                          }}
+                        >
+                          {claim.status}
+                        </span>
+                      </div>
+
+                      <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '600px', lineHeight: 1.4 }}>
+                        {claim.description}
+                      </p>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          fontSize: '11px',
+                          color: 'var(--text-muted)',
+                          marginTop: '6px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span>Merchant: <strong style={{ color: 'var(--text-secondary)' }}>{claim.merchant_name}</strong></span>
+                        <span>•</span>
+                        <span>Bill #: <strong style={{ color: 'var(--text-secondary)' }}>{claim.bill_number}</strong></span>
+                        <span>•</span>
+                        <span>Date: <strong style={{ color: 'var(--text-secondary)' }}>{claim.bill_date}</strong></span>
+                        {claim.reviewer_name && (
+                          <>
+                            <span>•</span>
+                            <span>Reviewer: <strong style={{ color: 'var(--accent-primary)' }}>{claim.reviewer_name}</strong></span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Claim Amount</div>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right' }}>
+                      {formatINR(claim.amount)}
                     </div>
                   </div>
                 </div>
-
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Claim Amount</div>
-                  <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right' }}>
-                    {formatINR(claim.amount)}
-                  </div>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       )}

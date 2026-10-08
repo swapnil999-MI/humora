@@ -8,6 +8,7 @@ import {
   PageId,
 } from './store/uiSlice';
 import { fetchMe } from './store/authSlice';
+import { useAuthStore } from './store/authStore';
 import { fetchEmployees, fetchAttendanceSummary } from './store/hrmsSlice';
 import { fetchProjects } from './store/workSlice';
 import { fetchMyWorkday } from './store/fusionSlice';
@@ -86,6 +87,19 @@ export const App: React.FC = () => {
       window.removeEventListener('popstate', handleUrlChange);
       window.removeEventListener('hashchange', handleUrlChange);
     };
+  }, []);
+
+  // Handle Social OAuth Callback Redirect (?token=...&refresh=...)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const refresh = urlParams.get('refresh');
+
+    if (token) {
+      useAuthStore.getState().setSessionFromTokens(token, refresh || '');
+      const cleanUrl = window.location.pathname + (window.location.hash || '#/hub');
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
   }, []);
 
   // Initial landing page setup based on role
@@ -193,7 +207,7 @@ export const App: React.FC = () => {
       } else if (e.altKey && e.key === '3') {
         e.preventDefault();
         dispatch(setWorkspace('pulse'));
-      } else if (e.key.toLowerCase() === 'c' && !e.metaKey && !e.ctrlKey) {
+      } else if (e.key?.toLowerCase() === 'c' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         dispatch(setCreateIssueOpen(true));
       }
@@ -279,7 +293,7 @@ export const App: React.FC = () => {
         </main>
       </div>
 
-      {/* Fullscreen Candidate Portal Simulation Overlay */}
+      {/* Fullscreen preview of the candidate portal (HR view) */}
       {candidateWizardToken && (
         <div
           style={{
@@ -316,7 +330,7 @@ export const App: React.FC = () => {
               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                 Candidate Portal Preview Mode
               </span>
-              <span>(Interactive Simulation)</span>
+              <span>(HR preview)</span>
             </div>
             <button
               className="btn-ghost"

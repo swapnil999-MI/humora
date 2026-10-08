@@ -2,7 +2,7 @@
 # Humora Enterprise Platform — Makefile
 # ==============================================================================
 
-.PHONY: help run stop logs migrate seed dev build test lint clean
+.PHONY: help run stop logs migrate seed dev build test lint clean docker-build allinone
 
 COMPOSE_FILE := infra/local/docker-compose.yml
 CONTAINER_NAME := humora-backend-local
@@ -23,6 +23,8 @@ help:
 	@echo "  make test    - Run unit tests"
 	@echo "  make lint    - Format Go code"
 	@echo "  make clean   - Remove build binaries"
+	@echo "  make docker-build - Build production backend and web images"
+	@echo "  make allinone     - Build the all-in-one image (DB, Redis, MinIO, API, web)"
 
 ## run: Start local Docker containers
 run:
@@ -46,8 +48,8 @@ migrate:
 	elif command -v atlas >/dev/null 2>&1; then \
 		cd database && atlas migrate hash && atlas migrate apply --env local; \
 	else \
-		docker run --rm -v "$(PWD)/database:/app/database" -w /app/database --network host arigaio/atlas migrate hash && \
-		docker run --rm -e DB_HOST=192.168.1.20 -e DB_PORT=5432 -e DB_USER=postgres -e DB_PASSWORD=Paylogic2026 -e DB_NAME=paylogic_local -e DB_DEV_NAME=paylogic_dev_tmp -e DB_SSLMODE=disable -v "$(PWD)/database:/app/database" -w /app/database --network host arigaio/atlas migrate apply --env local; \
+		docker run --rm -v "$(PWD)/database:/app/database" -w /app/database arigaio/atlas migrate hash && \
+		docker run --rm -e DB_HOST=postgres -e DB_PORT=5432 -e DB_USER=postgres -e DB_PASSWORD="$$(grep '^DB_PASSWORD=' .env | cut -d= -f2-)" -e DB_NAME=paylogic_local -e DB_DEV_NAME=paylogic_dev_tmp -e DB_SSLMODE=disable -v "$(PWD)/database:/app/database" -w /app/database --network paylogic-infra_default arigaio/atlas migrate apply --env local; \
 	fi
 
 ## dev: Run backend server locally
@@ -75,3 +77,12 @@ lint:
 clean:
 	@echo "$(GREEN)Cleaning build directory...$(RESET)"
 	rm -rf bin/ server worker tmp/
+
+## docker-build: Build production images
+docker-build:
+	docker build -t humora-backend:latest .
+	docker build -t humora-web:latest web
+
+## allinone: Build the all-in-one end-user image
+allinone:
+	docker build -f infra/allinone/Dockerfile -t humora:latest .

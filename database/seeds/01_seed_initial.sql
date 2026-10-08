@@ -118,21 +118,10 @@ VALUES
     ('40000000-0000-0000-0000-000000000004', '30000000-0000-0000-0000-000000000001', 'Done', 'done', 3)
 ON CONFLICT DO NOTHING;
 
--- 10. Default Admin Employee Profile
-INSERT INTO hrms_employees (
-    id, tenant_id, user_id, employee_code, first_name, last_name, work_email,
-    department_id, designation_id, date_of_joining, employment_type, status
-) VALUES (
-    'e1000000-0000-0000-0000-000000000001',
-    'a0000000-0000-0000-0000-000000000001',
-    'c0000000-0000-0000-0000-000000000001',
-    'EMP-001',
-    'Swapnil',
-    'Admin',
-    'admin@humora.internal',
-    'd0000000-0000-0000-0000-000000000001',
-    'e0000000-0000-0000-0000-000000000002',
-    '2024-01-01',
-    'full_time',
-    'active'
-) ON CONFLICT (id) DO NOTHING;
+-- 10. Default Admin Role Assignment (Strict separation: admin does not have an employee persona)
+INSERT INTO user_roles (user_id, role_id)
+SELECT 'c0000000-0000-0000-0000-000000000001', r.id
+FROM roles r
+WHERE r.tenant_id = 'a0000000-0000-0000-0000-000000000001' AND r.name = 'superadmin'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+

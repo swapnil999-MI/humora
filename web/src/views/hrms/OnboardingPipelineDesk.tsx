@@ -4,6 +4,11 @@ import {
   fetchOnboardingPipeline,
   inviteCandidate,
   convertCandidate,
+  fetchDepartments,
+  createDepartment,
+  fetchDesignations,
+  createDesignation,
+  fetchShifts,
 } from '../../store/hrmsSlice';
 import { addToast } from '../../store/uiSlice';
 import {
@@ -46,9 +51,17 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
   onOpenCandidateWizard,
 }) => {
   const dispatch = useAppDispatch();
-  const { onboardingPipeline, isLoadingOnboarding } = useAppSelector(
-    (state) => state.hrms
-  );
+  const {
+    onboardingPipeline,
+    isLoadingOnboarding,
+    departments: rawDepartments,
+    designations: rawDesignations,
+    shifts: rawShifts,
+  } = useAppSelector((state) => state.hrms);
+
+  const departments = rawDepartments || [];
+  const designations = rawDesignations || [];
+  const shifts = rawShifts || [];
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -62,6 +75,15 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
   const [joiningDate, setJoiningDate] = useState('2026-10-01');
   const [employmentType, setEmploymentType] = useState('full_time');
   const [hourlyRate, setHourlyRate] = useState<number>(75);
+
+  // Department, Designation, and Shift for Invite
+  const [inviteDepartmentId, setInviteDepartmentId] = useState<string>('');
+  const [inviteDesignationId, setInviteDesignationId] = useState<string>('');
+  const [inviteShiftId, setInviteShiftId] = useState<string>('');
+  const [newDepartmentName, setNewDepartmentName] = useState<string>('');
+  const [newDesignationTitle, setNewDesignationTitle] = useState<string>('');
+  const [isAddingNewDepartment, setIsAddingNewDepartment] = useState<boolean>(false);
+  const [isAddingNewDesignation, setIsAddingNewDesignation] = useState<boolean>(false);
 
   // Compensation / Payable information state for Invite Modal
   const [payStructureType, setPayStructureType] = useState<'annual_ctc' | 'hourly_rate'>('annual_ctc');
@@ -92,6 +114,13 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
   const [convertEmpCode, setConvertEmpCode] = useState<string>('');
   const [convertWorkEmail, setConvertWorkEmail] = useState<string>('');
   const [convertPassword, setConvertPassword] = useState<string>('EmployeePass2026!');
+  const [convertDepartmentId, setConvertDepartmentId] = useState<string>('');
+  const [convertDesignationId, setConvertDesignationId] = useState<string>('');
+  const [convertShiftId, setConvertShiftId] = useState<string>('');
+  const [convertNewDepartmentName, setConvertNewDepartmentName] = useState<string>('');
+  const [convertNewDesignationTitle, setConvertNewDesignationTitle] = useState<string>('');
+  const [isConvertAddingDept, setIsConvertAddingDept] = useState<boolean>(false);
+  const [isConvertAddingDesig, setIsConvertAddingDesig] = useState<boolean>(false);
   const [convertBasic, setConvertBasic] = useState<number>(5000);
   const [convertHRA, setConvertHRA] = useState<number>(2000);
   const [convertSpecial, setConvertSpecial] = useState<number>(3000);
@@ -102,6 +131,9 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
 
   useEffect(() => {
     dispatch(fetchOnboardingPipeline());
+    dispatch(fetchDepartments());
+    dispatch(fetchDesignations());
+    dispatch(fetchShifts());
     api.get('/hrms/company/smtp')
       .then((cfg) => {
         setSmtpConfigured(!!(cfg && cfg.host && cfg.has_password));
@@ -145,6 +177,18 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
     if (!firstName || !lastName || !personalEmail) return;
     setIsSubmittingInvite(true);
     try {
+      let finalDeptId = inviteDepartmentId;
+      if (isAddingNewDepartment && newDepartmentName.trim()) {
+        const createdDept = await dispatch(createDepartment(newDepartmentName.trim())).unwrap();
+        finalDeptId = createdDept.id;
+      }
+
+      let finalDesigId = inviteDesignationId;
+      if (isAddingNewDesignation && newDesignationTitle.trim()) {
+        const createdDesig = await dispatch(createDesignation(newDesignationTitle.trim())).unwrap();
+        finalDesigId = createdDesig.id;
+      }
+
       const res = await dispatch(
         inviteCandidate({
           first_name: firstName,
@@ -154,6 +198,9 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
           expected_joining_date: joiningDate,
           hourly_cost_rate: hourlyRate,
           employment_type: employmentType,
+          department_id: finalDeptId || undefined,
+          designation_id: finalDesigId || undefined,
+          shift_id: inviteShiftId || undefined,
           annual_ctc: payStructureType === 'annual_ctc' ? annualCTC : 0,
           monthly_gross: payStructureType === 'annual_ctc' ? monthlyGross : 0,
           basic_salary: payStructureType === 'annual_ctc' ? basicSalary : 0,
@@ -191,6 +238,13 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
       setLastName('');
       setPersonalEmail('');
       setCandidatePhone('');
+      setInviteDepartmentId('');
+      setInviteDesignationId('');
+      setInviteShiftId('');
+      setNewDepartmentName('');
+      setNewDesignationTitle('');
+      setIsAddingNewDepartment(false);
+      setIsAddingNewDesignation(false);
     } catch (err: any) {
       dispatch(
         addToast({
@@ -237,6 +291,15 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
         activeCand.expected_joining_date?.split('T')[0] || new Date().toISOString().split('T')[0]
       );
 
+      // Initialize designation, department, shift
+      setConvertDepartmentId(activeCand.department_id || (departments[0]?.id || ''));
+      setConvertDesignationId(activeCand.designation_id || (designations[0]?.id || ''));
+      setConvertShiftId(activeCand.shift_id || (shifts[0]?.id || ''));
+      setIsConvertAddingDept(false);
+      setIsConvertAddingDesig(false);
+      setConvertNewDepartmentName('');
+      setConvertNewDesignationTitle('');
+
       // Auto-suggest employee code and work email
       const activeCount = onboardingPipeline.filter((x) => x.status === 'approved').length;
       setConvertEmpCode(`EMP-${String(activeCount + 1).padStart(3, '0')}`);
@@ -255,12 +318,27 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
   const handleConvertWithCompensation = async (candidateId: string) => {
     setIsConverting(true);
     try {
+      let finalDeptId = convertDepartmentId;
+      if (isConvertAddingDept && convertNewDepartmentName.trim()) {
+        const createdDept = await dispatch(createDepartment(convertNewDepartmentName.trim())).unwrap();
+        finalDeptId = createdDept.id;
+      }
+
+      let finalDesigId = convertDesignationId;
+      if (isConvertAddingDesig && convertNewDesignationTitle.trim()) {
+        const createdDesig = await dispatch(createDesignation(convertNewDesignationTitle.trim())).unwrap();
+        finalDesigId = createdDesig.id;
+      }
+
       await dispatch(
         convertCandidate(candidateId, {
           candidate_id: candidateId,
           employee_code: convertEmpCode,
           work_email: convertWorkEmail,
           initial_password: convertPassword,
+          department_id: finalDeptId || undefined,
+          designation_id: finalDesigId || undefined,
+          shift_id: convertShiftId || undefined,
           basic_salary: convertBasic,
           hra: convertHRA,
           special_allowance: convertSpecial,
@@ -274,7 +352,7 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
       dispatch(
         addToast({
           type: 'success',
-          message: 'Candidate approved! Official compensation structure and user account provisioned.',
+          message: 'Candidate approved! Official compensation structure, shift, and user account provisioned.',
         })
       );
       setInspectCandidateView(null);
@@ -758,12 +836,12 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
                       Link
                     </button>
 
-                    {/* Open Candidate Wizard in Demo mode */}
+                    {/* Preview the candidate portal exactly as the candidate sees it */}
                     {onOpenCandidateWizard && (
                       <button
                         className="btn btn-ghost btn-sm"
                         style={{ fontSize: '11px', padding: '3px 8px', color: 'var(--accent-primary)' }}
-                        title="Simulate candidate portal"
+                        title="Open the candidate\u2019s onboarding portal"
                         onClick={() => onOpenCandidateWizard(cand.invite_token)}
                       >
                         <ExternalLink size={12} />
@@ -967,6 +1045,122 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
                     <option value="intern">Internship</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Designation, Department, and Shift Assignment */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Designation
+                    </label>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      style={{ fontSize: '10px', padding: '1px 4px', color: 'var(--accent-primary)' }}
+                      onClick={() => setIsAddingNewDesignation(!isAddingNewDesignation)}
+                    >
+                      {isAddingNewDesignation ? 'Select Existing' : '+ New Designation'}
+                    </button>
+                  </div>
+                  {isAddingNewDesignation ? (
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ width: '100%', marginTop: '4px' }}
+                      placeholder="e.g. Senior Software Engineer"
+                      value={newDesignationTitle}
+                      onChange={(e) => setNewDesignationTitle(e.target.value)}
+                    />
+                  ) : (
+                    <select
+                      className="select-field"
+                      style={{ width: '100%', marginTop: '4px' }}
+                      value={inviteDesignationId}
+                      onChange={(e) => {
+                        if (e.target.value === '__add_new__') {
+                          setIsAddingNewDesignation(true);
+                        } else {
+                          setInviteDesignationId(e.target.value);
+                        }
+                      }}
+                    >
+                      <option value="">Select Designation...</option>
+                      {designations.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.title}
+                        </option>
+                      ))}
+                      <option value="__add_new__">+ Add New Designation...</option>
+                    </select>
+                  )}
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Department
+                    </label>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      style={{ fontSize: '10px', padding: '1px 4px', color: 'var(--accent-primary)' }}
+                      onClick={() => setIsAddingNewDepartment(!isAddingNewDepartment)}
+                    >
+                      {isAddingNewDepartment ? 'Select Existing' : '+ New Department'}
+                    </button>
+                  </div>
+                  {isAddingNewDepartment ? (
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ width: '100%', marginTop: '4px' }}
+                      placeholder="e.g. Platform Engineering"
+                      value={newDepartmentName}
+                      onChange={(e) => setNewDepartmentName(e.target.value)}
+                    />
+                  ) : (
+                    <select
+                      className="select-field"
+                      style={{ width: '100%', marginTop: '4px' }}
+                      value={inviteDepartmentId}
+                      onChange={(e) => {
+                        if (e.target.value === '__add_new__') {
+                          setIsAddingNewDepartment(true);
+                        } else {
+                          setInviteDepartmentId(e.target.value);
+                        }
+                      }}
+                    >
+                      <option value="">Select Department...</option>
+                      {departments.map((dept) => (
+                        <option key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </option>
+                      ))}
+                      <option value="__add_new__">+ Add New Department...</option>
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                  Assigned Work Shift
+                </label>
+                <select
+                  className="select-field"
+                  style={{ width: '100%', marginTop: '4px' }}
+                  value={inviteShiftId}
+                  onChange={(e) => setInviteShiftId(e.target.value)}
+                >
+                  <option value="">Select Shift Roster...</option>
+                  {shifts.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.start_time?.slice(0, 5)} - {s.end_time?.slice(0, 5)})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* PAYABLE TO EMPLOYEE SECTION */}
@@ -1535,20 +1729,20 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
                           <span style={{ color: 'var(--text-muted)' }}>Account Number:</span>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px', fontFamily: 'monospace' }}>
                             {showMaskedBank
-                              ? (inspectCandidateView.dossier.bank_details.account_number_masked || '•••• •••• •••• 5612')
-                              : (inspectCandidateView.dossier.bank_details.account_number_masked || '•••• •••• •••• 5612')}
+                              ? (inspectCandidateView.dossier.bank_details.account_number_masked || 'Not provided')
+                              : (inspectCandidateView.dossier.bank_details.account_number_masked || 'Not provided')}
                           </div>
                         </div>
                         <div>
                           <span style={{ color: 'var(--text-muted)' }}>Routing / IFSC Code:</span>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px', fontFamily: 'monospace' }}>
-                            {inspectCandidateView.dossier.bank_details.routing_number || '121000358'}
+                            {inspectCandidateView.dossier.bank_details.routing_number || 'Not provided'}
                           </div>
                         </div>
                         <div>
                           <span style={{ color: 'var(--text-muted)' }}>Government Tax ID:</span>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px', fontFamily: 'monospace' }}>
-                            {inspectCandidateView.dossier.bank_details.tax_id_masked || '•••-••-9941'}
+                            {inspectCandidateView.dossier.bank_details.tax_id_masked || 'Not provided'}
                           </div>
                         </div>
                       </div>
@@ -1575,19 +1769,19 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
                       <div>
                         <span style={{ color: 'var(--text-muted)' }}>DOB & Gender:</span>
                         <div style={{ color: 'var(--text-primary)', marginTop: '2px' }}>
-                          {inspectCandidateView.dossier?.personal_details?.dob || '1998-05-14'} ({inspectCandidateView.dossier?.personal_details?.gender || 'Unspecified'})
+                          {inspectCandidateView.dossier?.personal_details?.dob || 'DOB not provided'} ({inspectCandidateView.dossier?.personal_details?.gender || 'Unspecified'})
                         </div>
                       </div>
                       <div>
                         <span style={{ color: 'var(--text-muted)' }}>Marital Status & Blood Group:</span>
                         <div style={{ color: 'var(--text-primary)', marginTop: '2px' }}>
-                          {inspectCandidateView.dossier?.personal_details?.marital_status || 'Single'} • {inspectCandidateView.dossier?.personal_details?.blood_group || 'B+'}
+                          {inspectCandidateView.dossier?.personal_details?.marital_status || 'Not provided'} • {inspectCandidateView.dossier?.personal_details?.blood_group || 'Not provided'}
                         </div>
                       </div>
                       <div style={{ gridColumn: 'span 2' }}>
                         <span style={{ color: 'var(--text-muted)' }}>Residential Address:</span>
                         <div style={{ color: 'var(--text-primary)', marginTop: '2px' }}>
-                          {inspectCandidateView.dossier?.personal_details?.current_address || '100 Main Street, Suite 400, Seattle, WA'}
+                          {inspectCandidateView.dossier?.personal_details?.current_address || 'Not provided'}
                         </div>
                       </div>
                     </div>
@@ -1639,6 +1833,122 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                       The candidate will use this initial password along with their work email to log in to the workforce portal.
                     </span>
+                  </div>
+
+                  {/* Designation & Department */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                          Official Designation
+                        </label>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          style={{ fontSize: '10px', padding: '1px 4px', color: 'var(--accent-primary)' }}
+                          onClick={() => setIsConvertAddingDesig(!isConvertAddingDesig)}
+                        >
+                          {isConvertAddingDesig ? 'Select Existing' : '+ New Designation'}
+                        </button>
+                      </div>
+                      {isConvertAddingDesig ? (
+                        <input
+                          type="text"
+                          className="input-field"
+                          style={{ width: '100%', marginTop: '4px' }}
+                          placeholder="e.g. Senior Software Engineer"
+                          value={convertNewDesignationTitle}
+                          onChange={(e) => setConvertNewDesignationTitle(e.target.value)}
+                        />
+                      ) : (
+                        <select
+                          className="select-field"
+                          style={{ width: '100%', marginTop: '4px' }}
+                          value={convertDesignationId}
+                          onChange={(e) => {
+                            if (e.target.value === '__add_new__') {
+                              setIsConvertAddingDesig(true);
+                            } else {
+                              setConvertDesignationId(e.target.value);
+                            }
+                          }}
+                        >
+                          <option value="">Select Designation...</option>
+                          {designations.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.title}
+                            </option>
+                          ))}
+                          <option value="__add_new__">+ Add New Designation...</option>
+                        </select>
+                      )}
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                          Assigned Department
+                        </label>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          style={{ fontSize: '10px', padding: '1px 4px', color: 'var(--accent-primary)' }}
+                          onClick={() => setIsConvertAddingDept(!isConvertAddingDept)}
+                        >
+                          {isConvertAddingDept ? 'Select Existing' : '+ New Department'}
+                        </button>
+                      </div>
+                      {isConvertAddingDept ? (
+                        <input
+                          type="text"
+                          className="input-field"
+                          style={{ width: '100%', marginTop: '4px' }}
+                          placeholder="e.g. Platform Engineering"
+                          value={convertNewDepartmentName}
+                          onChange={(e) => setNewDepartmentName(e.target.value)}
+                        />
+                      ) : (
+                        <select
+                          className="select-field"
+                          style={{ width: '100%', marginTop: '4px' }}
+                          value={convertDepartmentId}
+                          onChange={(e) => {
+                            if (e.target.value === '__add_new__') {
+                              setIsConvertAddingDept(true);
+                            } else {
+                              setConvertDepartmentId(e.target.value);
+                            }
+                          }}
+                        >
+                          <option value="">Select Department...</option>
+                          {departments.map((dept) => (
+                            <option key={dept.id} value={dept.id}>
+                              {dept.name}
+                            </option>
+                          ))}
+                          <option value="__add_new__">+ Add New Department...</option>
+                        </select>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Assigned Work Shift Roster
+                    </label>
+                    <select
+                      className="select-field"
+                      style={{ width: '100%', marginTop: '4px' }}
+                      value={convertShiftId}
+                      onChange={(e) => setConvertShiftId(e.target.value)}
+                    >
+                      <option value="">Select Shift Roster...</option>
+                      {shifts.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.start_time?.slice(0, 5)} - {s.end_time?.slice(0, 5)})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               )}

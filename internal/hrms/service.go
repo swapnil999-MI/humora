@@ -1,6 +1,8 @@
 package hrms
 
 import (
+	"strconv"
+	"humora-backend/internal/notify"
 	"bytes"
 	"context"
 	"crypto/ed25519"
@@ -11,6 +13,7 @@ import (
 	"image"
 	"image/jpeg"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,7 +26,8 @@ import (
 )
 
 func saveBiometricDebugImage(prefix, empID string, img image.Image) string {
-	if img == nil {
+	// Raw face images are biometric PII: only dump them when explicitly enabled for local debugging.
+	if img == nil || os.Getenv("BIOMETRIC_DEBUG_DUMP") != "true" {
 		return ""
 	}
 	debugDir := "storage/debug_biometrics"
@@ -84,6 +88,19 @@ type Service interface {
 	ListMyRegularizations(ctx context.Context, tenantID, userID uuid.UUID, status string) ([]AttendanceRegularization, error)
 	ListTeamRegularizations(ctx context.Context, tenantID uuid.UUID, status string) ([]AttendanceRegularization, error)
 	ReviewRegularization(ctx context.Context, tenantID, regID, reviewerUserID uuid.UUID, req *ReviewRegularizationRequest) (*AttendanceRegularization, error)
+
+	// Office Geofenced Locations
+	ListOfficeLocations(ctx context.Context, tenantID uuid.UUID) ([]OfficeLocation, error)
+	GetOfficeLocation(ctx context.Context, tenantID, locationID uuid.UUID) (*OfficeLocation, error)
+	CreateOfficeLocation(ctx context.Context, tenantID uuid.UUID, req *CreateOfficeLocationRequest) (*OfficeLocation, error)
+	UpdateOfficeLocation(ctx context.Context, tenantID, locationID uuid.UUID, req *UpdateOfficeLocationRequest) (*OfficeLocation, error)
+	DeleteOfficeLocation(ctx context.Context, tenantID, locationID uuid.UUID) error
+
+	// Departments & Designations
+	ListDepartments(ctx context.Context, tenantID uuid.UUID) ([]Department, error)
+	CreateDepartment(ctx context.Context, tenantID uuid.UUID, name string) (*Department, error)
+	ListDesignations(ctx context.Context, tenantID uuid.UUID) ([]Designation, error)
+	CreateDesignation(ctx context.Context, tenantID uuid.UUID, title string) (*Designation, error)
 }
 
 type service struct {
@@ -245,26 +262,50 @@ func (s *service) RecordPunch(ctx context.Context, tenantID, userID uuid.UUID, r
 	verificationMsg := "punch recorded"
 
 	// 1. Geofence & Wi-Fi Check
-	if req.Latitude != nil && req.Longitude != nil {
-		var office *OfficeLocation
-		if req.LocationID != nil && *req.LocationID != "" {
-			if locID, err := uuid.Parse(*req.LocationID); err == nil {
-				office, _ = s.repo.GetOfficeLocation(ctx, tenantID, locID)
+	offices, _ := s.repo.ListOfficeLocations(ctx, tenantID)
+	if len(offices) > 0 {
+		if req.Latitude == nil || req.Longitude == nil {
+			// Check if verified by corporate WiFi
+			wifiVerified := false
+			if req.WiFiBSSID != "" {
+				for _, off := range offices {
+					v, msg := VerifyGeofence(&off, 0, 0, req.WiFiBSSID)
+					if v {
+						wifiVerified = true
+						isGeofenceVerified = true
+						verificationMsg = msg
+						break
+					}
+				}
 			}
-		}
-
-		if office == nil {
-			// Find nearest office
-			offices, _ := s.repo.ListOfficeLocations(ctx, tenantID)
-			if len(offices) > 0 {
-				office = &offices[0]
+			if !wifiVerified && req.OfflineSignature == "" {
+				return nil, errors.New("location check failed: GPS coordinates are required for attendance check-in/check-out")
 			}
-		}
+		} else {
+			var nearestOffice *OfficeLocation
+			minDist := math.MaxFloat64
 
-		if office != nil {
-			verified, msg := VerifyGeofence(office, *req.Latitude, *req.Longitude, req.WiFiBSSID)
-			isGeofenceVerified = verified
-			verificationMsg = msg
+			for i := range offices {
+				off := &offices[i]
+				dist := HaversineDistance(off.Latitude, off.Longitude, *req.Latitude, *req.Longitude)
+				if dist < minDist {
+					minDist = dist
+					nearestOffice = off
+				}
+				verified, msg := VerifyGeofence(off, *req.Latitude, *req.Longitude, req.WiFiBSSID)
+				if verified {
+					isGeofenceVerified = true
+					verificationMsg = msg
+					break
+				}
+			}
+
+			if !isGeofenceVerified && req.OfflineSignature == "" {
+				if nearestOffice != nil {
+					return nil, fmt.Errorf("geofence check failed: you are %.1fm away from '%s' (allowed radius: %dm). Punch rejected", minDist, nearestOffice.Name, nearestOffice.RadiusMeters)
+				}
+				return nil, errors.New("geofence check failed: outside designated office perimeter. Punch rejected")
+			}
 		}
 	}
 
@@ -360,13 +401,19 @@ func (s *service) GetAttendanceSummary(ctx context.Context, tenantID, userID uui
 		presence = "in_office_active"
 	}
 
+	shift, _ := s.repo.GetEmployeeShift(ctx, tenantID, emp.ID, time.Now())
+	shiftName := ""
+	if shift != nil {
+		shiftName = shift.Name
+	}
+
 	return &AttendanceSummaryResponse{
 		PunchedIn:      punchedIn,
 		LastPunchType:  lastPunchType,
 		LastPunchTime:  lastPunchTime,
 		TodayHours:     totalDuration.Hours(),
 		PresenceStatus: presence,
-		ShiftName:      "General Shift",
+		ShiftName:      shiftName,
 	}, nil
 }
 
@@ -455,6 +502,19 @@ func (s *service) ApplyLeave(ctx context.Context, tenantID, userID uuid.UUID, re
 		return nil, fmt.Errorf("failed to create leave request: %w", err)
 	}
 
+	typeName := "Leave"
+	if lt, err := s.repo.GetLeaveType(ctx, tenantID, leaveTypeID); err == nil && lt != nil {
+		typeName = lt.Name
+	}
+	notify.ToApproversOf(tenantID, emp.ID, notify.Message{
+		Category:   notify.CategoryApproval,
+		Title:      fmt.Sprintf("Leave request from %s %s", emp.FirstName, emp.LastName),
+		Body:       fmt.Sprintf("%s • %s day(s), %s to %s", typeName, trimNum(leaveReq.TotalDays), fromDate.Format("2 Jan"), toDate.Format("2 Jan 2006")),
+		Link:       "approvals",
+		EntityType: "leave_request",
+		EntityID:   &leaveReq.ID,
+	})
+
 	return leaveReq, nil
 }
 
@@ -477,6 +537,15 @@ func (s *service) ApproveOrRejectLeave(ctx context.Context, tenantID, requestID,
 	if status == "approved" {
 		_ = s.repo.DeductLeaveBalance(ctx, tenantID, updatedReq.EmployeeID, updatedReq.LeaveTypeID, updatedReq.FromDate.Year(), updatedReq.TotalDays)
 	}
+
+	notify.ToEmployee(tenantID, updatedReq.EmployeeID, notify.Message{
+		Category:   notify.CategoryLeave,
+		Title:      "Your leave request was " + status,
+		Body:       fmt.Sprintf("%s to %s • decided by %s %s", updatedReq.FromDate.Format("2 Jan"), updatedReq.ToDate.Format("2 Jan 2006"), approverEmp.FirstName, approverEmp.LastName),
+		Link:       "leaves",
+		EntityType: "leave_request",
+		EntityID:   &updatedReq.ID,
+	})
 
 	return updatedReq, nil
 }
@@ -737,8 +806,8 @@ func (s *service) GetMonthlyAttendance(ctx context.Context, tenantID, userID uui
 	shift, _ := s.repo.GetEmployeeShift(ctx, tenantID, emp.ID, startOfMonth)
 	fullDayCutoff := 8.0
 	halfDayCutoff := 4.5
-	shiftName := "General Shift"
-	graceMin := 15
+	shiftName := ""
+	graceMin := 0
 	if shift != nil {
 		fullDayCutoff = shift.FullDayHours
 		halfDayCutoff = shift.HalfDayHours
@@ -986,7 +1055,7 @@ func (s *service) GetTeamPresenceRadar(ctx context.Context, tenantID uuid.UUID) 
 	var members []TeamPresenceRadarMember
 	for _, emp := range employees {
 		shift, _ := s.repo.GetEmployeeShift(ctx, tenantID, emp.ID, today)
-		shiftName := "General Shift"
+		shiftName := ""
 		if shift != nil {
 			shiftName = shift.Name
 		}
@@ -1113,6 +1182,15 @@ func (s *service) CreateRegularization(ctx context.Context, tenantID, userID uui
 		return nil, fmt.Errorf("failed to submit regularization request: %w", err)
 	}
 
+	notify.ToApproversOf(tenantID, emp.ID, notify.Message{
+		Category:   notify.CategoryApproval,
+		Title:      fmt.Sprintf("Attendance correction from %s %s", emp.FirstName, emp.LastName),
+		Body:       "For " + reqDate.Format("Mon, 2 Jan 2006"),
+		Link:       "approvals",
+		EntityType: "regularization",
+		EntityID:   &reg.ID,
+	})
+
 	return reg, nil
 }
 
@@ -1199,6 +1277,15 @@ func (s *service) ReviewRegularization(ctx context.Context, tenantID, regID, rev
 			_ = s.repo.CreateAttendancePunch(ctx, punchOut)
 		}
 	}
+
+	notify.ToEmployee(tenantID, reg.EmployeeID, notify.Message{
+		Category:   notify.CategoryAttendance,
+		Title:      "Your attendance correction was " + req.Status,
+		Body:       "For " + reg.RequestDate.Format("Mon, 2 Jan 2006"),
+		Link:       "attendance",
+		EntityType: "regularization",
+		EntityID:   &reg.ID,
+	})
 
 	return reg, nil
 }
@@ -1374,25 +1461,37 @@ func (s *service) PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID,
 		return nil, fmt.Errorf("identity mismatch: face belongs to a different person (match score: %.1f%%, required: >= 75.0%%). Proxy punch prevented", confidence)
 	}
 
-	// Face is verified! Record attendance punch
+	// Face is verified! Verify location & record attendance punch
 	punchedAt := time.Now().UTC()
 	isGeofenceVerified := false
-	if req.Latitude != nil && req.Longitude != nil {
-		var office *OfficeLocation
-		if req.LocationID != nil && *req.LocationID != "" {
-			if locID, err := uuid.Parse(*req.LocationID); err == nil {
-				office, _ = s.repo.GetOfficeLocation(ctx, tenantID, locID)
+	offices, _ := s.repo.ListOfficeLocations(ctx, tenantID)
+	if len(offices) > 0 {
+		if req.Latitude == nil || req.Longitude == nil {
+			return nil, errors.New("location check failed: GPS coordinates are required for attendance check-in/check-out")
+		}
+
+		var nearestOffice *OfficeLocation
+		minDist := math.MaxFloat64
+
+		for i := range offices {
+			off := &offices[i]
+			dist := HaversineDistance(off.Latitude, off.Longitude, *req.Latitude, *req.Longitude)
+			if dist < minDist {
+				minDist = dist
+				nearestOffice = off
+			}
+			verified, _ := VerifyGeofence(off, *req.Latitude, *req.Longitude, "")
+			if verified {
+				isGeofenceVerified = true
+				break
 			}
 		}
-		if office == nil {
-			offices, _ := s.repo.ListOfficeLocations(ctx, tenantID)
-			if len(offices) > 0 {
-				office = &offices[0]
+
+		if !isGeofenceVerified {
+			if nearestOffice != nil {
+				return nil, fmt.Errorf("geofence check failed: you are %.1fm away from '%s' (allowed radius: %dm). Punch rejected", minDist, nearestOffice.Name, nearestOffice.RadiusMeters)
 			}
-		}
-		if office != nil {
-			verified, _ := VerifyGeofence(office, *req.Latitude, *req.Longitude, "")
-			isGeofenceVerified = verified
+			return nil, errors.New("geofence check failed: outside designated office perimeter. Punch rejected")
 		}
 	}
 
@@ -1436,4 +1535,118 @@ func (s *service) PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID,
 	}, nil
 }
 
+func (s *service) ListOfficeLocations(ctx context.Context, tenantID uuid.UUID) ([]OfficeLocation, error) {
+	return s.repo.ListOfficeLocations(ctx, tenantID)
+}
 
+func (s *service) GetOfficeLocation(ctx context.Context, tenantID, locationID uuid.UUID) (*OfficeLocation, error) {
+	return s.repo.GetOfficeLocation(ctx, tenantID, locationID)
+}
+
+func (s *service) CreateOfficeLocation(ctx context.Context, tenantID uuid.UUID, req *CreateOfficeLocationRequest) (*OfficeLocation, error) {
+	if strings.TrimSpace(req.Name) == "" {
+		return nil, errors.New("office name is required")
+	}
+	if req.Latitude < -90 || req.Latitude > 90 || req.Longitude < -180 || req.Longitude > 180 {
+		return nil, errors.New("valid latitude [-90, 90] and longitude [-180, 180] are required")
+	}
+	radius := req.RadiusMeters
+	if radius <= 0 {
+		radius = 100
+	}
+
+	loc := &OfficeLocation{
+		ID:                 uuid.New(),
+		TenantID:           tenantID,
+		Name:               strings.TrimSpace(req.Name),
+		Latitude:           req.Latitude,
+		Longitude:          req.Longitude,
+		RadiusMeters:       radius,
+		PolygonCoordinates: req.PolygonCoordinates,
+		AllowedIPRanges:    req.AllowedIPRanges,
+		AllowedWiFiBSSID:   req.AllowedWiFiBSSID,
+		CreatedAt:          time.Now().UTC(),
+	}
+
+	if err := s.repo.CreateOfficeLocation(ctx, loc); err != nil {
+		return nil, fmt.Errorf("failed to create office location: %w", err)
+	}
+	return loc, nil
+}
+
+func (s *service) UpdateOfficeLocation(ctx context.Context, tenantID, locationID uuid.UUID, req *UpdateOfficeLocationRequest) (*OfficeLocation, error) {
+	loc, err := s.repo.GetOfficeLocation(ctx, tenantID, locationID)
+	if err != nil || loc == nil {
+		return nil, errors.New("office location not found")
+	}
+
+	if req.Name != nil && strings.TrimSpace(*req.Name) != "" {
+		loc.Name = strings.TrimSpace(*req.Name)
+	}
+	if req.Latitude != nil {
+		loc.Latitude = *req.Latitude
+	}
+	if req.Longitude != nil {
+		loc.Longitude = *req.Longitude
+	}
+	if req.RadiusMeters != nil && *req.RadiusMeters > 0 {
+		loc.RadiusMeters = *req.RadiusMeters
+	}
+	if req.PolygonCoordinates != nil {
+		loc.PolygonCoordinates = req.PolygonCoordinates
+	}
+	if req.AllowedIPRanges != nil {
+		loc.AllowedIPRanges = req.AllowedIPRanges
+	}
+	if req.AllowedWiFiBSSID != nil {
+		loc.AllowedWiFiBSSID = req.AllowedWiFiBSSID
+	}
+
+	if err := s.repo.UpdateOfficeLocation(ctx, loc); err != nil {
+		return nil, fmt.Errorf("failed to update office location: %w", err)
+	}
+	return loc, nil
+}
+
+func (s *service) DeleteOfficeLocation(ctx context.Context, tenantID, locationID uuid.UUID) error {
+	return s.repo.DeleteOfficeLocation(ctx, tenantID, locationID)
+}
+
+func (s *service) ListDepartments(ctx context.Context, tenantID uuid.UUID) ([]Department, error) {
+	return s.repo.ListDepartments(ctx, tenantID)
+}
+
+func (s *service) CreateDepartment(ctx context.Context, tenantID uuid.UUID, name string) (*Department, error) {
+	dept := &Department{
+		ID:       uuid.New(),
+		TenantID: tenantID,
+		Name:     strings.TrimSpace(name),
+	}
+	if err := s.repo.CreateDepartment(ctx, dept); err != nil {
+		return nil, fmt.Errorf("failed to create department: %w", err)
+	}
+	return dept, nil
+}
+
+func (s *service) ListDesignations(ctx context.Context, tenantID uuid.UUID) ([]Designation, error) {
+	return s.repo.ListDesignations(ctx, tenantID)
+}
+
+func (s *service) CreateDesignation(ctx context.Context, tenantID uuid.UUID, title string) (*Designation, error) {
+	desig := &Designation{
+		ID:       uuid.New(),
+		TenantID: tenantID,
+		Title:    strings.TrimSpace(title),
+	}
+	if err := s.repo.CreateDesignation(ctx, desig); err != nil {
+		return nil, fmt.Errorf("failed to create designation: %w", err)
+	}
+	return desig, nil
+}
+
+
+
+// trimNum formats a day count without a needless ".0" (1.5 stays 1.5, 2.0 becomes 2).
+func trimNum(v float64) string {
+	return strconv.FormatFloat(v, 'f', -1, 64)
+}

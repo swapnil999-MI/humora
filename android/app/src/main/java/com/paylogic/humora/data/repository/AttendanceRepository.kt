@@ -42,10 +42,16 @@ class AttendanceRepository(
     private val apiClient: HumoraApiClient,
     private val database: HumoraDatabase? = null
 ) {
-    // Configurable Office HQ coordinate (Bangalore Tech Park HQ)
-    var officeLatitude: Double = 12.9715987
-    var officeLongitude: Double = 77.5945627
-    var allowedGeofenceRadius: Double = 200.0 // 200 meters
+    // The organisation's configured offices (Admin > Geofence). Empty until loaded, or if none exist.
+    @Volatile private var offices: List<OfficeLocationDto> = emptyList()
+    @Volatile private var officesLoaded = false
+
+    private val _geofence = MutableStateFlow<GeofenceStatus?>(null)
+    /** Latest check against the nearest office; null until both a location and an office are known. */
+    val geofence: StateFlow<GeofenceStatus?> = _geofence.asStateFlow()
+
+    /** null while not loaded yet; false when the organisation has no office set up. */
+    val hasOffices: Boolean? get() = if (officesLoaded) offices.isNotEmpty() else null
 
     private val _summary = MutableStateFlow(
         AttendanceSummary(
@@ -53,7 +59,7 @@ class AttendanceRepository(
             lastPunchType = "out",
             todayHours = 0.0,
             presenceStatus = "not_punched",
-            shiftName = "General Shift (09:00 - 18:00)"
+            shiftName = ""
         )
     )
     val summary: StateFlow<AttendanceSummary> = _summary.asStateFlow()
@@ -66,20 +72,42 @@ class AttendanceRepository(
     )
     val session: StateFlow<AttendanceSessionResponse> = _session.asStateFlow()
 
-    fun checkGeofence(currentLocation: Location?): GeofenceStatus {
-        if (currentLocation == null) {
-            return GeofenceStatus(false, 9999.0, "Corporate HQ", allowedGeofenceRadius)
+    suspend fun fetchOfficeLocations(): NetworkResult<List<OfficeLocationDto>> {
+        val res = apiClient.getOfficeLocations()
+        if (res is NetworkResult.Success) {
+            offices = res.data
+            officesLoaded = true
         }
-        return GeofenceManager.checkGeofence(
-            userLat = currentLocation.latitude,
-            userLon = currentLocation.longitude,
-            officeLat = officeLatitude,
-            officeLon = officeLongitude,
-            allowedRadiusMeters = allowedGeofenceRadius
-        )
+        return res
+    }
+
+    /**
+     * Checks [currentLocation] against every configured office: inside any of them wins, otherwise the
+     * office whose boundary is closest. Null when the location or the offices are unknown; the server
+     * validates every punch regardless.
+     */
+    fun checkGeofence(currentLocation: Location?): GeofenceStatus? {
+        if (currentLocation == null || offices.isEmpty()) return null
+        val status = offices
+            .map {
+                GeofenceManager.checkGeofence(
+                    userLat = currentLocation.latitude,
+                    userLon = currentLocation.longitude,
+                    officeLat = it.latitude,
+                    officeLon = it.longitude,
+                    allowedRadiusMeters = it.radiusMeters.toDouble(),
+                    officeName = it.name
+                )
+            }
+            .minBy { if (it.isInside) -1.0 else it.distanceMeters - it.radiusMeters }
+        _geofence.value = status
+        return status
     }
 
     suspend fun refreshSession(): NetworkResult<AttendanceSessionResponse> {
+        // Sync active geofence from backend
+        fetchOfficeLocations()
+
         return when (val result = apiClient.getAttendanceSession()) {
             is NetworkResult.Success -> {
                 _session.value = result.data
@@ -101,6 +129,9 @@ class AttendanceRepository(
         punchType: String,
         location: Location?
     ): PunchResult {
+        if (location == null) {
+            return PunchResult.Error("Location check failed: GPS coordinates are required for attendance check-in/check-out. Please enable GPS.")
+        }
         // 1. Anti-Spoof Validation
         val securityCheck = AntiSpoofEngine.validateLocation(location, context)
         if (!securityCheck.isSecure) {
@@ -109,16 +140,10 @@ class AttendanceRepository(
 
         val loc = location!!
 
-        // 2. Geofence Perimeter Validation
-        val geofence = GeofenceManager.checkGeofence(
-            userLat = loc.latitude,
-            userLon = loc.longitude,
-            officeLat = officeLatitude,
-            officeLon = officeLongitude,
-            allowedRadiusMeters = allowedGeofenceRadius
-        )
+        // 2. Geofence pre-check (the server enforces it too)
+        val geofence = checkGeofence(loc)
 
-        if (!geofence.isInside) {
+        if (geofence != null && !geofence.isInside) {
             return PunchResult.GeofenceRejection(
                 distanceMeters = geofence.distanceMeters,
                 allowedMeters = geofence.radiusMeters
@@ -152,7 +177,18 @@ class AttendanceRepository(
                 )
                 PunchResult.Success(resp, isOfflineQueued = false)
             }
-            is NetworkResult.Error, is NetworkResult.Exception -> {
+            is NetworkResult.Error -> {
+                val msg = networkResult.message
+                if ((msg.contains("geofence", ignoreCase = true) || msg.contains("outside", ignoreCase = true)) && geofence != null) {
+                    PunchResult.GeofenceRejection(
+                        distanceMeters = geofence.distanceMeters,
+                        allowedMeters = geofence.radiusMeters
+                    )
+                } else {
+                    PunchResult.Error(msg)
+                }
+            }
+            is NetworkResult.Exception -> {
                 // Offline fallback: Queue into Room DB
                 val now = System.currentTimeMillis()
                 try {
@@ -196,16 +232,21 @@ class AttendanceRepository(
     suspend fun recordPunchWithFace(
         punchType: String,
         base64Image: String,
-        location: Location?
+        location: Location?,
+        source: String = "android"
     ): BiometricPunchResult {
+        if (location == null) {
+            return BiometricPunchResult.Error("Location check failed: GPS coordinates are required for attendance check-in/check-out. Please enable GPS.")
+        }
+
         val securityCheck = AntiSpoofEngine.validateLocation(location, context)
         if (!securityCheck.isSecure) {
             return BiometricPunchResult.SecurityRejection(securityCheck.failureReason ?: "Location compromised")
         }
 
-        val loc = location!!
+        val loc = location
         val geofence = checkGeofence(loc)
-        if (!geofence.isInside) {
+        if (geofence != null && !geofence.isInside) {
             return BiometricPunchResult.GeofenceRejection(geofence.distanceMeters, geofence.radiusMeters)
         }
 
@@ -216,7 +257,7 @@ class AttendanceRepository(
             latitude = loc.latitude,
             longitude = loc.longitude,
             accuracyMeters = loc.accuracy.toDouble(),
-            source = "android"
+            source = source
         )
 
         return when (val res = apiClient.punchWithFace(request)) {
@@ -247,6 +288,8 @@ class AttendanceRepository(
                     BiometricPunchResult.NotEnrolled(msg)
                 } else if (msg.contains("identity mismatch", ignoreCase = true) || msg.contains("Proxy punch prevented", ignoreCase = true)) {
                     BiometricPunchResult.IdentityMismatch(msg)
+                } else if ((msg.contains("geofence", ignoreCase = true) || msg.contains("outside", ignoreCase = true)) && geofence != null) {
+                    BiometricPunchResult.GeofenceRejection(geofence.distanceMeters, geofence.radiusMeters)
                 } else {
                     BiometricPunchResult.Error(msg)
                 }

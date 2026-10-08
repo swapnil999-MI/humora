@@ -1,10 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/store';
 import { login, register } from '../../store/authSlice';
 import { setWorkspace, navigateToPage } from '../../store/uiSlice';
 import { useHrmsStore } from '../../store/hrmsStore';
-import { Sparkles, ShieldCheck, ArrowRight, Lock, Mail, KeyRound, CheckCircle2, X, Building2, User, Globe, AlertCircle, Server } from 'lucide-react';
+import {
+  Sparkles,
+  ShieldCheck,
+  ArrowRight,
+  Lock,
+  Mail,
+  KeyRound,
+  CheckCircle2,
+  X,
+  Building2,
+  User,
+  Globe,
+  AlertCircle,
+  Server,
+  RefreshCw,
+  QrCode,
+} from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { useAuthStore } from '../../store/authStore';
 import { api } from '../../api/client';
+import { PeopleOSLogo } from '../../components/PeopleOSLogo';
 
 export const LoginView: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -13,8 +32,94 @@ export const LoginView: React.FC = () => {
   const [authMode, setAuthMode] = useState<'signin' | 'register'>('signin');
 
   // Sign In State
-  const [email, setEmail] = useState('admin@humora.internal');
-  const [password, setPassword] = useState('Password@123');
+  const [email, setEmail] = useState(import.meta.env.DEV ? 'admin@humora.internal' : '');
+  const [password, setPassword] = useState(import.meta.env.DEV ? 'Password@123' : '');
+
+  // Sign In Method: 'password' | 'qr'
+  const [signInMethod, setSignInMethod] = useState<'password' | 'qr'>('password');
+
+  // OAuth Providers State
+  const [authProviders, setAuthProviders] = useState<{ google: boolean; github: boolean; microsoft: boolean; qr_code: boolean }>({
+    google: false,
+    github: false,
+    microsoft: false,
+    qr_code: true,
+  });
+
+  // WhatsApp-style QR Login State
+  const [qrPayload, setQrPayload] = useState<string>('');
+  const [qrExpiresIn, setQrExpiresIn] = useState<number>(120);
+  const [qrStatus, setQrStatus] = useState<'loading' | 'pending' | 'authenticated' | 'expired'>('loading');
+
+  // Fetch enabled OAuth providers on mount
+  useEffect(() => {
+    api.get<{ google: boolean; github: boolean; microsoft: boolean; qr_code: boolean }>('/auth/providers')
+      .then((data) => setAuthProviders(data))
+      .catch(() => {});
+  }, []);
+
+  // WhatsApp-style QR code lifecycle
+  useEffect(() => {
+    if (signInMethod !== 'qr') return;
+
+    let timer: any;
+    let pollInterval: any;
+
+    const startQrSession = async () => {
+      setQrStatus('loading');
+      try {
+        const res = await api.post<{ session_id: string; qr_payload: string; expires_in: number }>('/auth/qr/initiate', {});
+        setQrPayload(res.qr_payload);
+        setQrExpiresIn(res.expires_in || 120);
+        setQrStatus('pending');
+
+        // Countdown timer
+        timer = setInterval(() => {
+          setQrExpiresIn((prev) => {
+            if (prev <= 1) {
+              clearInterval(timer);
+              clearInterval(pollInterval);
+              setQrStatus('expired');
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
+        // Status polling every 2s
+        pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await api.get<{ status: string; auth?: any }>(`/auth/qr/status?session_id=${res.session_id}`);
+            if (statusRes.status === 'authenticated' && statusRes.auth) {
+              clearInterval(timer);
+              clearInterval(pollInterval);
+              setQrStatus('authenticated');
+              await useAuthStore.getState().setSessionFromTokens(
+                statusRes.auth.access_token,
+                statusRes.auth.refresh_token,
+                statusRes.auth.user
+              );
+            } else if (statusRes.status === 'expired') {
+              clearInterval(timer);
+              clearInterval(pollInterval);
+              setQrStatus('expired');
+            }
+          } catch {
+            // Ignore transient network errors during polling
+          }
+        }, 2000);
+      } catch {
+        setQrStatus('expired');
+      }
+    };
+
+    startQrSession();
+
+    return () => {
+      if (timer) clearInterval(timer);
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [signInMethod]);
 
   // Admin Registration State
   const [orgName, setOrgName] = useState('');
@@ -122,11 +227,6 @@ export const LoginView: React.FC = () => {
     setPassword('Password@123');
   };
 
-  const handleDemoEmployee = () => {
-    setEmail('marcus@gmail.com');
-    setPassword('123');
-  };
-
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!forgotEmail.trim()) {
@@ -190,59 +290,101 @@ export const LoginView: React.FC = () => {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100%',
+        width: '100%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.12), transparent), var(--surface-0)',
-        padding: '24px',
+        background: 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(245, 158, 11, 0.08), transparent), var(--surface-0)',
+        padding: '40px 16px',
+        boxSizing: 'border-box',
         position: 'relative',
       }}
     >
       <div
         style={{
-          maxWidth: '420px',
+          maxWidth: authMode === 'register' ? '880px' : '460px',
           width: '100%',
-          padding: '36px 32px',
+          padding: authMode === 'register' ? '36px 36px' : '36px 30px',
           background: 'var(--surface-1)',
           border: '1px solid var(--border-hairline)',
-          borderRadius: 'var(--radius-lg)',
+          borderRadius: 'var(--radius-xl)',
           boxShadow: 'var(--shadow-popover)',
           position: 'relative',
+          transition: 'max-width 0.25s cubic-bezier(0.16, 1, 0.3, 1), padding 0.25s ease',
         }}
       >
-        {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+        {/* Humora Brand Header */}
+        <div style={{ textAlign: 'center', marginBottom: '26px' }}>
           <div
             style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--accent-primary)',
               display: 'inline-flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.25), var(--shadow-sm)',
-              marginBottom: '16px',
+              marginBottom: '14px',
             }}
           >
-            <Sparkles size={22} color="#ffffff" />
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '18px',
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(251, 191, 36, 0.05) 100%)',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.14)',
+                marginBottom: '10px',
+              }}
+            >
+              <PeopleOSLogo size={40} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-heading)',
+                  fontSize: '24px',
+                  fontWeight: 800,
+                  letterSpacing: '-0.02em',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                HUMORA
+              </span>
+              <span
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  color: '#f59e0b',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Platform
+              </span>
+            </div>
           </div>
           <h1
             style={{
-              fontSize: '22px',
+              fontSize: '21px',
               fontWeight: 600,
               letterSpacing: '-0.02em',
               color: 'var(--text-primary)',
               marginBottom: '6px',
             }}
           >
-            {authMode === 'signin' ? 'Sign in to Humora' : 'Register Organization'}
+            {authMode === 'signin' ? 'Sign In to Workspace' : 'Create Your Organization'}
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.4 }}>
             {authMode === 'signin'
-              ? 'Enterprise HRMS & Agile Work Intelligence'
-              : 'Management Admin Tenant Onboarding & Mandatory Setup'}
+              ? 'Humora Administrative & Management Workspace'
+              : 'Launch your modern enterprise HRMS & biometric workspace in seconds'}
           </p>
         </div>
 
@@ -277,7 +419,7 @@ export const LoginView: React.FC = () => {
               transition: 'all 0.15s ease',
             }}
           >
-            Sign In
+            Admin Sign In
           </button>
           <button
             type="button"
@@ -304,11 +446,74 @@ export const LoginView: React.FC = () => {
 
         {authMode === 'signin' ? (
           <>
-            {/* Demo Quick Select Pill */}
+            {/* Authentication Method Selector: Password vs QR Code */}
             <div
               style={{
-                marginBottom: '20px',
-                padding: '8px 12px',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '6px',
+                marginBottom: '16px',
+                padding: '4px',
+                background: 'var(--surface-2)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-hairline)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setSignInMethod('password')}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  background: signInMethod === 'password' ? 'var(--surface-1)' : 'transparent',
+                  color: signInMethod === 'password' ? 'var(--text-primary)' : 'var(--text-muted)',
+                  boxShadow: signInMethod === 'password' ? 'var(--shadow-xs)' : 'none',
+                  transition: 'all 0.16s ease',
+                }}
+              >
+                <Lock size={13} color={signInMethod === 'password' ? 'var(--accent-primary)' : 'currentColor'} />
+                <span>Password</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSignInMethod('qr')}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  background: signInMethod === 'qr' ? 'var(--surface-1)' : 'transparent',
+                  color: signInMethod === 'qr' ? '#10b981' : 'var(--text-muted)',
+                  boxShadow: signInMethod === 'qr' ? 'var(--shadow-xs)' : 'none',
+                  transition: 'all 0.16s ease',
+                }}
+              >
+                <QrCode size={14} color={signInMethod === 'qr' ? '#10b981' : 'currentColor'} />
+                <span>QR Code Login</span>
+              </button>
+            </div>
+
+            {/* Quick-fill for the seeded demo account: development builds only */}
+            {import.meta.env.DEV && (
+            <div
+              style={{
+                marginBottom: '16px',
+                padding: '6px 12px',
                 background: 'var(--surface-2)',
                 border: '1px solid var(--border-hairline)',
                 borderRadius: 'var(--radius-sm)',
@@ -317,56 +522,29 @@ export const LoginView: React.FC = () => {
                 justifyContent: 'space-between',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: 'var(--accent-emerald)',
-                  }}
-                />
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  Quick Fill Demo:
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-emerald)' }} />
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Demo Admin:</span>
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: '#818cf8',
-                    padding: '2px 8px',
-                    cursor: 'pointer',
-                    background: 'rgba(99, 102, 241, 0.1)',
-                    borderRadius: '4px',
-                    border: '1px solid rgba(99, 102, 241, 0.25)',
-                  }}
-                  onClick={handleDemoAdmin}
-                >
-                  Admin
-                </button>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: '#34d399',
-                    padding: '2px 8px',
-                    cursor: 'pointer',
-                    background: 'rgba(16, 185, 129, 0.1)',
-                    borderRadius: '4px',
-                    border: '1px solid rgba(16, 185, 129, 0.25)',
-                  }}
-                  onClick={handleDemoEmployee}
-                >
-                  Employee
-                </button>
-              </div>
+              <button
+                type="button"
+                className="btn-ghost"
+                style={{
+                  fontSize: '10.5px',
+                  fontWeight: 600,
+                  color: '#818cf8',
+                  padding: '2px 10px',
+                  cursor: 'pointer',
+                  background: 'rgba(99, 102, 241, 0.1)',
+                  borderRadius: '4px',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                }}
+                onClick={handleDemoAdmin}
+              >
+                Auto-fill Admin
+              </button>
             </div>
+            )}
 
             {error && (
               <div
@@ -376,123 +554,369 @@ export const LoginView: React.FC = () => {
                   color: 'var(--accent-rose)',
                   padding: '10px 14px',
                   borderRadius: 'var(--radius-md)',
-                  fontSize: '13px',
-                  marginBottom: '20px',
+                  fontSize: '12px',
+                  marginBottom: '16px',
                 }}
               >
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Mail size={12} />
-                  <span>Work Email</span>
-                </label>
-                <input
-                  type="email"
-                  className="input-field"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="name@company.com"
-                  autoComplete="username"
-                />
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* METHOD 1: STANDARD PASSWORD FORM */}
+            {signInMethod === 'password' && (
+              <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
                   <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Lock size={12} />
-                    <span>Password</span>
+                    <Mail size={12} />
+                    <span>Work Email</span>
                   </label>
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    style={{
-                      fontSize: '11px',
-                      color: 'var(--accent-primary)',
-                      padding: 0,
-                      cursor: 'pointer',
-                      background: 'none',
-                      border: 'none',
-                    }}
-                    onClick={() => {
-                      setForgotEmail(email);
-                      setShowForgotModal(true);
-                      setForgotStep('request');
-                      setForgotMessage(null);
-                      setForgotError(null);
-                    }}
-                  >
-                    Forgot Password?
-                  </button>
+                  <input
+                    type="email"
+                    className="input-field"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder="name@company.com"
+                    autoComplete="username"
+                  />
                 </div>
-                <input
-                  type="password"
-                  className="input-field"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                />
-              </div>
 
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{ width: '100%', marginTop: '4px', height: '38px', gap: '8px' }}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <span>Verifying Argon2id credentials...</span>
-                ) : (
-                  <>
-                    <span>Sign In to Workspace</span>
-                    <ArrowRight size={15} />
-                  </>
-                )}
-              </button>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Lock size={12} />
+                      <span>Password</span>
+                    </label>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      style={{
+                        fontSize: '11px',
+                        color: 'var(--accent-primary)',
+                        padding: 0,
+                        cursor: 'pointer',
+                        background: 'none',
+                        border: 'none',
+                      }}
+                      onClick={() => {
+                        setForgotEmail(email);
+                        setShowForgotModal(true);
+                        setForgotStep('request');
+                        setForgotMessage(null);
+                        setForgotError(null);
+                      }}
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                  <input
+                    type="password"
+                    className="input-field"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                  />
+                </div>
 
-              <div style={{ textAlign: 'center', marginTop: '6px' }}>
                 <button
-                  type="button"
-                  onClick={() => setAuthMode('register')}
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ width: '100%', marginTop: '4px', height: '40px', gap: '8px' }}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <span>Verifying credentials...</span>
+                  ) : (
+                    <>
+                      <span>Sign In to Management Console</span>
+                      <ArrowRight size={15} />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* METHOD 2: WHATSAPP-STYLE QR CODE WEB LOGIN */}
+            {signInMethod === 'qr' && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '12px 0' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Log in with Humora Android App
+                </div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '16px', maxWidth: '300px', lineHeight: 1.4 }}>
+                  Scan this QR code from your phone's camera or Humora app to log in instantly.
+                </div>
+
+                <div
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--accent-primary)',
-                    fontSize: '12px',
-                    cursor: 'pointer',
+                    padding: '14px',
+                    background: '#ffffff',
+                    borderRadius: '16px',
+                    boxShadow: '0 8px 30px rgba(0, 0, 0, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    width: '208px',
+                    height: '208px',
                   }}
                 >
-                  Need to onboard a new company? <strong>Register as Admin →</strong>
-                </button>
+                  {qrStatus === 'loading' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <RefreshCw size={24} className="animate-spin" color="#6366f1" />
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>Generating QR...</span>
+                    </div>
+                  )}
+
+                  {qrStatus === 'pending' && qrPayload && (
+                    <QRCodeSVG
+                      value={qrPayload}
+                      size={180}
+                      level="M"
+                      includeMargin={false}
+                    />
+                  )}
+
+                  {qrStatus === 'authenticated' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <CheckCircle2 size={48} color="#10b981" />
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#10b981' }}>
+                        Authenticated!
+                      </span>
+                    </div>
+                  )}
+
+                  {qrStatus === 'expired' && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(15, 23, 42, 0.88)',
+                        borderRadius: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '16px',
+                        gap: '10px',
+                      }}
+                    >
+                      <AlertCircle size={28} color="#fbbf24" />
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc' }}>
+                        QR Code Expired
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSignInMethod('password');
+                          setTimeout(() => setSignInMethod('qr'), 50);
+                        }}
+                        style={{
+                          padding: '6px 14px',
+                          background: '#10b981',
+                          color: '#ffffff',
+                          borderRadius: '8px',
+                          border: 'none',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <RefreshCw size={12} /> Click to Reload
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {qrStatus === 'pending' && (
+                  <div style={{ marginTop: '12px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Code expires in <strong style={{ color: '#fbbf24' }}>{qrExpiresIn}s</strong>
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    marginTop: '16px',
+                    padding: '10px 14px',
+                    background: 'var(--surface-2)',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-hairline)',
+                    fontSize: '11px',
+                    color: 'var(--text-secondary)',
+                    textAlign: 'left',
+                    lineHeight: 1.6,
+                    width: '100%',
+                    maxWidth: '320px',
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>
+                    How to use QR Login:
+                  </div>
+                  1. Open Humora on your Android app<br />
+                  2. Tap <strong>Link Web Device</strong> in Settings or the Camera in Pulse Chat<br />
+                  3. Point your camera at this QR code
+                </div>
               </div>
-            </form>
+            )}
+
+            {/* SOCIAL LOGIN (Google, GitHub, Microsoft) */}
+            {(authProviders.google || authProviders.github || authProviders.microsoft) && (
+              <div style={{ marginTop: '20px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: '14px',
+                  }}
+                >
+                  <div style={{ flex: 1, height: '1px', background: 'var(--border-hairline)' }} />
+                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Or continue with
+                  </span>
+                  <div style={{ flex: 1, height: '1px', background: 'var(--border-hairline)' }} />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {authProviders.google && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.href = '/api/v1/auth/oauth/google?client=web';
+                      }}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--border-hairline)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        cursor: 'pointer',
+                        transition: 'all 0.16s ease',
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.29 21.43 7.37 24 12 24z"/>
+                        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.17 0 9.97 0 12s.46 3.83 1.26 5.42l4.02-3.15z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.37 0 3.29 2.57 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                      </svg>
+                      <span>Continue with Google</span>
+                    </button>
+                  )}
+
+                  {authProviders.github && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.href = '/api/v1/auth/oauth/github?client=web';
+                      }}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--border-hairline)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        cursor: 'pointer',
+                        transition: 'all 0.16s ease',
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+                      </svg>
+                      <span>Continue with GitHub</span>
+                    </button>
+                  )}
+
+                  {authProviders.microsoft && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.href = '/api/v1/auth/oauth/microsoft?client=web';
+                      }}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--border-hairline)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        cursor: 'pointer',
+                        transition: 'all 0.16s ease',
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24">
+                        <path fill="#f25022" d="M1 1h10v10H1z"/>
+                        <path fill="#00a4ef" d="M1 13h10v10H1z"/>
+                        <path fill="#7fba00" d="M13 1h10v10H13z"/>
+                        <path fill="#ffb900" d="M13 13h10v10H13z"/>
+                      </svg>
+                      <span>Continue with Microsoft</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div style={{ textAlign: 'center', marginTop: '16px' }}>
+              <button
+                type="button"
+                onClick={() => setAuthMode('register')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent-primary)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Need to onboard a new company? <strong>Register as Admin →</strong>
+              </button>
+            </div>
           </>
         ) : (
           /* Admin / Organization Registration Mode */
           <>
             <div
               style={{
-                background: 'rgba(99, 102, 241, 0.08)',
-                border: '1px solid rgba(99, 102, 241, 0.25)',
-                borderRadius: '8px',
-                padding: '12px 14px',
+                background: 'rgba(245, 158, 11, 0.08)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 16px',
                 marginBottom: '18px',
                 fontSize: '12px',
-                color: '#cbd5e1',
+                color: 'var(--text-secondary)',
                 lineHeight: 1.5,
               }}
             >
-              <div style={{ fontWeight: 600, color: '#a5b4fc', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+              <div style={{ fontWeight: 600, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                 <Building2 size={14} />
-                <span>Organization Management Setup</span>
+                <span>Enterprise Multi-Tenant Provisioning</span>
               </div>
-              Creates your corporate tenant and grants you the <strong>Superadmin</strong> role. Employees will be invited later from your dashboard.
+              Registers your company workspace, initializes automated roles, departments, shifts, and grants you primary <strong>Superadmin</strong> root authority.
             </div>
 
             {registerError && (
@@ -515,106 +939,145 @@ export const LoginView: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Building2 size={12} />
-                  <span>Company / Organization Name *</span>
-                </label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={orgName}
-                  onChange={(e) => handleOrgNameChange(e.target.value)}
-                  required
-                  placeholder="Acme Innovations Ltd."
-                />
-              </div>
-
-              <div>
-                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Globe size={12} />
-                  <span>Workspace URL Slug *</span>
-                </label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  required
-                  placeholder="acme-innovations"
-                />
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
-                  Workspace identifier: {slug || 'company-name'}.humora.internal
-                </span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label className="input-label">Admin First Name *</label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    value={adminFirstName}
-                    onChange={(e) => setAdminFirstName(e.target.value)}
-                    required
-                    placeholder="Sarah"
-                  />
-                </div>
-                <div>
-                  <label className="input-label">Admin Last Name</label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    value={adminLastName}
-                    onChange={(e) => setAdminLastName(e.target.value)}
-                    placeholder="Connor"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Mail size={12} />
-                  <span>Official Admin Work Email *</span>
-                </label>
-                <input
-                  type="email"
-                  className="input-field"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  required
-                  placeholder="admin@yourcompany.com"
-                />
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
-                  Strict platform conflict check enforced. Must not already exist.
-                </span>
-              </div>
-
-              <div>
-                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Lock size={12} />
-                  <span>Admin Master Password *</span>
-                </label>
-                <input
-                  type="password"
-                  className="input-field"
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  placeholder="Minimum 8 characters"
-                />
-              </div>
-
-              {/* Optional SMTP Gateway Setup Accordion */}
+            <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {/* SECTION 1: WORKSPACE IDENTITY (2-COLUMN GRID) */}
               <div
                 style={{
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: enableSmtpNow ? 'rgba(99, 102, 241, 0.05)' : 'var(--surface-2)',
-                  padding: '12px 14px',
-                  marginTop: '4px',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border-hairline)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '16px 18px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                  <Building2 size={15} color="var(--accent-primary)" />
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                    1. Organization & Domain Setup
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                  <div>
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Building2 size={12} />
+                      <span>Company / Organization Name *</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={orgName}
+                      onChange={(e) => handleOrgNameChange(e.target.value)}
+                      required
+                      placeholder="Acme Innovations Ltd."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Globe size={12} />
+                      <span>Workspace URL Slug *</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                      required
+                      placeholder="acme-innovations"
+                    />
+                    <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
+                      Workspace URL: <strong style={{ color: 'var(--accent-primary)' }}>{slug || 'company-slug'}</strong>.humora.internal
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: SUPERADMIN CREDENTIALS (2-COLUMN GRID) */}
+              <div
+                style={{
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border-hairline)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '16px 18px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                  <User size={15} color="var(--accent-primary)" />
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                    2. Primary Superadmin Account
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                  <div>
+                    <label className="input-label">Admin First Name *</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={adminFirstName}
+                      onChange={(e) => setAdminFirstName(e.target.value)}
+                      required
+                      placeholder="Sarah"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="input-label">Admin Last Name</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={adminLastName}
+                      onChange={(e) => setAdminLastName(e.target.value)}
+                      placeholder="Connor"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Mail size={12} />
+                      <span>Corporate Admin Email *</span>
+                    </label>
+                    <input
+                      type="email"
+                      className="input-field"
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
+                      required
+                      placeholder="admin@yourcompany.com"
+                    />
+                    <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
+                      Primary administrative identity for workspace access.
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Lock size={12} />
+                      <span>Admin Master Password *</span>
+                    </label>
+                    <input
+                      type="password"
+                      className="input-field"
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      required
+                      minLength={8}
+                      placeholder="Minimum 8 characters"
+                    />
+                    <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
+                      Protected by salted bcrypt & cryptographic session tokens.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: CORPORATE OUTBOUND EMAIL (SMTP GATEWAY) */}
+              <div
+                style={{
+                  border: enableSmtpNow ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid var(--border-hairline)',
+                  borderRadius: 'var(--radius-lg)',
+                  background: enableSmtpNow ? 'linear-gradient(145deg, rgba(245, 158, 11, 0.05) 0%, var(--surface-2) 100%)' : 'var(--surface-2)',
+                  padding: '16px 18px',
                   transition: 'all 0.2s ease',
                 }}
               >
@@ -629,24 +1092,47 @@ export const LoginView: React.FC = () => {
                   onClick={() => setEnableSmtpNow(!enableSmtpNow)}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Server size={14} style={{ color: 'var(--accent-primary)' }} />
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      Corporate Outbound Email (SMTP)
+                    <Server size={15} color="var(--accent-primary)" />
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      3. Outbound Email Delivery (SMTP Gateway)
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      Optional
                     </span>
                   </div>
-                  <span style={{ fontSize: '11px', color: 'var(--accent-primary)', fontWeight: 500 }}>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: enableSmtpNow ? '#fbbf24' : 'var(--accent-primary)',
+                      fontWeight: 600,
+                      background: enableSmtpNow ? 'rgba(245, 158, 11, 0.12)' : 'rgba(245, 158, 11, 0.06)',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(245, 158, 11, 0.25)',
+                    }}
+                  >
                     {enableSmtpNow ? 'Collapse ▲' : '+ Setup Email Now (Optional) ▼'}
                   </span>
                 </div>
 
-                <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                  Connect your SMTP gateway to send automated employee onboarding invites, monthly payslips, and OTPs. You can also configure this later in Company Settings.
+                <p style={{ margin: '6px 0 0', fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  Connect your corporate SMTP gateway for sending employee onboarding invites, monthly payslips, and OTPs. You can also configure this later in Company Settings.
                 </p>
 
                 {enableSmtpNow && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-hairline)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
-                      <div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-hairline)' }}>
+                    {/* SMTP Row 1: Host, Port, Encryption in a 3-column / responsive grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                      <div style={{ gridColumn: 'span 2' }}>
                         <label className="input-label" style={{ fontSize: '11px' }}>SMTP Host</label>
                         <input
                           type="text"
@@ -667,44 +1153,6 @@ export const LoginView: React.FC = () => {
                           onChange={(e) => setSmtpPort(Number(e.target.value))}
                         />
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="input-label" style={{ fontSize: '11px' }}>SMTP Username / Work Email</label>
-                      <input
-                        type="text"
-                        className="input-field"
-                        style={{ fontSize: '12px' }}
-                        value={smtpUsername}
-                        onChange={(e) => setSmtpUsername(e.target.value)}
-                        placeholder="hr@yourcompany.com"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="input-label" style={{ fontSize: '11px' }}>SMTP Password / App Password</label>
-                      <input
-                        type="password"
-                        className="input-field"
-                        style={{ fontSize: '12px' }}
-                        value={smtpPassword}
-                        onChange={(e) => setSmtpPassword(e.target.value)}
-                        placeholder="App password or secret key"
-                      />
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <div>
-                        <label className="input-label" style={{ fontSize: '11px' }}>Sender Display Name</label>
-                        <input
-                          type="text"
-                          className="input-field"
-                          style={{ fontSize: '12px' }}
-                          value={smtpFromName}
-                          onChange={(e) => setSmtpFromName(e.target.value)}
-                          placeholder="e.g. Acme HR"
-                        />
-                      </div>
                       <div>
                         <label className="input-label" style={{ fontSize: '11px' }}>Encryption</label>
                         <select
@@ -719,40 +1167,82 @@ export const LoginView: React.FC = () => {
                         </select>
                       </div>
                     </div>
+
+                    {/* SMTP Row 2: Username, Password, From Name in a 3-column / responsive grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                      <div>
+                        <label className="input-label" style={{ fontSize: '11px' }}>SMTP Username / Work Email</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          style={{ fontSize: '12px' }}
+                          value={smtpUsername}
+                          onChange={(e) => setSmtpUsername(e.target.value)}
+                          placeholder="hr@yourcompany.com"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="input-label" style={{ fontSize: '11px' }}>SMTP Password / App Password</label>
+                        <input
+                          type="password"
+                          className="input-field"
+                          style={{ fontSize: '12px' }}
+                          value={smtpPassword}
+                          onChange={(e) => setSmtpPassword(e.target.value)}
+                          placeholder="App password or secret key"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="input-label" style={{ fontSize: '11px' }}>Sender Display Name</label>
+                        <input
+                          type="text"
+                          className="input-field"
+                          style={{ fontSize: '12px' }}
+                          value={smtpFromName}
+                          onChange={(e) => setSmtpFromName(e.target.value)}
+                          placeholder="e.g. Acme HR"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{ width: '100%', marginTop: '6px', height: '40px', gap: '8px' }}
-                disabled={isRegistering}
-              >
-                {isRegistering ? (
-                  <span>Registering Organization...</span>
-                ) : (
-                  <>
-                    <span>Create Organization & Proceed →</span>
-                    <ArrowRight size={15} />
-                  </>
-                )}
-              </button>
-
-              <div style={{ textAlign: 'center', marginTop: '6px' }}>
+              {/* ACTION BUTTON & TOGGLE */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
                 <button
-                  type="button"
-                  onClick={() => setAuthMode('signin')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--accent-primary)',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ width: '100%', height: '42px', fontSize: '13px', fontWeight: 600, gap: '8px' }}
+                  disabled={isRegistering}
                 >
-                  Already have an organization? <strong>Sign in here →</strong>
+                  {isRegistering ? (
+                    <span>Registering Organization...</span>
+                  ) : (
+                    <>
+                      <span>Create Organization & Launch Workspace</span>
+                      <ArrowRight size={15} />
+                    </>
+                  )}
                 </button>
+
+                <div style={{ textAlign: 'center', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('signin')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--accent-primary)',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Already have an organization? <strong>Sign in here →</strong>
+                  </button>
+                </div>
               </div>
             </form>
           </>

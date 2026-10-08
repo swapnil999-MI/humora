@@ -2,6 +2,7 @@ package hrms
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 )
@@ -78,8 +79,8 @@ func VerifyGeofence(office *OfficeLocation, lat, lon float64, wifiBSSID string) 
 	// 3. Fallback to Haversine radial distance
 	dist := HaversineDistance(office.Latitude, office.Longitude, lat, lon)
 	if dist <= float64(office.RadiusMeters) {
-		return true, "verified by office geofence radius"
+		return true, fmt.Sprintf("verified by office geofence radius (%.1fm away, max %dm)", dist, office.RadiusMeters)
 	}
 
-	return false, "outside office geofenced boundary"
+	return false, fmt.Sprintf("outside office geofenced boundary (%.1fm away, max %dm)", dist, office.RadiusMeters)
 }

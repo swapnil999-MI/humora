@@ -1,0 +1,15 @@
+.git
+.env
+**/.env*
+!.env.example
+android
+web/node_modules
+web/dist
+bin
+tmp
+server
+scratch
+storage
+doc
+*.log
+crypto/**/target

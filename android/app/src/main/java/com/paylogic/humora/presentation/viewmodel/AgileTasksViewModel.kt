@@ -16,6 +16,7 @@ data class AgileTasksUiState(
     val isLoading: Boolean = false,
     val projects: List<ProjectItem> = emptyList(),
     val selectedProjectId: String? = null,
+    val sprintName: String = "",          // populated from API — no hardcoded sprint label
     val allTasks: List<SprintTaskItem> = emptyList(),
     val selectedFilterIndex: Int = 0, // 0: All, 1: Todo, 2: In Progress, 3: Done
     val isUpdating: Boolean = false,
@@ -55,6 +56,9 @@ class AgileTasksViewModel(
                     )
 
                     if (activeProject != null) {
+                        _uiState.value = _uiState.value.copy(
+                            sprintName = activeProject.name
+                        )
                         loadIssuesForProject(activeProject.id)
                     } else {
                         setFallbackTasks()
@@ -80,14 +84,11 @@ class AgileTasksViewModel(
     }
 
     private fun setFallbackTasks() {
+        // Issue #10 Fix: No fake fallback tasks — show empty list when API is unavailable
+        // Real users should never see internal developer task names (HUM-204, etc.)
         _uiState.value = _uiState.value.copy(
             isLoading = false,
-            allTasks = listOf(
-                SprintTaskItem("1", "HUM-204", "Geofence Mock Detection Engine", "high", "in_progress", "In Progress", 14400, 7200),
-                SprintTaskItem("2", "HUM-189", "Sandwich Leave Rule Calculator", "medium", "todo", "To Do", 10800, 10800),
-                SprintTaskItem("3", "HUM-156", "Statutory Tax Deductions preview", "low", "todo", "To Do", 7200, 7200),
-                SprintTaskItem("4", "HUM-142", "Biometric Face Embedding Preprocessor", "high", "done", "Done", 18000, 0)
-            )
+            allTasks = emptyList()
         )
     }
 
@@ -111,17 +112,23 @@ class AgileTasksViewModel(
                 else -> "40000000-0000-0000-0000-000000000001"
             }
 
-            workRepo.transitionIssue(taskId, targetStatusId)
-
-            // Optimistically update list
-            val updated = _uiState.value.allTasks.map {
-                if (it.id == taskId) it.copy(status = newStatus) else it
+            // Bug #1 Fix: Check API result — only update UI on success
+            val result = workRepo.transitionIssue(taskId, targetStatusId)
+            if (result is NetworkResult.Success) {
+                val updated = _uiState.value.allTasks.map {
+                    if (it.id == taskId) it.copy(status = newStatus) else it
+                }
+                _uiState.value = _uiState.value.copy(
+                    isUpdating = false,
+                    allTasks = updated,
+                    actionMessage = "Task transitioned to ${newStatus.replace('_', ' ').uppercase()}"
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isUpdating = false,
+                    actionMessage = "Failed to update task. Please check your connection and retry."
+                )
             }
-            _uiState.value = _uiState.value.copy(
-                isUpdating = false,
-                allTasks = updated,
-                actionMessage = "Task transitioned to ${newStatus.replace('_', ' ').uppercase()}"
-            )
         }
     }
 

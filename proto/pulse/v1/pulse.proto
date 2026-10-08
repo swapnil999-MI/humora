@@ -1,0 +1,296 @@
+// Pulse wire protocol (v1).
+//
+// Two layers live in this file:
+//   1. Transport frames (ClientFrame / ServerFrame) exchanged with the gateway
+//      over a single WebSocket, one protobuf message per binary WS frame.
+//   2. Content: the plaintext a client encrypts into Envelope.ciphertext.
+//      The server never parses Content and cannot read it.
+//
+// IDs are raw 16-byte UUIDs. Message IDs are client-generated UUIDv7 and act
+// as the idempotency key for retries.
+syntax = "proto3";
+
+package pulse.v1;
+
+option go_package = "humora-backend/internal/pulse/pulsepb;pulsepb";
+option java_package = "com.paylogic.humora.pulse.v1";
+option java_multiple_files = true;
+
+// ───────────────────────────── Transport ─────────────────────────────
+
+enum MessageKind {
+  MESSAGE_KIND_UNSPECIFIED = 0;
+  // Encrypted Content (text, media, reaction, edit, delete...).
+  MESSAGE_KIND_APPLICATION = 1;
+  // Group key-agreement handshake (MLS commit/proposal). Stored in order with
+  // application messages so every device replays the same history.
+  MESSAGE_KIND_HANDSHAKE = 2;
+}
+
+// A stored message as the server sees it: routing metadata plus opaque bytes.
+message Envelope {
+  bytes conversation_id = 1;
+  // Gapless, per-conversation, assigned by the server.
+  uint64 seq = 2;
+  bytes id = 3;
+  bytes sender_id = 4;
+  bytes sender_device_id = 5;
+  MessageKind kind = 6;
+  bytes ciphertext = 7;
+  // Server receive time, unix milliseconds.
+  int64 server_ts = 8;
+  // See Send.epoch.
+  uint64 epoch = 9;
+}
+
+message ClientFrame {
+  // Echoed back on the matching SendAck / SyncBatch / Error. 0 = no reply expected.
+  uint64 req_id = 1;
+  oneof body {
+    Send send = 2;
+    Watermark delivered = 3;
+    Watermark read = 4;
+    Typing typing = 5;
+    Sync sync = 6;
+    Ping ping = 7;
+    DirectSend direct_send = 8;
+    DirectAck direct_ack = 9;
+  }
+}
+
+message ServerFrame {
+  uint64 req_id = 1;
+  oneof body {
+    SendAck send_ack = 2;
+    Envelope message = 3;
+    Receipt receipt = 4;
+    TypingEvent typing = 5;
+    SyncBatch sync_batch = 6;
+    Pong pong = 7;
+    Error error = 8;
+    Direct direct = 9;
+    ConversationChanged conversation_changed = 10;
+    DirectSendAck direct_send_ack = 11;
+  }
+}
+
+message Send {
+  bytes conversation_id = 1;
+  bytes id = 2;
+  MessageKind kind = 3;
+  bytes ciphertext = 4;
+  // HANDSHAKE: the epoch this commit moves the group to. The server accepts
+  // it only if it is exactly one past the conversation's current epoch, so
+  // of two racing commits one wins and the other gets ERROR_CODE_CONFLICT.
+  // APPLICATION: the epoch the content was sealed in (informational; the
+  // authoritative value is inside the signed ciphertext).
+  uint64 epoch = 5;
+}
+
+// Single tick: the message is durably stored.
+message SendAck {
+  bytes conversation_id = 1;
+  bytes id = 2;
+  uint64 seq = 3;
+  int64 server_ts = 4;
+  // True when this id was already stored (a retry); seq is the original.
+  bool duplicate = 5;
+}
+
+// "Everything up to and including seq" — one frame covers any number of
+// messages, so receipts cost one small write however fast a chat moves.
+message Watermark {
+  bytes conversation_id = 1;
+  uint64 seq = 2;
+}
+
+// A member's watermarks moved. Double tick: delivered_seq >= message seq for
+// every other member. Blue tick: read_seq >= message seq for every other member.
+message Receipt {
+  bytes conversation_id = 1;
+  bytes user_id = 2;
+  uint64 delivered_seq = 3;
+  uint64 read_seq = 4;
+}
+
+message Typing {
+  bytes conversation_id = 1;
+  bool active = 2;
+}
+
+message TypingEvent {
+  bytes conversation_id = 1;
+  bytes user_id = 2;
+  bool active = 3;
+}
+
+// Fetch stored envelopes, ascending by seq.
+//   before_seq = 0 -> forward from after_seq (0 = start of the log): gap fill
+//   before_seq > 0 -> the page just below before_seq: scroll-back
+//                     (before_seq = max uint64 gives the latest page)
+message Sync {
+  bytes conversation_id = 1;
+  uint64 after_seq = 2;
+  uint64 before_seq = 3;
+  uint32 limit = 4;
+}
+
+message SyncBatch {
+  bytes conversation_id = 1;
+  repeated Envelope messages = 2;
+  // More rows exist in the requested direction.
+  bool has_more = 3;
+}
+
+message Ping {
+  // Client clock, unix ms; echoed so the client can measure round-trip time.
+  int64 client_ts = 1;
+}
+
+message Pong {
+  int64 client_ts = 1;
+  int64 server_ts = 2;
+}
+
+// Device-to-device payload outside any conversation's message log, e.g. an
+// MLS Welcome for a newly added member or a history-key share.
+message DirectSend {
+  bytes to_device_id = 1;
+  bytes conversation_id = 2; // optional context
+  bytes payload = 3;
+}
+
+message Direct {
+  uint64 id = 1;
+  bytes from_user_id = 2;
+  bytes from_device_id = 3;
+  bytes conversation_id = 4;
+  bytes payload = 5;
+  int64 server_ts = 6;
+}
+
+// The payload is queued for the target device.
+message DirectSendAck {
+  uint64 id = 1;
+}
+
+// Removes delivered Direct payloads from the server queue.
+message DirectAck {
+  repeated uint64 ids = 1;
+}
+
+// Membership or metadata changed; the client should refetch the conversation.
+message ConversationChanged {
+  bytes conversation_id = 1;
+}
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_BAD_REQUEST = 1;
+  ERROR_CODE_FORBIDDEN = 2;
+  ERROR_CODE_RATE_LIMITED = 3;
+  ERROR_CODE_INTERNAL = 4;
+  ERROR_CODE_TOO_LARGE = 5;
+  // A handshake lost the race for its epoch; apply the winner and retry.
+  ERROR_CODE_CONFLICT = 6;
+}
+
+message Error {
+  ErrorCode code = 1;
+  string message = 2;
+}
+
+// ───────────────────────────── Content ─────────────────────────────
+// Plaintext that clients serialize, encrypt, and place in Envelope.ciphertext.
+
+message Content {
+  oneof body {
+    Text text = 1;
+    Media media = 2;
+    Reaction reaction = 3;
+    Edit edit = 4;
+    Delete delete = 5;
+  }
+  // Message being replied to, if any.
+  bytes reply_to_id = 10;
+  // Thread root, if this message belongs to a thread.
+  bytes thread_root_id = 11;
+  repeated Tag tags = 12;
+}
+
+message Text {
+  string body = 1;
+}
+
+enum MediaKind {
+  MEDIA_KIND_UNSPECIFIED = 0;
+  MEDIA_KIND_IMAGE = 1;
+  MEDIA_KIND_VIDEO = 2;
+  MEDIA_KIND_AUDIO = 3;
+  MEDIA_KIND_VOICE_NOTE = 4;
+  MEDIA_KIND_DOCUMENT = 5;
+}
+
+// The file itself is uploaded to object storage already encrypted; only the
+// holder of this message can fetch and decrypt it.
+message Media {
+  MediaKind kind = 1;
+  string object_key = 2;
+  // AES-256-GCM key and nonce prefix for the uploaded blob.
+  bytes key = 3;
+  bytes nonce = 4;
+  // SHA-256 of the encrypted blob.
+  bytes sha256 = 5;
+  uint64 size_bytes = 6;
+  string mime_type = 7;
+  string file_name = 8;
+  uint32 width = 9;
+  uint32 height = 10;
+  uint32 duration_ms = 11;
+  // Small inline JPEG/WebP preview so the bubble renders before download.
+  bytes thumbnail = 12;
+  // Voice-note amplitude samples, 0-255.
+  bytes waveform = 13;
+  string caption = 14;
+}
+
+// One reaction per (sender, target): a new emoji replaces the old one,
+// an empty emoji removes it.
+message Reaction {
+  bytes target_id = 1;
+  string emoji = 2;
+}
+
+message Edit {
+  bytes target_id = 1;
+  Text text = 2;
+}
+
+message Delete {
+  bytes target_id = 1;
+}
+
+enum TagType {
+  TAG_TYPE_UNSPECIFIED = 0;
+  TAG_TYPE_USER = 1;
+  TAG_TYPE_TASK = 2;
+  TAG_TYPE_SPRINT = 3;
+  TAG_TYPE_PROJECT = 4;
+  TAG_TYPE_LEAVE = 5;
+  TAG_TYPE_ATTENDANCE = 6;
+  TAG_TYPE_PAYSLIP = 7;
+  TAG_TYPE_APPROVAL = 8;
+  TAG_TYPE_DOCUMENT = 9;
+}
+
+// A reference to a Humora element. The viewer's client resolves it live with
+// the viewer's own permissions; the snapshot is only a fallback label.
+message Tag {
+  TagType type = 1;
+  bytes id = 2;
+  // Byte range in Text.body that this tag covers (length 0 = attached chip).
+  uint32 offset = 3;
+  uint32 length = 4;
+  string snapshot_title = 5;
+  string snapshot_status = 6;
+}

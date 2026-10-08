@@ -51,13 +51,11 @@ class LeavesViewModel(
                 )
             }
 
+            // Issue #13 Fix: No fake personal leave history — show empty list when API unavailable
             val requests = if (leavesRes is NetworkResult.Success) {
                 leavesRes.data
             } else {
-                listOf(
-                    LeaveRequestItem("1", "Casual Leave", "2026-08-14", "2026-08-14", 1.0, 0.0, "Family function", "approved"),
-                    LeaveRequestItem("2", "Sick Leave", "2026-07-02", "2026-07-03", 2.0, 0.0, "Viral fever and doctor visit", "approved")
-                )
+                emptyList()
             }
 
             val types = if (typesRes is NetworkResult.Success) {

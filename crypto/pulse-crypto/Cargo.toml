@@ -1,0 +1,30 @@
+[package]
+name = "pulse-crypto"
+version = "0.1.0"
+edition = "2021"
+description = "End-to-end encryption core for Pulse: MLS (RFC 9420) group key agreement plus per-epoch message keys."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+openmls = "0.9.0"
+openmls_basic_credential = "0.6.0"
+openmls_rust_crypto = "0.6.0"
+openmls_traits = "0.6.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+openmls = { version = "0.9.0", features = ["js"] }
+wasm-bindgen = "0.2.129"
+js-sys = "0.3"
+# Transitive RustCrypto crates still use getrandom 0.2, which needs this to
+# reach the browser's crypto.getRandomValues.
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

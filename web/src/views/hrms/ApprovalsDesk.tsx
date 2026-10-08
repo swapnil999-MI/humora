@@ -1,12 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../../store/store';
+import {
+  useAppDispatch,
+  useAppSelector,
+} from '../../store/store';
 import {
   fetchCompanyLeaves,
   updateLeaveStatus,
   fetchTeamRegularizations,
   reviewRegularization,
 } from '../../store/hrmsSlice';
-import { addToast, navigateToPage } from '../../store/uiSlice';
+import {
+  addToast,
+  navigateToPage,
+} from '../../store/uiSlice';
 import {
   ShieldCheck,
   Check,
@@ -15,37 +21,34 @@ import {
   Calendar,
   Clock,
   UserCheck,
-  Layers,
   History,
   CheckCircle2,
-  XCircle,
   DollarSign,
-  Zap,
   Users,
   MessageSquare,
   Sparkles,
-  Flame,
-  ShieldAlert,
-  ChevronRight,
-  Filter,
-  ArrowRight,
-  Receipt,
   FileCheck,
-  Briefcase,
   AlertCircle,
-  ExternalLink,
 } from 'lucide-react';
-import { FounderPulseBar } from './components/FounderPulseBar';
-import { FounderDelegationModal, DelegationPolicy } from './components/FounderDelegationModal';
-import { DecisionAuditLedger, AuditRecord } from './components/DecisionAuditLedger';
+import {
+  FounderPulseBar,
+} from './components/FounderPulseBar';
+import {
+  api,
+} from '../../api/client';
+import type { OnboardingCandidate, ReimbursementClaim } from '../../types';
+import {
+  DecisionAuditLedger,
+  AuditRecord,
+} from './components/DecisionAuditLedger';
 
-export type MainTab = 'inbox' | 'pulse' | 'audit' | 'governance';
-export type ApprovalCategory = 'all' | 'leaves' | 'regularizations' | 'expenses' | 'sprints' | 'offers';
+export type MainTab = 'inbox' | 'audit';
+export type ApprovalCategory = 'all' | 'leaves' | 'regularizations' | 'expenses' | 'offers';
 export type RiskLevel = 'low' | 'medium' | 'high';
 
 interface BaseApprovalItem {
   id: string;
-  category: 'leaves' | 'regularizations' | 'expenses' | 'sprints' | 'offers';
+  category: 'leaves' | 'regularizations' | 'expenses' | 'offers';
   requesterName: string;
   requesterRole: string;
   requesterAvatar?: string;
@@ -73,133 +76,35 @@ export const ApprovalsDesk: React.FC = () => {
   const [activeRemarkId, setActiveRemarkId] = useState<string | null>(null);
   const [customRemark, setCustomRemark] = useState<string>('');
 
-  // Delegation Modal State
-  const [isDelegationOpen, setIsDelegationOpen] = useState(false);
-  const [delegationPolicy, setDelegationPolicy] = useState<DelegationPolicy>({
-    isDelegated: false,
-    delegateName: 'Sarah Jenkins',
-    delegateRole: 'VP of Engineering',
-    scope: 'routine_only',
-    autoApproveLowRisk: true,
-    emergencyFreeze: false,
-    validUntil: 'friday',
-  });
 
-  // Local simulated records for executive domains (expenses, sprints, offers)
-  const [executiveRequests, setExecutiveRequests] = useState<BaseApprovalItem[]>([
-    {
-      id: 'exp-1',
-      category: 'expenses',
-      requesterName: 'Rohan Deshmukh',
-      requesterRole: 'Principal Platform Architect',
-      title: 'AWS Certified Solutions Architect Pro Certification Fee',
-      submittedAt: 'Today, 10:15 AM',
-      riskLevel: 'low',
-      riskReason: 'Pre-approved within engineering learning & development budget',
-      details: (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
-          <div><strong>Claim Amount:</strong> ₹24,500 ($300 USD) • <em>Receipt attached</em></div>
-          <div><strong>Cost Center:</strong> Engineering Platform L&D • Manager: Sarah Jenkins</div>
-          <div style={{ color: 'var(--text-muted)' }}>Exam scheduled for October 2nd. Boosts enterprise compliance credentials.</div>
-        </div>
-      ),
-    },
-    {
-      id: 'exp-2',
-      category: 'expenses',
-      requesterName: 'Sarah Jenkins',
-      requesterRole: 'VP of Engineering',
-      title: 'Q3 All-Hands Engineering Offsite & Hackathon Venue',
-      submittedAt: 'Yesterday, 16:40',
-      riskLevel: 'high',
-      riskReason: 'High single expenditure requiring Founder co-signature (>₹50,000)',
-      details: (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
-          <div><strong>Claim Amount:</strong> ₹68,500 • <em>Advance Venue Deposit</em></div>
-          <div><strong>Event Dates:</strong> October 14-15 (45 attendees)</div>
-          <div><strong>Budget Line:</strong> People & Culture Q3 All-Hands Pool (Balance remaining: ₹1,20,000)</div>
-        </div>
-      ),
-    },
-    {
-      id: 'spr-1',
-      category: 'sprints',
-      requesterName: 'Sarah Jenkins',
-      requesterRole: 'VP of Engineering',
-      title: 'Add WebAuthn Biometric Liveness to Active Sprint 24',
-      submittedAt: 'Today, 09:30 AM',
-      riskLevel: 'medium',
-      riskReason: 'Mid-sprint scope injection (+8 Story Points) with release timeline impact',
-      details: (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
-          <div><strong>Target Sprint:</strong> Sprint 24 (Ends Friday) • Impact: +8 pts</div>
-          <div><strong>Justification:</strong> Client Enterprise Security Audit requirement for SOC2 compliance.</div>
-          <div><strong>Team Capacity:</strong> Devs have 12 buffer hours allocated. No delivery delay projected.</div>
-        </div>
-      ),
-    },
-    {
-      id: 'off-1',
-      category: 'offers',
-      requesterName: 'Elena Rostova',
-      requesterRole: 'Head of People & Talent',
-      title: 'Staff Distributed Systems Engineer — Priya Sharma',
-      submittedAt: 'Yesterday, 11:20',
-      riskLevel: 'high',
-      riskReason: 'Senior Leadership Band CTC + Equity grant exceeding standard hiring band',
-      details: (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
-          <div><strong>Proposed Compensation:</strong> ₹42,00,000 CTC + ₹4,00,000 Joining Bonus</div>
-          <div><strong>Equity:</strong> 0.15% ESOPs over 4-year vesting schedule (1-year cliff)</div>
-          <div><strong>Interview Score:</strong> 4.9/5.0 (Strong Hire across all 4 technical bars)</div>
-        </div>
-      ),
-    },
-  ]);
+  // Expense claims awaiting review, and candidates who submitted their onboarding dossier.
+  const [teamClaims, setTeamClaims] = useState<(ReimbursementClaim & { employee_name?: string })[]>([]);
+  const [submittedCandidates, setSubmittedCandidates] = useState<OnboardingCandidate[]>([]);
 
-  // Initial audit records ledger
-  const [auditLedger, setAuditLedger] = useState<AuditRecord[]>([
-    {
-      id: 'aud-1',
-      category: 'leaves',
-      title: 'Casual Leave • 2 Days',
-      requesterName: 'Alex Rivera',
-      requesterRole: 'DevOps Lead',
-      details: 'Personal family travel • Sep 18 - Sep 19',
-      outcome: 'approved',
-      decidedBy: 'Founder (Direct)',
-      decidedAt: 'Sep 17, 14:22',
-      remarks: 'Approved. Backup on-call assigned to Rohan.',
-    },
-    {
-      id: 'aud-2',
-      category: 'regularizations',
-      title: 'Missed In-Punch Reconciled',
-      requesterName: 'Neha Patel',
-      requesterRole: 'Frontend Developer',
-      details: 'Biometric device offline during morning shift at 09:30 AM',
-      outcome: 'approved',
-      decidedBy: 'Sarah Jenkins (Delegate)',
-      decidedAt: 'Sep 19, 10:15',
-      remarks: 'Biometric turnstile log verified.',
-    },
-    {
-      id: 'aud-3',
-      category: 'expenses',
-      title: 'Datadog APM Monthly Overage Claim',
-      requesterName: 'Alex Rivera',
-      requesterRole: 'DevOps Lead',
-      details: '₹32,000 infrastructure overage charge',
-      outcome: 'approved',
-      decidedBy: 'Founder (Direct)',
-      decidedAt: 'Sep 20, 16:50',
-      remarks: 'Approved per AWS traffic switch spike.',
-    },
-  ]);
+  // Decisions taken in this console during this session (the server keeps each request's final status).
+  const [auditLedger, setAuditLedger] = useState<AuditRecord[]>([]);
+
+  const loadClaims = async () => {
+    try {
+      setTeamClaims((await api.get<(ReimbursementClaim & { employee_name?: string })[]>('/hrms/payroll/reimbursements/team?status=pending')) || []);
+    } catch {
+      setTeamClaims([]);
+    }
+  };
+  const loadCandidates = async () => {
+    try {
+      const all = (await api.get<OnboardingCandidate[]>('/hrms/onboarding/pipeline')) || [];
+      setSubmittedCandidates(all.filter((c) => c.status === 'submitted'));
+    } catch {
+      setSubmittedCandidates([]);
+    }
+  };
 
   useEffect(() => {
     dispatch(fetchCompanyLeaves());
     dispatch(fetchTeamRegularizations());
+    void loadClaims();
+    void loadCandidates();
   }, [dispatch]);
 
   // Transform Pending Leaves to Unified Format
@@ -257,7 +162,7 @@ export const ApprovalsDesk: React.FC = () => {
         id: l.id,
         category: 'leaves',
         requesterName: l.employee_name || 'Team Member',
-        requesterRole: 'Engineering',
+        requesterRole: '',
         title: `${leaveTypeName.toUpperCase()} Request • ${days} ${days === 1 ? 'Day' : 'Days'}`,
         submittedAt: new Date(l.created_at || Date.now()).toLocaleDateString(),
         riskLevel,
@@ -268,11 +173,11 @@ export const ApprovalsDesk: React.FC = () => {
               <strong>Dates:</strong> {new Date(l.from_date).toLocaleDateString()} &rarr; {new Date(l.to_date).toLocaleDateString()}
             </div>
             <div>
-              <strong>Reason:</strong> <em>"{l.reason || 'Personal time-off'}"</em>
+              <strong>Reason:</strong> <em>{l.reason ? `"${l.reason}"` : 'No reason given'}</em>
             </div>
             {hasConflict && (
               <div style={{ color: '#fbbf24', fontWeight: 600 }}>
-                ⚠️ Overlap Alert: Another engineer is scheduled off during this window.
+                ⚠️ Overlap: someone else is also off during this period.
               </div>
             )}
           </div>
@@ -284,15 +189,16 @@ export const ApprovalsDesk: React.FC = () => {
   // Convert HRMS Regularizations to unified BaseApprovalItem
   const unifiedRegularizations: BaseApprovalItem[] = useMemo(() => {
     return pendingRegularizations.map((r) => {
-      const riskLevel: RiskLevel = 'low';
-      const riskReason = 'Routine biometric correction verified against workstation shift log';
+      // Nothing about a correction is verified automatically, so it always needs a human check.
+      const riskLevel: RiskLevel = 'medium';
+      const riskReason = 'Check the requested time against the shift roster before approving';
       const punchType = r.requested_punch_in ? 'Check-In' : r.requested_punch_out ? 'Check-Out' : 'Shift';
 
       return {
         id: r.id,
         category: 'regularizations',
         requesterName: r.employee_name || 'Team Member',
-        requesterRole: 'Product & Operations',
+        requesterRole: '',
         title: `Attendance Regularization • ${punchType} Missed`,
         submittedAt: r.request_date || r.created_at || 'Recent',
         riskLevel,
@@ -300,16 +206,10 @@ export const ApprovalsDesk: React.FC = () => {
         details: (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
             <div>
-              <strong>Scheduled Shift:</strong> {r.request_date} (General Shift: 09:00 AM - 06:00 PM)
+              <strong>Requested Punch:</strong> {r.requested_punch_in || r.requested_punch_out || 'Not specified'}
             </div>
             <div>
-              <strong>Requested Punch:</strong> {r.requested_punch_in || r.requested_punch_out || '09:15 AM'}
-            </div>
-            <div>
-              <strong>Employee Reason:</strong> <em>"{r.reason || 'Biometric hardware reader sync delay'}"</em>
-            </div>
-            <div style={{ color: 'var(--accent-emerald, #10b981)', fontWeight: 600 }}>
-              Biometric Liveness Match: 98.4% Confidence Score
+              <strong>Employee Reason:</strong> <em>{r.reason ? `"${r.reason}"` : 'No reason given'}</em>
             </div>
           </div>
         ),
@@ -317,10 +217,60 @@ export const ApprovalsDesk: React.FC = () => {
     });
   }, [pendingRegularizations]);
 
+  const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
+
+  // Expense claims: risk from the amount (single claims above ₹50,000 need a closer look).
+  const unifiedExpenses: BaseApprovalItem[] = useMemo(() => {
+    return teamClaims.map((c) => {
+      const riskLevel: RiskLevel = c.amount > 50000 ? 'high' : c.amount > 10000 ? 'medium' : 'low';
+      return {
+        id: c.id,
+        category: 'expenses',
+        requesterName: c.employee_name || 'Employee',
+        requesterRole: '',
+        title: `${c.category_name || c.category} • ${inr(c.amount)}`,
+        submittedAt: new Date(c.created_at).toLocaleDateString(),
+        riskLevel,
+        riskReason: riskLevel === 'high' ? 'Large single claim (over ₹50,000)' : riskLevel === 'medium' ? 'Claim over ₹10,000' : 'Small claim',
+        details: (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
+            <div><strong>Merchant:</strong> {c.merchant_name}{c.bill_number ? ` • Bill ${c.bill_number}` : ''}</div>
+            <div><strong>Bill date:</strong> {new Date(c.bill_date).toLocaleDateString()}</div>
+            {c.description && <div><strong>Description:</strong> <em>{c.description}</em></div>}
+            {c.receipt_url && (
+              <div><a href={c.receipt_url} target="_blank" rel="noreferrer">View receipt</a></div>
+            )}
+          </div>
+        ),
+      };
+    });
+  }, [teamClaims]);
+
+  // Candidates who submitted their onboarding dossier: hiring decisions are always reviewed in full.
+  const unifiedOffers: BaseApprovalItem[] = useMemo(() => {
+    return submittedCandidates.map((c) => ({
+      id: c.id,
+      category: 'offers',
+      requesterName: `${c.first_name} ${c.last_name}`.trim(),
+      requesterRole: c.designation_title || '',
+      title: `Onboarding dossier submitted${c.designation_title ? ` • ${c.designation_title}` : ''}`,
+      submittedAt: new Date(c.submitted_at || c.created_at).toLocaleDateString(),
+      riskLevel: 'high' as RiskLevel,
+      riskReason: 'Hiring decision: review the full dossier in Onboarding',
+      details: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
+          <div><strong>Joining:</strong> {new Date(c.expected_joining_date).toLocaleDateString()} • {c.employment_type}</div>
+          {c.department_name && <div><strong>Department:</strong> {c.department_name}</div>}
+          {c.annual_ctc ? <div><strong>Annual CTC:</strong> {inr(c.annual_ctc)}</div> : null}
+        </div>
+      ),
+    }));
+  }, [submittedCandidates]);
+
   // Combine all active pending items
   const allPendingItems = useMemo(() => {
-    return [...unifiedLeaves, ...unifiedRegularizations, ...executiveRequests];
-  }, [unifiedLeaves, unifiedRegularizations, executiveRequests]);
+    return [...unifiedLeaves, ...unifiedRegularizations, ...unifiedExpenses, ...unifiedOffers];
+  }, [unifiedLeaves, unifiedRegularizations, unifiedExpenses, unifiedOffers]);
 
   // Filter by category, risk, and search
   const filteredItems = useMemo(() => {
@@ -343,16 +293,20 @@ export const ApprovalsDesk: React.FC = () => {
   // Individual Actions
   const handleApproveItem = async (item: BaseApprovalItem, remarks: string = '') => {
     setProcessingId(item.id);
-    const remarkText = remarks || customRemark || 'Approved by Founder';
+    const remarkText = remarks || customRemark || '';
 
     try {
       if (item.category === 'leaves') {
         await dispatch(updateLeaveStatus({ requestId: item.id, status: 'approved' })).unwrap();
       } else if (item.category === 'regularizations') {
         await dispatch(reviewRegularization({ id: item.id, status: 'approved' })).unwrap();
+      } else if (item.category === 'expenses') {
+        await api.put(`/hrms/payroll/reimbursements/${item.id}/review`, { status: 'approved' });
+        setTeamClaims((prev) => prev.filter((c) => c.id !== item.id));
       } else {
-        // Executive items
-        setExecutiveRequests((prev) => prev.filter((r) => r.id !== item.id));
+        // Hiring decisions need the department, designation and manager chosen in Onboarding.
+        dispatch(navigateToPage('onboarding'));
+        return;
       }
 
       // Add to audit ledger
@@ -364,8 +318,8 @@ export const ApprovalsDesk: React.FC = () => {
         requesterRole: item.requesterRole,
         details: item.riskReason,
         outcome: 'approved',
-        decidedBy: delegationPolicy.isDelegated ? `${delegationPolicy.delegateName} (Delegate)` : 'Founder (Direct)',
-        decidedAt: 'Just now',
+        decidedBy: 'You',
+        decidedAt: new Date().toLocaleString(),
         remarks: remarkText,
       };
       setAuditLedger((prev) => [newAudit, ...prev]);
@@ -377,7 +331,7 @@ export const ApprovalsDesk: React.FC = () => {
         })
       );
     } catch (err: any) {
-      dispatch(addToast({ type: 'error', message: err || 'Approval failed' }));
+      dispatch(addToast({ type: 'error', message: err?.message || String(err || 'Approval failed') }));
     } finally {
       setProcessingId(null);
       setActiveRemarkId(null);
@@ -387,16 +341,20 @@ export const ApprovalsDesk: React.FC = () => {
 
   const handleRejectItem = async (item: BaseApprovalItem, remarks: string = '') => {
     setProcessingId(item.id);
-    const remarkText = remarks || customRemark || 'Declined by Founder';
+    const remarkText = remarks || customRemark || '';
 
     try {
       if (item.category === 'leaves') {
         await dispatch(updateLeaveStatus({ requestId: item.id, status: 'rejected' })).unwrap();
       } else if (item.category === 'regularizations') {
         await dispatch(reviewRegularization({ id: item.id, status: 'rejected' })).unwrap();
+      } else if (item.category === 'expenses') {
+        await api.put(`/hrms/payroll/reimbursements/${item.id}/review`, { status: 'rejected' });
+        setTeamClaims((prev) => prev.filter((c) => c.id !== item.id));
       } else {
-        // Executive items
-        setExecutiveRequests((prev) => prev.filter((r) => r.id !== item.id));
+        // Hiring decisions need the department, designation and manager chosen in Onboarding.
+        dispatch(navigateToPage('onboarding'));
+        return;
       }
 
       // Add to audit ledger
@@ -408,8 +366,8 @@ export const ApprovalsDesk: React.FC = () => {
         requesterRole: item.requesterRole,
         details: item.riskReason,
         outcome: 'rejected',
-        decidedBy: delegationPolicy.isDelegated ? `${delegationPolicy.delegateName} (Delegate)` : 'Founder (Direct)',
-        decidedAt: 'Just now',
+        decidedBy: 'You',
+        decidedAt: new Date().toLocaleString(),
         remarks: remarkText,
       };
       setAuditLedger((prev) => [newAudit, ...prev]);
@@ -417,11 +375,11 @@ export const ApprovalsDesk: React.FC = () => {
       dispatch(
         addToast({
           type: 'info',
-          message: `Declined ${item.title}. Audit record preserved.`,
+          message: `Declined ${item.title}.`,
         })
       );
     } catch (err: any) {
-      dispatch(addToast({ type: 'error', message: err || 'Rejection failed' }));
+      dispatch(addToast({ type: 'error', message: err?.message || String(err || 'Rejection failed') }));
     } finally {
       setProcessingId(null);
       setActiveRemarkId(null);
@@ -429,51 +387,51 @@ export const ApprovalsDesk: React.FC = () => {
     }
   };
 
-  // High-Velocity: Approve All Low-Risk
+  // Approve every low-risk leave and expense claim in one go (corrections and hires always need a look).
   const handleApproveAllLowRisk = async () => {
-    const lowRiskItems = allPendingItems.filter((i) => i.riskLevel === 'low');
+    const lowRiskItems = allPendingItems.filter((i) => i.riskLevel === 'low' && (i.category === 'leaves' || i.category === 'expenses'));
     if (lowRiskItems.length === 0) {
       dispatch(addToast({ type: 'info', message: 'No low-risk items pending sign-off.' }));
       return;
     }
 
     setProcessingId('bulk');
+    let approved = 0;
     for (const item of lowRiskItems) {
-      if (item.category === 'leaves') {
-        try {
+      try {
+        if (item.category === 'leaves') {
           await dispatch(updateLeaveStatus({ requestId: item.id, status: 'approved' })).unwrap();
-        } catch (_) {}
-      } else if (item.category === 'regularizations') {
-        try {
-          await dispatch(reviewRegularization({ id: item.id, status: 'approved' })).unwrap();
-        } catch (_) {}
-      } else {
-        setExecutiveRequests((prev) => prev.filter((r) => r.id !== item.id));
+        } else {
+          await api.put(`/hrms/payroll/reimbursements/${item.id}/review`, { status: 'approved' });
+          setTeamClaims((prev) => prev.filter((c) => c.id !== item.id));
+        }
+        approved++;
+        setAuditLedger((prev) => [
+          {
+            id: `aud-${Date.now()}-${item.id}`,
+            category: item.category,
+            title: item.title,
+            requesterName: item.requesterName,
+            requesterRole: item.requesterRole,
+            details: item.riskReason,
+            outcome: 'approved',
+            decidedBy: 'You (bulk approval)',
+            decidedAt: new Date().toLocaleString(),
+            remarks: '',
+          },
+          ...prev,
+        ]);
+      } catch {
+        // counted below
       }
-
-      // Log to audit
-      setAuditLedger((prev) => [
-        {
-          id: `aud-${Date.now()}-${item.id}`,
-          category: item.category,
-          title: item.title,
-          requesterName: item.requesterName,
-          requesterRole: item.requesterRole,
-          details: item.riskReason,
-          outcome: 'approved',
-          decidedBy: 'Founder (Batch Quick-Pass)',
-          decidedAt: 'Just now',
-          remarks: 'Automated 1-click low-risk executive sign-off.',
-        },
-        ...prev,
-      ]);
     }
 
     setProcessingId(null);
+    const failed = lowRiskItems.length - approved;
     dispatch(
       addToast({
-        type: 'success',
-        message: `⚡ Batch cleared ${lowRiskItems.length} low-risk approvals in one click.`,
+        type: failed ? 'error' : 'success',
+        message: failed ? `Approved ${approved}; ${failed} could not be approved and are still pending.` : `Approved ${approved} low-risk items.`,
       })
     );
   };
@@ -547,38 +505,13 @@ export const ApprovalsDesk: React.FC = () => {
                 </span>
               </div>
               <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-                High-velocity executive command center for cross-departmental approvals, runway liabilities, and company operations.
+                Every pending sign-off across leave, attendance corrections, expense claims and new hires, in one place.
               </p>
             </div>
           </div>
 
           {/* Quick Authority & Governance Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {/* Delegation Button */}
-            <button
-              onClick={() => setIsDelegationOpen(true)}
-              style={{
-                background: delegationPolicy.isDelegated ? 'rgba(245, 158, 11, 0.15)' : 'var(--surface-3)',
-                border: delegationPolicy.isDelegated ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--border-hairline)',
-                borderRadius: '8px',
-                padding: '8px 14px',
-                color: delegationPolicy.isDelegated ? '#fbbf24' : 'var(--text-primary)',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <ShieldAlert size={15} />
-              <span>
-                {delegationPolicy.isDelegated
-                  ? `Delegate Active: ${delegationPolicy.delegateName}`
-                  : 'Configure Delegation'}
-              </span>
-            </button>
 
             {/* Quick-Pass Low-Risk Button */}
             {lowRiskCount > 0 && (
@@ -607,28 +540,6 @@ export const ApprovalsDesk: React.FC = () => {
           </div>
         </div>
 
-        {/* Emergency Freeze Alert Banner */}
-        {delegationPolicy.emergencyFreeze && (
-          <div
-            style={{
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
-              borderRadius: '8px',
-              padding: '10px 14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              color: '#f87171',
-              fontSize: '12px',
-              fontWeight: 600,
-            }}
-          >
-            <Flame size={16} />
-            <span>
-              <strong>EMERGENCY OPERATIONS FREEZE ENGAGED:</strong> Unbudgeted scope additions, out-of-band expense claims, and hiring requisition approvals are locked.
-            </span>
-          </div>
-        )}
 
         {/* ========================================================================= */}
         {/* 2. COMPANY VITAL SIGNS & PULSE BAR                                        */}
@@ -700,28 +611,6 @@ export const ApprovalsDesk: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setActiveMainTab('pulse')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 18px',
-              borderRadius: '8px',
-              border: 'none',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              background: activeMainTab === 'pulse' ? 'var(--surface-3)' : 'transparent',
-              color: activeMainTab === 'pulse' ? 'var(--text-primary)' : 'var(--text-secondary)',
-              borderBottom: activeMainTab === 'pulse' ? '2px solid var(--accent-primary, #f59e0b)' : '2px solid transparent',
-            }}
-          >
-            <Zap size={14} />
-            <span>Company Vitals & Runway</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveMainTab('audit')}
             style={{
               display: 'flex',
@@ -789,10 +678,9 @@ export const ApprovalsDesk: React.FC = () => {
               {[
                 { id: 'all', label: 'All Items', count: allPendingItems.length, icon: ShieldCheck },
                 { id: 'leaves', label: 'Leaves & Time-Off', count: unifiedLeaves.length, icon: Calendar },
-                { id: 'regularizations', label: 'Biometrics', count: unifiedRegularizations.length, icon: Clock },
-                { id: 'expenses', label: 'Payroll & Expenses', count: executiveRequests.filter((e) => e.category === 'expenses').length, icon: DollarSign },
-                { id: 'sprints', label: 'Sprint Scope', count: executiveRequests.filter((e) => e.category === 'sprints').length, icon: Zap },
-                { id: 'offers', label: 'Hiring Offers', count: executiveRequests.filter((e) => e.category === 'offers').length, icon: Users },
+                { id: 'regularizations', label: 'Attendance Corrections', count: unifiedRegularizations.length, icon: Clock },
+                { id: 'expenses', label: 'Expense Claims', count: unifiedExpenses.length, icon: DollarSign },
+                { id: 'offers', label: 'New Hires', count: unifiedOffers.length, icon: Users },
               ].map((c) => {
                 const Icon = c.icon;
                 const isActive = activeCategory === c.id;
@@ -1159,6 +1047,7 @@ export const ApprovalsDesk: React.FC = () => {
 
                       {/* Primary Decision Buttons */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {item.category !== 'offers' && (
                         <button
                           type="button"
                           onClick={() => handleRejectItem(item)}
@@ -1180,6 +1069,7 @@ export const ApprovalsDesk: React.FC = () => {
                           <X size={14} />
                           <span>Decline</span>
                         </button>
+                        )}
 
                         <button
                           type="button"
@@ -1201,7 +1091,7 @@ export const ApprovalsDesk: React.FC = () => {
                           }}
                         >
                           <Check size={14} strokeWidth={3} />
-                          <span>Approve</span>
+                          <span>{item.category === 'offers' ? 'Review in Onboarding' : 'Approve'}</span>
                         </button>
                       </div>
                     </div>
@@ -1214,95 +1104,12 @@ export const ApprovalsDesk: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 5. TAB 2: COMPANY VITALS & RUNWAY HEALTH                                  */}
-      {/* ========================================================================= */}
-      {activeMainTab === 'pulse' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div
-            style={{
-              background: 'var(--surface-1)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-lg, 12px)',
-              padding: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            }}
-          >
-            <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-              Executive Runway, Payroll & Capacity Forecast
-            </h2>
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-              Cross-domain analysis linking biometric shift attendance, statutory salary liabilities, and agile story point burn.
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginTop: '8px' }}>
-              <div style={{ background: 'var(--surface-2)', padding: '16px', borderRadius: '10px', border: '1px solid var(--border-hairline)' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Payroll Reserve Status
-                </span>
-                <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }}>
-                  18.4 Months Runway
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--accent-emerald, #10b981)', marginTop: '4px' }}>
-                  Healthy cash buffer covering 48 FTEs + Q4 projected hiring.
-                </div>
-              </div>
-
-              <div style={{ background: 'var(--surface-2)', padding: '16px', borderRadius: '10px', border: '1px solid var(--border-hairline)' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Attendance-to-Worklog Sync
-                </span>
-                <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }}>
-                  94.2% Reconciled
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Biometric attendance shifts match ticket sprint hours with &lt; 0.6h average variance.
-                </div>
-              </div>
-
-              <div style={{ background: 'var(--surface-2)', padding: '16px', borderRadius: '10px', border: '1px solid var(--border-hairline)' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Sprint Capacity Allocation
-                </span>
-                <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }}>
-                  82% Core Features
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  12% Tech Debt &bull; 6% Production Support & Monitoring.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
       {/* 6. TAB 3: DECISION AUDIT LEDGER                                           */}
       {/* ========================================================================= */}
       {activeMainTab === 'audit' && (
         <DecisionAuditLedger records={auditLedger} />
       )}
 
-      {/* ========================================================================= */}
-      {/* 7. FOUNDER DELEGATION MODAL                                               */}
-      {/* ========================================================================= */}
-      <FounderDelegationModal
-        isOpen={isDelegationOpen}
-        onClose={() => setIsDelegationOpen(false)}
-        currentPolicy={delegationPolicy}
-        onSave={(newPolicy) => {
-          setDelegationPolicy(newPolicy);
-          dispatch(
-            addToast({
-              type: 'success',
-              message: newPolicy.isDelegated
-                ? `Delegation granted to ${newPolicy.delegateName}.`
-                : 'Direct Founder authority re-engaged.',
-            })
-          );
-        }}
-      />
     </div>
   );
 };

@@ -15,13 +15,8 @@ import kotlinx.coroutines.launch
 data class PayrollUiState(
     val isLoading: Boolean = false,
     val payslips: List<PayslipItem> = emptyList(),
-    val compensation: CompensationItem = CompensationItem(
-        annualCtc = 1800000.0,
-        monthlyGross = 150000.0,
-        basic = 75000.0,
-        hra = 37500.0,
-        specialAllowance = 37500.0
-    ),
+    val compensation: CompensationItem = CompensationItem(), // zeroed — populated from API
+    val nextPayDate: String = "",                           // populated from API or left blank
     val actionMessage: String? = null
 )
 
@@ -43,14 +38,11 @@ class PayrollViewModel(
             val payslipsRes = payrollRepo.getMyPayslips()
             val compRes = payrollRepo.getMyCompensation()
 
+            // Issue #6 Fix: No fake fallback payslips — show empty list on API failure
             val payslips = if (payslipsRes is NetworkResult.Success && payslipsRes.data.isNotEmpty()) {
                 payslipsRes.data
             } else {
-                listOf(
-                    PayslipItem("1", "Swapnil P.", 8, 2026, "August 2026", 142800.0, 165000.0, 22200.0, "paid", "2026-08-31"),
-                    PayslipItem("2", "Swapnil P.", 7, 2026, "July 2026", 142800.0, 165000.0, 22200.0, "paid", "2026-07-31"),
-                    PayslipItem("3", "Swapnil P.", 6, 2026, "June 2026", 138500.0, 160000.0, 21500.0, "paid", "2026-06-30")
-                )
+                emptyList()
             }
 
             val comp = if (compRes is NetworkResult.Success) {

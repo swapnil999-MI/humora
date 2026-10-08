@@ -582,13 +582,186 @@ func (h *Handler) PunchWithFace(c *fiber.Ctx) error {
 			log.Printf("[SECURITY ALERT] Biometric Presentation Attack Blocked (Tenant: %s, User: %s): %s", tenantID, userID, errStr)
 			return response.Error(c, fiber.StatusForbidden, errStr)
 		}
-		if strings.Contains(errStr, "No human face detected") || strings.Contains(errStr, "facial features") || strings.Contains(errStr, "blurry") || strings.Contains(errStr, "dark") || strings.Contains(errStr, "resolution") {
+		if strings.Contains(errStr, "No human face detected") || strings.Contains(errStr, "facial features") || strings.Contains(errStr, "blurry") || strings.Contains(errStr, "dark") || strings.Contains(errStr, "resolution") || strings.Contains(errStr, "geofence") || strings.Contains(errStr, "location") {
 			return response.Error(c, fiber.StatusBadRequest, errStr)
 		}
 		return response.Error(c, fiber.StatusForbidden, errStr)
 	}
 
 	return response.TypedSuccess(c, fiber.StatusOK, res.Message, res)
+}
+
+// ListOfficeLocations returns all geofenced office premises for the tenant.
+func (h *Handler) ListOfficeLocations(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+
+	locations, err := h.service.ListOfficeLocations(c.UserContext(), tenantID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, err.Error())
+	}
+
+	return response.TypedSuccess(c, fiber.StatusOK, "Office locations retrieved successfully", locations)
+}
+
+// GetOfficeLocation retrieves a specific office location.
+func (h *Handler) GetOfficeLocation(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+
+	locID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid location ID")
+	}
+
+	loc, err := h.service.GetOfficeLocation(c.UserContext(), tenantID, locID)
+	if err != nil || loc == nil {
+		return response.Error(c, fiber.StatusNotFound, "Office location not found")
+	}
+
+	return response.TypedSuccess(c, fiber.StatusOK, "Office location retrieved successfully", loc)
+}
+
+// CreateOfficeLocation creates a new office geofence.
+func (h *Handler) CreateOfficeLocation(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+
+	var req CreateOfficeLocationRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid JSON payload")
+	}
+
+	loc, err := h.service.CreateOfficeLocation(c.UserContext(), tenantID, &req)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	return response.TypedSuccess(c, fiber.StatusCreated, "Office location created successfully", loc)
+}
+
+// UpdateOfficeLocation updates an office geofence perimeter.
+func (h *Handler) UpdateOfficeLocation(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+
+	locID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid location ID")
+	}
+
+	var req UpdateOfficeLocationRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid JSON payload")
+	}
+
+	loc, err := h.service.UpdateOfficeLocation(c.UserContext(), tenantID, locID, &req)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	return response.TypedSuccess(c, fiber.StatusOK, "Office location updated successfully", loc)
+}
+
+// DeleteOfficeLocation removes an office geofence.
+func (h *Handler) DeleteOfficeLocation(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+
+	locID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid location ID")
+	}
+
+	if err := h.service.DeleteOfficeLocation(c.UserContext(), tenantID, locID); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, err.Error())
+	}
+
+	return response.Success(c, fiber.StatusOK, "Office location deleted successfully", nil)
+}
+
+// ListDepartments returns all active organizational departments for the tenant.
+func (h *Handler) ListDepartments(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+
+	depts, err := h.service.ListDepartments(c.UserContext(), tenantID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, err.Error())
+	}
+
+	return response.TypedSuccess(c, fiber.StatusOK, "Departments retrieved", depts)
+}
+
+// CreateDepartment creates a new department.
+func (h *Handler) CreateDepartment(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Name) == "" {
+		return response.Error(c, fiber.StatusBadRequest, "Department name is required")
+	}
+
+	dept, err := h.service.CreateDepartment(c.UserContext(), tenantID, req.Name)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	return response.TypedSuccess(c, fiber.StatusCreated, "Department created", dept)
+}
+
+// ListDesignations returns all job designations for the tenant.
+func (h *Handler) ListDesignations(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+
+	desigs, err := h.service.ListDesignations(c.UserContext(), tenantID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, err.Error())
+	}
+
+	return response.TypedSuccess(c, fiber.StatusOK, "Designations retrieved", desigs)
+}
+
+// CreateDesignation creates a new designation.
+func (h *Handler) CreateDesignation(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+
+	var req struct {
+		Title string `json:"title"`
+	}
+	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Title) == "" {
+		return response.Error(c, fiber.StatusBadRequest, "Designation title is required")
+	}
+
+	desig, err := h.service.CreateDesignation(c.UserContext(), tenantID, req.Title)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	return response.TypedSuccess(c, fiber.StatusCreated, "Designation created", desig)
 }
 
 

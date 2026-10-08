@@ -471,13 +471,13 @@ export const IssueDrawer: React.FC = () => {
                 >
                   <div>
                     <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {wl.employee_name || 'Alice Smith'} &bull;{' '}
+                      {wl.employee_name || 'Unknown'} &bull;{' '}
                       <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>
                         {(wl.time_spent_seconds / 3600).toFixed(2)}h
                       </span>
                     </div>
                     <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>
-                      {wl.description || 'Sprint task implementation'}
+                      {wl.description || 'No description'}
                     </div>
                   </div>
 

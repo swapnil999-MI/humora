@@ -41,6 +41,13 @@ func (m *mockRepository) GetTenantByID(ctx context.Context, id uuid.UUID) (*Tena
 	return nil, nil
 }
 
+func (m *mockRepository) GetFirstTenant(ctx context.Context) (*Tenant, error) {
+	for _, t := range m.tenants {
+		return t, nil
+	}
+	return nil, nil
+}
+
 func (m *mockRepository) CreateUser(ctx context.Context, user *User) error {
 	m.users[user.Email] = user
 	return nil
@@ -101,6 +108,10 @@ func (m *mockRepository) RegisterDevicePublicKey(ctx context.Context, id uuid.UU
 }
 
 func (m *mockRepository) CreateDefaultRoles(ctx context.Context, tenantID uuid.UUID) error {
+	return nil
+}
+
+func (m *mockRepository) SeedDefaultTenantData(ctx context.Context, tenantID uuid.UUID, orgName, adminEmail, adminName string) error {
 	return nil
 }
 

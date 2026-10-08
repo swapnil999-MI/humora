@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,8 +29,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.paylogic.humora.core.theme.*
 import com.paylogic.humora.data.model.SprintTaskItem
 import com.paylogic.humora.data.model.TeamMemberPresence
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.clickable
+import com.paylogic.humora.presentation.components.ClayButton
+import com.paylogic.humora.presentation.components.ClayCard
 import com.paylogic.humora.presentation.components.GlassCard
 import com.paylogic.humora.presentation.components.SwipeToPunchSlider
+import com.paylogic.humora.presentation.components.clayEffect
+import com.paylogic.humora.presentation.components.glassEffect
 import com.paylogic.humora.presentation.viewmodel.WorkdayViewModel
 
 @Composable
@@ -41,6 +48,7 @@ fun WorkdayScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showBiometricFaceSheet by remember { mutableStateOf(false) }
+    var showBiometricFingerprintSheet by remember { mutableStateOf(false) }
     var targetPunchType by remember { mutableStateOf("in") }
 
     val hours = uiState.sessionTimerSeconds / 3600
@@ -121,7 +129,7 @@ fun WorkdayScreen(
                                 .padding(horizontal = 10.dp, vertical = 5.dp)
                         ) {
                             Text(
-                                text = uiState.shiftName,
+                                text = uiState.shiftName.ifBlank { "No Shift Assigned" },
                                 color = TextSecondaryDark,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium
@@ -153,6 +161,23 @@ fun WorkdayScreen(
                         onSwipeComplete = {
                             targetPunchType = if (uiState.isPunchedIn) "out" else "in"
                             showBiometricFaceSheet = true
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Fingerprint Punch with Auto-Selfie Snapshot (Tactile 3D Clay)
+                    ClayButton(
+                        text = if (uiState.isPunchedIn) "Fingerprint Punch-Out (Auto-Selfie)" else "Fingerprint Punch-In (Auto-Selfie)",
+                        icon = Icons.Default.Fingerprint,
+                        brush = ClayDarkButtonGradient,
+                        contentColor = Color(0xFFA78BFA),
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 14.dp,
+                        elevation = 4.dp,
+                        onClick = {
+                            targetPunchType = if (uiState.isPunchedIn) "out" else "in"
+                            showBiometricFingerprintSheet = true
                         }
                     )
                 }
@@ -262,6 +287,16 @@ fun WorkdayScreen(
             }
         )
     }
+
+    if (showBiometricFingerprintSheet) {
+        com.paylogic.humora.presentation.components.BiometricFingerprintPunchSheet(
+            punchType = targetPunchType,
+            onDismiss = { showBiometricFingerprintSheet = false },
+            onPunchSuccess = { successMsg ->
+                viewModel.refreshData()
+            }
+        )
+    }
 }
 
 @Composable
@@ -273,10 +308,15 @@ private fun QuickActionChip(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(DarkSurface)
-            .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
-            .padding(vertical = 12.dp, horizontal = 10.dp),
+            .clayEffect(
+                shape = RoundedCornerShape(20.dp),
+                elevation = 6.dp,
+                borderWidth = 1.2.dp,
+                borderBrush = ClayBorderGradient,
+                backgroundBrush = ClaySurfaceGradient
+            )
+            .clickable { onClick() }
+            .padding(vertical = 16.dp, horizontal = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -287,14 +327,14 @@ private fun QuickActionChip(
                 imageVector = icon,
                 contentDescription = title,
                 tint = BrandPrimary,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(24.dp)
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = title,
                 color = TextPrimaryDark,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
@@ -310,6 +350,7 @@ private fun TeamMemberRadarCard(member: TeamMemberPresence) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
+                    .shadow(4.dp, CircleShape, ambientColor = Color(0x66000000))
                     .clip(CircleShape)
                     .background(Color(member.avatarColor)),
                 contentAlignment = Alignment.Center
@@ -334,7 +375,7 @@ private fun TeamMemberRadarCard(member: TeamMemberPresence) {
                             else -> TextMutedDark
                         }
                     )
-                    .border(2.dp, DarkSurface, CircleShape)
+                    .border(2.dp, ClaySurface, CircleShape)
                     .align(Alignment.BottomEnd)
             )
         }
@@ -351,13 +392,10 @@ private fun TeamMemberRadarCard(member: TeamMemberPresence) {
 
 @Composable
 private fun SprintTaskMiniCard(task: SprintTaskItem) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(DarkSurface)
-            .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
-            .padding(14.dp)
+    ClayCard(
+        cornerRadius = 20.dp,
+        elevation = 6.dp,
+        contentPadding = PaddingValues(14.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -376,13 +414,15 @@ private fun SprintTaskMiniCard(task: SprintTaskItem) {
                     text = task.title,
                     color = TextPrimaryDark,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.SemiBold
                 )
             }
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(DarkSurfaceVariant)
+                    .shadow(3.dp, RoundedCornerShape(8.dp), ambientColor = Color(0x66000000))
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(ClaySurfacePressed)
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(

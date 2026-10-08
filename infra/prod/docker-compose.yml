@@ -1,0 +1,48 @@
+# Production-style deployment of the Humora app tier.
+# Postgres, Redis and object storage are expected to be managed services; point .env.production at them.
+# Put a TLS-terminating load balancer (or Caddy/Traefik) in front of `web`.
+#
+#   cp infra/prod/.env.production.example infra/prod/.env.production   # fill in secrets
+#   docker compose -f infra/prod/docker-compose.yml --env-file infra/prod/.env.production run --rm migrate
+#   docker compose -f infra/prod/docker-compose.yml --env-file infra/prod/.env.production up -d
+
+services:
+  migrate:
+    image: arigaio/atlas:latest
+    profiles: ["migrate"]
+    volumes:
+      - ../../database/migrations:/migrations:ro
+    command: >
+      migrate apply --dir file:///migrations
+      --url "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}"
+
+  backend:
+    build:
+      context: ../..
+    image: humora-backend:${HUMORA_VERSION:-latest}
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      ENV: production
+      PORT: "8090"
+      # nginx in `web` forwards the client IP; only trust it from the compose network.
+      PROXY_HEADER: X-Forwarded-For
+      TRUSTED_PROXIES: 172.16.0.0/12,10.0.0.0/8,192.168.0.0/16
+    expose: ["8090"]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+  web:
+    build:
+      context: ../../web
+    image: humora-web:${HUMORA_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      BACKEND_UPSTREAM: http://backend:8090
+    ports: ["8080:8080"]
+    depends_on: [backend]

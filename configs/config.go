@@ -1,8 +1,10 @@
 package configs
 
 import (
+	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -25,6 +27,10 @@ type ServerConfig struct {
 	AllowedOrigins        string
 	CookieDomain          string
 	LogLevel              string
+	// ProxyHeader names the header carrying the real client IP (e.g. X-Forwarded-For)
+	// when the server runs behind a reverse proxy. Empty means use the socket address.
+	ProxyHeader    string
+	TrustedProxies []string
 }
 
 type DatabaseConfig struct {
@@ -77,15 +83,26 @@ type CharsetConfig struct {
 	AlphaNumericSpecial string
 }
 
+type OAuthConfig struct {
+	GoogleClientID        string
+	GoogleClientSecret    string
+	GithubClientID        string
+	GithubClientSecret    string
+	MicrosoftClientID     string
+	MicrosoftClientSecret string
+	RedirectBaseURL       string
+}
+
 type Config struct {
-	Server   ServerConfig
-	DB       DatabaseConfig
-	Redis    RedisConfig
-	Telegram TelegramConfig
-	Minio    MinioConfig
-	S3       S3Config
+	Server        ServerConfig
+	DB            DatabaseConfig
+	Redis         RedisConfig
+	Telegram      TelegramConfig
+	Minio         MinioConfig
+	S3            S3Config
 	StorageDriver string
 	Charset       CharsetConfig
+	OAuth         OAuthConfig
 }
 
 var AppConfig *Config
@@ -103,10 +120,11 @@ func LoadConfig() {
 	if env == "" {
 		env = "local"
 	}
+	local := isLocalEnv(env)
 
 	jwtSecret := GetEnv(JwtSecretEnv)
-	if jwtSecret == "" {
-		jwtSecret = "humora-development-jwt-secret-super-secure-key-2026"
+	if jwtSecret == "" && local {
+		jwtSecret = devJWTSecret
 	}
 
 	accessExpiryStr := GetEnv(JwtAccessTokenExpiryMinEnv)
@@ -122,18 +140,18 @@ func LoadConfig() {
 	}
 
 	passwordSecret := GetEnv(PasswordSecretEnv)
-	if passwordSecret == "" {
-		passwordSecret = "humora-secret-salt-2026"
+	if passwordSecret == "" && local {
+		passwordSecret = DevPasswordSecret
 	}
 
 	frontendURL := GetEnv(FrontendBaseURLEnv)
-	if frontendURL == "" {
-		frontendURL = "http://localhost:5173"
+	if frontendURL == "" && local {
+		frontendURL = "http://192.168.1.50:3000"
 	}
 
 	allowedOrigins := GetEnv(AllowedOriginsEnv)
-	if allowedOrigins == "" {
-		allowedOrigins = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+	if allowedOrigins == "" && local {
+		allowedOrigins = "http://192.168.1.50:3000,http://192.168.1.50:5173,http://192.168.1.50:8090,http://192.168.1.50:8000,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
 	}
 
 	cookieDomain := GetEnv(CookieDomainEnv)
@@ -155,7 +173,7 @@ func LoadConfig() {
 		dbUser = "postgres"
 	}
 	dbPassword := GetEnv(DbPasswordEnv)
-	if dbPassword == "" {
+	if dbPassword == "" && local {
 		dbPassword = "postgres_humora_password"
 	}
 	dbName := GetEnv(DbNameEnv)
@@ -187,11 +205,11 @@ func LoadConfig() {
 		minioEndpoint = "127.0.0.1:9000"
 	}
 	minioAccessKey := GetEnv(MinioAccessKeyEnv)
-	if minioAccessKey == "" {
+	if minioAccessKey == "" && local {
 		minioAccessKey = "minioadmin"
 	}
 	minioSecretKey := GetEnv(MinioSecretKeyEnv)
-	if minioSecretKey == "" {
+	if minioSecretKey == "" && local {
 		minioSecretKey = "minioadmin"
 	}
 	minioUseSSL, _ := strconv.ParseBool(GetEnv(MinioUseSSLEnv))
@@ -204,8 +222,8 @@ func LoadConfig() {
 		minioRegion = "us-east-1"
 	}
 	minioPublicURL := GetEnv(MinioPublicURLEnv)
-	if minioPublicURL == "" {
-		minioPublicURL = "http://localhost:9000"
+	if minioPublicURL == "" && local {
+		minioPublicURL = "http://192.168.1.50:9000"
 	}
 
 	storageDriver := GetEnv(StorageDriverEnv)
@@ -225,6 +243,8 @@ func LoadConfig() {
 			AllowedOrigins:        allowedOrigins,
 			CookieDomain:          cookieDomain,
 			LogLevel:              logLevel,
+			ProxyHeader:           GetEnv(ProxyHeaderEnv),
+			TrustedProxies:        splitCSV(GetEnv(TrustedProxiesEnv)),
 		},
 		DB: DatabaseConfig{
 			Host:     dbHost,
@@ -271,7 +291,90 @@ func LoadConfig() {
 			AlphaNumeric:        AlphaNumericChars,
 			AlphaNumericSpecial: AlphaNumericSpecialChars,
 		},
+		OAuth: OAuthConfig{
+			GoogleClientID:        GetEnv(GoogleClientIDEnv),
+			GoogleClientSecret:    GetEnv(GoogleClientSecretEnv),
+			GithubClientID:        GetEnv(GithubClientIDEnv),
+			GithubClientSecret:    GetEnv(GithubClientSecretEnv),
+			MicrosoftClientID:     GetEnv(MicrosoftClientIDEnv),
+			MicrosoftClientSecret: GetEnv(MicrosoftClientSecretEnv),
+			RedirectBaseURL:       GetEnv(OAuthRedirectBaseURLEnv),
+		},
+	}
+
+	if !local {
+		if errs := AppConfig.validate(); len(errs) > 0 {
+			log.Fatalf("[Config] Refusing to start in %q environment with unsafe configuration:\n  - %s", env, strings.Join(errs, "\n  - "))
+		}
 	}
 
 	log.Printf("[Config] Loaded configuration for env: %s, port: %s, db: %s", env, port, dbName)
+}
+
+const (
+	devJWTSecret = "humora-development-jwt-secret-super-secure-key-2026"
+	// DevPasswordSecret is the at-rest encryption secret used only in local/test environments.
+	DevPasswordSecret = "humora-secret-salt-2026"
+)
+
+// isLocalEnv reports whether env is a developer environment where insecure defaults are allowed.
+func isLocalEnv(env string) bool {
+	return env == "local" || env == "test"
+}
+
+// IsLocal reports whether the server runs in a developer environment (local or test).
+func (c *Config) IsLocal() bool {
+	return isLocalEnv(c.Server.Env)
+}
+
+// validate returns every configuration problem that makes a deployed environment unsafe.
+func (c *Config) validate() []string {
+	var errs []string
+	s := c.Server
+	switch {
+	case s.JWTSecret == "":
+		errs = append(errs, "JWT_SECRET is required")
+	case len(s.JWTSecret) < 32 || s.JWTSecret == devJWTSecret || strings.Contains(s.JWTSecret, "change-in-production"):
+		errs = append(errs, "JWT_SECRET must be a random value of at least 32 characters (e.g. `openssl rand -base64 48`)")
+	}
+	if s.PasswordSecret == "" || s.PasswordSecret == DevPasswordSecret || s.PasswordSecret == "your-secret-salt-key" {
+		errs = append(errs, "PASSWORD_SECRET is required and must not be a default value (it encrypts stored SMTP/identity secrets)")
+	}
+	if s.FrontendBaseURL == "" {
+		errs = append(errs, "FRONTEND_BASE_URL is required (used in emailed links)")
+	}
+	if s.AllowedOrigins == "" {
+		errs = append(errs, "ALLOWED_ORIGINS is required")
+	} else if strings.Contains(s.AllowedOrigins, "*") {
+		errs = append(errs, "ALLOWED_ORIGINS must not contain a wildcard because credentials are allowed")
+	}
+	if c.DB.Password == "" {
+		errs = append(errs, "DB_PASSWORD is required")
+	}
+	if c.StorageDriver == "minio" && (c.Minio.AccessKeyID == "" || c.Minio.SecretAccessKey == "" || c.Minio.SecretAccessKey == "minioadmin") {
+		errs = append(errs, "MINIO_ACCESS_KEY and MINIO_SECRET_KEY are required and must not be minioadmin")
+	}
+	o := c.OAuth
+	if (o.GoogleClientID != "" || o.GithubClientID != "" || o.MicrosoftClientID != "") && o.RedirectBaseURL == "" {
+		errs = append(errs, "OAUTH_REDIRECT_BASE_URL is required when an OAuth provider is configured")
+	}
+	if s.ProxyHeader != "" && len(s.TrustedProxies) == 0 {
+		errs = append(errs, "TRUSTED_PROXIES is required when PROXY_HEADER is set, otherwise clients can spoof their IP")
+	}
+	return errs
+}
+
+func splitCSV(v string) []string {
+	var out []string
+	for _, part := range strings.Split(v, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+// String hides secrets when the config is printed.
+func (c *Config) String() string {
+	return fmt.Sprintf("Config{env=%s port=%s db=%s@%s/%s}", c.Server.Env, c.Server.Port, c.DB.User, c.DB.Host, c.DB.Name)
 }

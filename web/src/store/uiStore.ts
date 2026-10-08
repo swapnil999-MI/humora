@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { api } from '../api/client';
 
 export type WorkspaceType = 'employee' | 'management' | 'work' | 'pulse';
 export type HrmsTab =
@@ -47,6 +48,7 @@ export interface AppNotification {
   id: string;
   title: string;
   message: string;
+  /** ISO time it was created; shown relative. */
   timestamp: string;
   type: 'punch' | 'approval' | 'work' | 'system' | 'leave';
   read: boolean;
@@ -80,6 +82,7 @@ export interface UiState {
   setRegularizationOpen: (open: boolean) => void;
   toggleNotificationDrawer: () => void;
   setNotificationDrawerOpen: (open: boolean) => void;
+  setNotifications: (items: AppNotification[]) => void;
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
   clearNotifications: () => void;
@@ -105,44 +108,8 @@ export const useUiStore = create<UiState>((set) => ({
   isApplyLeaveOpen: false,
   isRegularizationOpen: false,
   isNotificationDrawerOpen: false,
-  notifications: [
-    {
-      id: 'notif-1',
-      title: 'Timesheet Auto-Sync Completed',
-      message: '8.0h session was automatically logged and reconciled with Project sprint cycle.',
-      timestamp: '15m ago',
-      type: 'work',
-      read: false,
-      actionLink: 'kanban',
-    },
-    {
-      id: 'notif-2',
-      title: 'Regularization Approved',
-      message: 'Your punch regularization request for yesterday was approved by Lead.',
-      timestamp: '1h ago',
-      type: 'approval',
-      read: false,
-      actionLink: 'attendance',
-    },
-    {
-      id: 'notif-3',
-      title: 'Sprint Scope Updated',
-      message: 'New critical security task assigned to your active queue with high priority.',
-      timestamp: '3h ago',
-      type: 'work',
-      read: true,
-      actionLink: 'kanban',
-    },
-    {
-      id: 'notif-4',
-      title: 'Monthly Leave Accrual',
-      message: '+1.75 days earned leave balance added for the current cycle.',
-      timestamp: 'Yesterday',
-      type: 'leave',
-      read: true,
-      actionLink: 'leaves',
-    },
-  ],
+  // Loaded from /notifications by useNotificationPolling (store/notifications.ts).
+  notifications: [],
   toasts: [],
 
   navigateToPage: (page) => {
@@ -290,15 +257,24 @@ export const useUiStore = create<UiState>((set) => ({
   setRegularizationOpen: (open) => set({ isRegularizationOpen: open }),
   toggleNotificationDrawer: () => set((state) => ({ isNotificationDrawerOpen: !state.isNotificationDrawerOpen })),
   setNotificationDrawerOpen: (open) => set({ isNotificationDrawerOpen: open }),
-  markNotificationAsRead: (id) =>
+  setNotifications: (items) => set({ notifications: items }),
+  // Read/cleared state lives on the server; the UI updates at once and the next refresh reconciles.
+  markNotificationAsRead: (id) => {
     set((state) => ({
       notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    })),
-  markAllNotificationsAsRead: () =>
+    }));
+    api.post(`/notifications/${id}/read`).catch(() => {});
+  },
+  markAllNotificationsAsRead: () => {
     set((state) => ({
       notifications: state.notifications.map((n) => ({ ...n, read: true })),
-    })),
-  clearNotifications: () => set({ notifications: [] }),
+    }));
+    api.post('/notifications/read-all').catch(() => {});
+  },
+  clearNotifications: () => {
+    set({ notifications: [] });
+    api.delete('/notifications').catch(() => {});
+  },
 
   addToast: (toast) => {
     const id = Math.random().toString(36).substring(2, 9);

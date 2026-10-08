@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Sparkles,
 } from 'lucide-react';
+import { formatNotificationTime, refreshNotifications } from '../store/notifications';
 
 export const NotificationDrawer: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -38,6 +39,11 @@ export const NotificationDrawer: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [dispatch, isNotificationDrawerOpen]);
+
+  // Opening the drawer always shows the latest.
+  useEffect(() => {
+    if (isNotificationDrawerOpen) refreshNotifications();
+  }, [isNotificationDrawerOpen]);
 
   if (!isNotificationDrawerOpen) return null;
 
@@ -391,7 +397,7 @@ export const NotificationDrawer: React.FC = () => {
                       fontSize: '11px',
                     }}
                   >
-                    <span style={{ color: 'var(--text-dim)' }}>{notif.timestamp}</span>
+                    <span style={{ color: 'var(--text-dim)' }}>{formatNotificationTime(notif.timestamp)}</span>
 
                     {notif.actionLink && (
                       <span

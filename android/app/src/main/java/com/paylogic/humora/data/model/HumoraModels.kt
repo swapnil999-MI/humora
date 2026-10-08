@@ -15,6 +15,16 @@ data class LoginRequest(
 )
 
 @Serializable
+data class RegisterOrganizationRequest(
+    @SerialName("organization_name") val organizationName: String,
+    val slug: String,
+    @SerialName("admin_email") val adminEmail: String,
+    @SerialName("admin_password") val adminPassword: String,
+    @SerialName("first_name") val firstName: String,
+    @SerialName("last_name") val lastName: String = ""
+)
+
+@Serializable
 data class UserSummary(
     val id: String = "",
     @SerialName("tenant_id") val tenantId: String = "",
@@ -34,6 +44,19 @@ data class AuthResponse(
     @SerialName("token_type") val tokenType: String = "Bearer",
     @SerialName("expires_in") val expiresIn: Long = 0L,
     val user: UserSummary = UserSummary()
+)
+
+@Serializable
+data class AuthProvidersResponse(
+    val google: Boolean = false,
+    val github: Boolean = false,
+    val microsoft: Boolean = false,
+    @SerialName("qr_code") val qrCode: Boolean = true
+)
+
+@Serializable
+data class QRConfirmRequest(
+    @SerialName("session_id") val sessionId: String
 )
 
 // ==========================================
@@ -113,6 +136,81 @@ data class MyProfileResponse(
     val employee: EmployeeMini = EmployeeMini()
 )
 
+@Serializable
+data class PersonalDetails(
+    val dob: String? = null,
+    val gender: String? = null,
+    @SerialName("blood_group") val bloodGroup: String? = null,
+    @SerialName("marital_status") val maritalStatus: String? = null,
+    @SerialName("current_address") val currentAddress: String? = null,
+    @SerialName("permanent_address") val permanentAddress: String? = null
+)
+
+@Serializable
+data class EmergencyContact(
+    val name: String = "",
+    val relationship: String = "",
+    val phone: String = "",
+    val email: String? = null
+)
+
+@Serializable
+data class BankDetails(
+    @SerialName("bank_name") val bankName: String? = null,
+    @SerialName("account_number_masked") val accountNumberMasked: String? = null,
+    @SerialName("routing_number") val routingNumber: String? = null,
+    @SerialName("tax_id_masked") val taxIdMasked: String? = null,
+    @SerialName("direct_deposit") val directDeposit: Boolean = false
+)
+
+@Serializable
+data class AssignedAsset(
+    @SerialName("asset_name") val assetName: String = "",
+    val category: String = "",
+    val serial: String = "",
+    @SerialName("assigned_date") val assignedDate: String = ""
+)
+
+@Serializable
+data class FullEmployeeProfile(
+    val employee: EmployeeDetail = EmployeeDetail(),
+    @SerialName("personal_details") val personalDetails: PersonalDetails? = null,
+    @SerialName("emergency_contacts") val emergencyContacts: List<EmergencyContact> = emptyList(),
+    @SerialName("bank_details") val bankDetails: BankDetails? = null,
+    val skills: List<String> = emptyList(),
+    @SerialName("assigned_assets") val assignedAssets: List<AssignedAsset> = emptyList()
+)
+
+@Serializable
+data class EmployeeDetail(
+    val id: String = "",
+    /** The employee's login account; null for employees who cannot sign in. */
+    @SerialName("user_id") val userId: String? = null,
+    @SerialName("employee_code") val employeeCode: String = "",
+    @SerialName("first_name") val firstName: String = "",
+    @SerialName("last_name") val lastName: String = "",
+    @SerialName("work_email") val workEmail: String = "",
+    @SerialName("department_name") val departmentName: String? = null,
+    @SerialName("designation_title") val designationTitle: String? = null,
+    val status: String = "active",
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("biometric_face_url") val biometricFaceUrl: String? = null,
+    @SerialName("biometric_face_registered_at") val biometricFaceRegisteredAt: String? = null,
+    @SerialName("date_of_joining") val dateOfJoining: String? = null,
+    @SerialName("employment_type") val employmentType: String? = null
+) {
+    val fullName: String
+        get() = "$firstName $lastName".trim()
+
+    val isFaceRegistered: Boolean
+        get() = !biometricFaceRegisteredAt.isNullOrBlank()
+}
+
+@Serializable
+data class PaginatedEmployeesResponse(
+    val items: List<EmployeeDetail> = emptyList()
+)
+
 
 @Serializable
 data class AttendancePunchItem(
@@ -144,7 +242,7 @@ data class AttendanceSummary(
     @SerialName("last_punch_time") val lastPunchTime: String? = null,
     @SerialName("today_hours") val todayHours: Double = 0.0,
     @SerialName("presence_status") val presenceStatus: String = "not_punched",
-    @SerialName("shift_name") val shiftName: String = "General Shift (09:00 - 18:00)"
+    @SerialName("shift_name") val shiftName: String = ""
 )
 
 @Serializable
@@ -160,8 +258,8 @@ data class MonthlyAttendanceDay(
 
 @Serializable
 data class MonthlyAttendanceResponse(
-    val year: Int = 2026,
-    val month: Int = 9,
+    val year: Int = java.time.LocalDate.now().year,
+    val month: Int = java.time.LocalDate.now().monthValue,
     val days: List<MonthlyAttendanceDay> = emptyList(),
     @SerialName("total_present") val totalPresent: Double = 0.0,
     @SerialName("total_half_days") val totalHalfDays: Int = 0,
@@ -304,4 +402,119 @@ data class CompensationItem(
     val basic: Double = 0.0,
     val hra: Double = 0.0,
     @SerialName("special_allowance") val specialAllowance: Double = 0.0
+)
+
+// ==========================================
+// 6. SYNERGY CAPACITY & BURNOUT DTOs
+// ==========================================
+
+@Serializable
+data class TeamMemberCapacity(
+    @SerialName("employee_id") val employeeId: String = "",
+    @SerialName("employee_name") val employeeName: String = "",
+    @SerialName("employee_code") val employeeCode: String = "",
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("department_name") val departmentName: String = "",
+    @SerialName("designation_title") val designationTitle: String = "",
+    @SerialName("punched_in") val punchedIn: Boolean = false,
+    @SerialName("presence_status") val presenceStatus: String = "offline",
+    @SerialName("assigned_issue_count") val assignedIssueCount: Int = 0,
+    @SerialName("total_story_points") val totalStoryPoints: Int = 0,
+    @SerialName("capacity_status") val capacityStatus: String = "available", // 'overloaded', 'balanced', 'available'
+    @SerialName("current_focus_issue") val currentFocusIssue: String? = null,
+    @SerialName("upcoming_leave_dates") val upcomingLeaveDates: String? = null
+)
+
+@Serializable
+data class TeamCapacityResponse(
+    @SerialName("total_engineers") val totalEngineers: Int = 0,
+    @SerialName("clocked_in_count") val clockedInCount: Int = 0,
+    @SerialName("on_leave_count") val onLeaveCount: Int = 0,
+    @SerialName("overallocated_count") val overallocatedCount: Int = 0,
+    @SerialName("available_count") val availableCount: Int = 0,
+    val members: List<TeamMemberCapacity> = emptyList()
+)
+
+@Serializable
+data class MemberBurnoutRisk(
+    @SerialName("employee_id") val employeeId: String = "",
+    @SerialName("employee_name") val employeeName: String = "",
+    @SerialName("employee_code") val employeeCode: String = "",
+    @SerialName("department_name") val departmentName: String = "",
+    @SerialName("designation_title") val designationTitle: String = "",
+    @SerialName("risk_score") val riskScore: Int = 0,
+    @SerialName("risk_tier") val riskTier: String = "optimal", // 'optimal', 'moderate', 'high'
+    @SerialName("late_checkout_days") val lateCheckoutDays: Int = 0,
+    @SerialName("weekend_hours_logged") val weekendHoursLogged: Double = 0.0,
+    @SerialName("active_sprint_points") val activeSprintPoints: Int = 0,
+    @SerialName("days_since_last_leave") val daysSinceLastLeave: Int = 0,
+    @SerialName("primary_risk_trigger") val primaryRiskTrigger: String = "",
+    @SerialName("action_recommendation") val actionRecommendation: String = ""
+)
+
+@Serializable
+data class BurnoutSentinelReport(
+    @SerialName("tenant_id") val tenantId: String = "",
+    @SerialName("team_burnout_index") val teamBurnoutIndex: Int = 0,
+    @SerialName("overall_tier") val overallTier: String = "optimal",
+    @SerialName("total_engineers") val totalEngineers: Int = 0,
+    @SerialName("optimal_count") val optimalCount: Int = 0,
+    @SerialName("moderate_count") val moderateCount: Int = 0,
+    @SerialName("high_risk_count") val highRiskCount: Int = 0,
+    val members: List<MemberBurnoutRisk> = emptyList(),
+    @SerialName("system_recommendations") val systemRecommendations: List<String> = emptyList()
+)
+
+// ==========================================
+// 8. OFFICE GEOFENCE LOCATION DTOs
+// ==========================================
+
+@Serializable
+data class OfficeLocationDto(
+    val id: String = "",
+    @SerialName("tenant_id") val tenantId: String = "",
+    val name: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    @SerialName("radius_meters") val radiusMeters: Int = 100,
+    @SerialName("polygon_coordinates") val polygonCoordinates: String? = null,
+    @SerialName("allowed_wifi_bssid") val allowedWifiBssid: List<String> = emptyList()
+)
+
+@Serializable
+data class CreateOfficeLocationDto(
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    @SerialName("radius_meters") val radiusMeters: Int
+)
+
+@Serializable
+data class UpdateOfficeLocationDto(
+    val name: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerialName("radius_meters") val radiusMeters: Int? = null
+)
+
+
+// ==========================================
+// IN-APP NOTIFICATIONS
+// ==========================================
+
+@Serializable
+data class AppNotificationDto(
+    val id: String,
+    val category: String = "",
+    val title: String = "",
+    val body: String = "",
+    val link: String? = null,
+    @SerialName("created_at") val createdAt: String = "",
+    @SerialName("read_at") val readAt: String? = null,
+)
+
+@Serializable
+data class AppNotificationList(
+    val items: List<AppNotificationDto> = emptyList(),
+    @SerialName("unread_count") val unreadCount: Int = 0,
 )

@@ -29,7 +29,8 @@
 5. [Keyboard Navigation & Shortcuts (`?`)](#-keyboard-navigation--shortcuts-)
 6. [Folder & Directory Structure](#-folder--directory-structure)
 7. [API Integration & State Management](#-api-integration--state-management)
-8. [Local Setup & Development Guide](#-local-setup--development-guide)
+8. [Install on Your Own Server (Docker)](#-install-on-your-own-server-docker)
+9. [Local Setup & Development Guide](#-local-setup--development-guide)
 
 ---
 
@@ -298,6 +299,94 @@ frontend/
 - **Proxy Routing**: All network calls beginning with `/api/*` are routed via Vite proxy to the local Go backend (`http://127.0.0.1:8090`).
 - **Resilient Fallbacks**: If the backend database contains no row for a specific query (e.g. initial compensation records), stores automatically fallback to statutory defaults so the interface never crashes.
 - **Safe Rendering**: All list mappings use optional chaining (`items?.map(...)`) ensuring graceful degradation during async network operations.
+
+---
+
+## 🐳 Install on Your Own Server (Docker)
+
+Humora ships as one image that contains everything it needs: the web app, the API server, PostgreSQL, Redis and MinIO. You only need Docker.
+
+```bash
+docker volume create humora-data
+docker run -d --name humora --restart unless-stopped --stop-timeout 120 \
+  -p 8080:8080 \
+  -v humora-data:/data \
+  -v /mnt/backup-disk/humora:/backups \
+  -e HUMORA_URL=http://<server-ip-or-domain>:8080 \
+  ghcr.io/swapnil999-mi/humora:latest
+```
+
+Or with Compose: download [`infra/allinone/docker-compose.yml`](infra/allinone/docker-compose.yml), run `docker volume create humora-data`, then `HUMORA_URL=... BACKUP_PATH=/mnt/backup-disk/humora docker compose up -d`.
+
+Then open `HUMORA_URL` and choose **Register Organization** to create the first admin account.
+
+| Setting | Meaning |
+|---|---|
+| `HUMORA_URL` | The address people type in the browser. Emailed links and file downloads use it, so it must be exact (scheme, host and port). |
+| `/data` | Database, uploaded files and the secrets generated on first start. **Required**: Humora refuses to start without it, so data can never silently live inside a disposable container. |
+| `/backups` | Where backups go. Put it on a **different disk or a NAS**. Without it, backups fall back to the data volume and Humora warns on every start. |
+| `BACKUP_TIME` / `BACKUP_KEEP` | Daily full backup time (UTC, default `02:00`) and how many days to keep (default `7`). |
+| Port `8080` | The only port. For HTTPS, put a TLS proxy (Caddy, Traefik, nginx, a cloud load balancer) in front and set `HUMORA_URL=https://...`. The proxy must pass the original `Host` header. |
+
+### Data safety
+
+- **Every committed change is on disk** (`fsync`), and a power cut or `kill -9` loses nothing that was committed.
+- **Continuous backup:** each database log segment is copied to `/backups` within a minute, so the database can be restored **to any minute** within the last `BACKUP_KEEP` days.
+- **Nightly full backup** at `BACKUP_TIME`: a physical base backup, a logical dump that is **test-restored before it is kept**, a snapshot of uploaded files, and a copy of the secrets. Failed backups are retried hourly; the first one runs as soon as Humora starts.
+- **Before every upgrade that changes the database**, a verified dump is taken automatically. If it fails, the upgrade does not run.
+- **Guards:** two containers can never share one data volume, an older image refuses to run on a database upgraded by a newer one, a PostgreSQL major-version mismatch stops startup without touching data, and page checksums detect disk corruption.
+
+Check backups at any time:
+```bash
+docker exec humora humora-entrypoint backup-status   # what exists and the restorable time range
+docker exec humora humora-entrypoint backup          # take a full backup now
+```
+
+### Restoring
+
+Restores never delete anything: the current database and files are moved aside first. Stop Humora, run the restore with the same volumes, then start Humora again (it takes a fresh backup immediately).
+
+```bash
+docker stop humora
+IMAGE=ghcr.io/swapnil999-mi/humora:latest
+VOLS="-v humora-data:/data -v /mnt/backup-disk/humora:/backups"
+
+# Undo a mistake: rebuild the database as it was at a given minute (UTC)
+docker run --rm $VOLS $IMAGE restore-pitr latest "2026-10-07 14:30:00"
+
+# Disk died: on a NEW empty volume, restore everything (database, files, secrets) up to the newest backup
+docker volume create humora-data
+docker run --rm $VOLS $IMAGE restore-pitr latest
+
+# Or restore a specific verified dump (also works across PostgreSQL major versions)
+docker run --rm $VOLS $IMAGE restore-dump nightly-20261007T020000Z.dump
+
+docker start humora
+```
+
+### Push notifications (optional)
+
+Chat notifications on Android use Firebase Cloud Messaging. The push only says "this conversation has news"; the phone fetches the encrypted messages, decrypts them itself and builds the notification, so Google never sees message content.
+
+1. In the [Firebase console](https://console.firebase.google.com) create a project and add an Android app with package `com.paylogic.humora`.
+2. **App:** from *Project settings → Your apps*, put these in `android/gradle.properties` and rebuild the APK:
+   ```
+   humora.fcm.projectId=...
+   humora.fcm.appId=1:...:android:...
+   humora.fcm.apiKey=...
+   humora.fcm.senderId=...
+   ```
+3. **Server:** create a service account key (*Project settings → Service accounts → Generate new private key*) and give the server its contents, e.g. `-e FCM_SERVICE_ACCOUNT_JSON="$(cat key.json)"` for the all-in-one image.
+
+Without these, everything still works; notifications then only appear while the app is running.
+
+**Off-site copies:** `/backups` is plain files. Sync it to another location (rsync, rclone to S3, a NAS snapshot) for protection against losing the whole server. It contains the secrets, so keep it private.
+
+**Upgrading:** `docker pull` the new tag and recreate the container with the same volumes. Pending migrations run automatically after a safety backup.
+
+**Building the image yourself:** `make allinone` (or `docker build -f infra/allinone/Dockerfile -t humora .`). Pushing a `vX.Y.Z` tag publishes it to GitHub Container Registry for amd64 and arm64 via `.github/workflows/release.yml`.
+
+Larger deployments that need managed databases or several API instances should use the separate images in [`infra/prod`](infra/prod/docker-compose.yml) instead.
 
 ---
 

@@ -53,7 +53,7 @@ type Employee struct {
 	AvatarURL                  *string    `db:"avatar_url" json:"avatar_url,omitempty"`
 	BannerURL                  *string    `db:"banner_url" json:"banner_url,omitempty"`
 	BiometricFaceURL           *string    `db:"biometric_face_url" json:"biometric_face_url,omitempty"`
-	FaceEmbedding              *string    `db:"face_embedding" json:"face_embedding,omitempty"`
+	FaceEmbedding              *string    `db:"face_embedding" json:"-"` // biometric template: server-side only
 	BiometricFaceRegisteredAt  *time.Time `db:"biometric_face_registered_at" json:"biometric_face_registered_at,omitempty"`
 	BiometricSampleCount       int        `db:"biometric_sample_count" json:"biometric_sample_count"`
 	EffectiveFrom              time.Time  `db:"effective_from" json:"effective_from"`
@@ -333,6 +333,7 @@ type ReimbursementClaim struct {
 	Description  *string    `db:"description" json:"description,omitempty"`
 	ReceiptURL   *string    `db:"receipt_url" json:"receipt_url,omitempty"`
 	Status       string     `db:"status" json:"status"` // 'pending', 'approved', 'rejected', 'reimbursed'
+	EmployeeName string     `db:"employee_name" json:"employee_name,omitempty"` // team listings only
 	ReviewerName *string    `db:"reviewer_name" json:"reviewer_name,omitempty"`
 	ReviewedBy   *uuid.UUID `db:"reviewed_by" json:"reviewed_by,omitempty"`
 	CreatedAt    time.Time  `db:"created_at" json:"created_at"`

@@ -5,6 +5,7 @@ import { recordPunch } from '../store/hrmsSlice';
 import { GoogleSearchBar } from './GoogleSearchBar';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { PeopleOSLogo } from './PeopleOSLogo';
+import { useNotificationPolling } from '../store/notifications';
 import {
   Kanban,
   Search,
@@ -25,6 +26,12 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
   const { workspace, activePage, isNotificationDrawerOpen, notifications } = useAppSelector((state) => state.ui);
   const { attendanceSummary, isPunching } = useAppSelector((state) => state.hrms);
   const { activeProject } = useAppSelector((state) => state.work);
+  const { user } = useAppSelector((state) => state.auth);
+
+  useNotificationPolling(!!user);
+
+  const userRoles = user?.roles || [];
+  const isAdmin = userRoles.some((r) => ['superadmin', 'admin', 'hr_admin'].includes(r.toLowerCase()));
 
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
@@ -127,7 +134,7 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '13px' }}>
         <button
           type="button"
-          onClick={() => dispatch(navigateToPage('hub'))}
+          onClick={() => dispatch(navigateToPage(isAdmin ? 'company_settings' : 'hub'))}
           style={{
             background: 'none',
             border: 'none',
@@ -138,9 +145,9 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
             borderRadius: 'var(--radius-sm)',
             transition: 'opacity var(--transition-fast)',
           }}
-          title="Humora Platform Home (My Workday Hub)"
+          title={isAdmin ? "Humora Management Console" : "Humora Platform Home (My Workday Hub)"}
         >
-          <PeopleOSLogo size={26} showBrandName brandTextSize={15} subText="Enterprise" />
+          <PeopleOSLogo size={26} showBrandName brandTextSize={15} subText={isAdmin ? "Management" : "Enterprise"} />
         </button>
 
         <div style={{ width: '1px', height: '18px', background: 'var(--border-subtle)' }} />
@@ -212,7 +219,7 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
             </button>
             <ChevronRight size={12} color="var(--text-dim)" />
             <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
-              [{activeProject?.key || 'ACME'}] {activeProject?.name || 'Main Project'}
+              {activeProject ? `[${activeProject.key}] ${activeProject.name}` : 'No project selected'}
             </span>
             <ChevronRight size={12} color="var(--text-dim)" />
             <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
@@ -231,84 +238,104 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
 
       {/* Right: Workforce Clock Widget & Action Trigger */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {/* Attendance Punch Mini Desk with Live Stopwatch */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '4px 10px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border-hairline)',
-          }}
-        >
-          {/* Circular Progress Ring */}
-          <div style={{ position: 'relative', width: '20px', height: '20px' }}>
-            <svg width="20" height="20" viewBox="0 0 36 36">
-              <path
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none"
-                stroke="var(--border-subtle)"
-                strokeWidth="3.5"
-              />
-              <path
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none"
-                stroke={attendanceSummary?.punched_in ? 'var(--hrms-present)' : 'var(--text-muted)'}
-                strokeWidth="4"
-                strokeDasharray={`${progressPercent}, 100`}
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
+        {/* Attendance Punch Mini Desk with Live Stopwatch — ONLY for Employees */}
+        {!isAdmin ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '4px 10px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-hairline)',
+            }}
+          >
+            {/* Circular Progress Ring */}
+            <div style={{ position: 'relative', width: '20px', height: '20px' }}>
+              <svg width="20" height="20" viewBox="0 0 36 36">
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="var(--border-subtle)"
+                  strokeWidth="3.5"
+                />
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke={attendanceSummary?.punched_in ? 'var(--hrms-present)' : 'var(--text-muted)'}
+                  strokeWidth="4"
+                  strokeDasharray={`${progressPercent}, 100`}
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {attendanceSummary?.punched_in ? (
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {attendanceSummary?.punched_in ? (
+                  <>
+                    <span className="live-pulse-dot" />
+                    Active Session
+                  </>
+                ) : (
+                  'Clocked Out'
+                )}
+              </span>
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: attendanceSummary?.punched_in ? 'var(--accent-primary)' : 'var(--text-primary)',
+                  fontFamily: 'var(--font-mono)',
+                }}
+                title={attendanceSummary?.punched_in ? `Active Session: ${formatStopwatch(elapsedSeconds)}` : `Today: ${todayHours.toFixed(1)}h`}
+              >
+                {attendanceSummary?.punched_in ? formatStopwatch(elapsedSeconds) : `${todayHours.toFixed(1)}h`}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className={`btn btn-sm ${attendanceSummary?.punched_in ? 'btn-danger' : 'btn-success'}`}
+              onClick={handlePunchToggle}
+              disabled={isPunching}
+              style={{ padding: '3px 8px', fontSize: '11px' }}
+            >
+              {isPunching ? (
+                '...'
+              ) : attendanceSummary?.punched_in ? (
                 <>
-                  <span className="live-pulse-dot" />
-                  Active Session
+                  <LogOut size={12} strokeWidth={2} />
+                  Out
                 </>
               ) : (
-                'Clocked Out'
+                <>
+                  <LogIn size={12} strokeWidth={2} />
+                  In
+                </>
               )}
-            </span>
-            <span
-              style={{
-                fontSize: '12px',
-                fontWeight: 600,
-                color: attendanceSummary?.punched_in ? 'var(--accent-primary)' : 'var(--text-primary)',
-                fontFamily: 'var(--font-mono)',
-              }}
-              title={attendanceSummary?.punched_in ? `Active Session: ${formatStopwatch(elapsedSeconds)}` : `Today: ${todayHours.toFixed(1)}h`}
-            >
-              {attendanceSummary?.punched_in ? formatStopwatch(elapsedSeconds) : `${todayHours.toFixed(1)}h`}
-            </span>
+            </button>
           </div>
-
-          <button
-            type="button"
-            className={`btn btn-sm ${attendanceSummary?.punched_in ? 'btn-danger' : 'btn-success'}`}
-            onClick={handlePunchToggle}
-            disabled={isPunching}
-            style={{ padding: '3px 8px', fontSize: '11px' }}
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '5px 12px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-hairline)',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              color: 'var(--text-secondary)',
+            }}
           >
-            {isPunching ? (
-              '...'
-            ) : attendanceSummary?.punched_in ? (
-              <>
-                <LogOut size={12} strokeWidth={2} />
-                Out
-              </>
-            ) : (
-              <>
-                <LogIn size={12} strokeWidth={2} />
-                In
-              </>
-            )}
-          </button>
-        </div>
+            <ShieldCheck size={14} color="var(--accent-primary)" />
+            <span>Management Console</span>
+          </div>
+        )}
 
         {/* Notifications Drawer Toggle */}
         <button

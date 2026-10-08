@@ -1,6 +1,7 @@
 package fusion
 
 import (
+	"humora-backend/internal/notify"
 	"context"
 	"errors"
 	"fmt"
@@ -298,6 +299,18 @@ func (s *service) ReassignIssue(ctx context.Context, tenantID, issueID, targetAs
 		WHERE tenant_id = $2 AND id = $3
 	`
 	_, err := s.db.ExecContext(ctx, query, targetAssigneeID, tenantID, issueID)
+	if err == nil {
+		var issue struct {
+			Key   string `db:"issue_key"`
+			Title string `db:"title"`
+		}
+		if s.db.GetContext(ctx, &issue, `SELECT issue_key, title FROM work_issues WHERE tenant_id = $1 AND id = $2`, tenantID, issueID) == nil {
+			notify.ToEmployee(tenantID, targetAssigneeID, notify.Message{
+				Category: notify.CategoryWork, Title: issue.Key + " was assigned to you", Body: issue.Title,
+				Link: "kanban", EntityType: "issue", EntityID: &issueID,
+			})
+		}
+	}
 	return err
 }
 

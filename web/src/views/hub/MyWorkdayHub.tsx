@@ -1,15 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../../store/store';
+import {
+  useAppDispatch,
+  useAppSelector,
+} from '../../store/store';
 import {
   fetchMyWorkday,
   quickLogWork,
   fetchWeeklyTimesheet,
   submitWeeklyTimesheet,
 } from '../../store/fusionSlice';
-import { recordPunch } from '../../store/hrmsSlice';
-import { addToast, setWorkspace, navigateToPage } from '../../store/uiSlice';
-import { StatusGlyph, PriorityGlyph } from '../../components/StatusGlyph';
-import { PeopleOSLogo } from '../../components/PeopleOSLogo';
+import {
+  recordPunch,
+} from '../../store/hrmsSlice';
+import {
+  addToast,
+  setWorkspace,
+  navigateToPage,
+} from '../../store/uiSlice';
+import {
+  StatusGlyph,
+  PriorityGlyph,
+} from '../../components/StatusGlyph';
+import {
+  PeopleOSLogo,
+} from '../../components/PeopleOSLogo';
 import {
   Clock,
   Play,
@@ -22,17 +36,12 @@ import {
   TrendingUp,
   Sparkles,
   Layers,
-  ChevronRight,
   ChevronDown,
   ChevronUp,
   Check,
   Plus,
-  Calendar,
   Send,
-  FileCheck2,
   ShieldCheck,
-  CalendarDays,
-  Tag,
 } from 'lucide-react';
 
 export const MyWorkdayHub: React.FC = () => {
@@ -213,7 +222,7 @@ export const MyWorkdayHub: React.FC = () => {
             Welcome back, {myWorkday?.employee_name || user?.email?.split('@')[0] || 'Team Member'}
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-            {myWorkday?.designation || 'Engineer'} • {myWorkday?.department || 'Engineering'} • {myWorkday?.work_email || user?.email}
+            {myWorkday?.designation || 'No designation'} • {myWorkday?.department || 'No department'} • {myWorkday?.work_email || user?.email}
           </p>
         </div>
 
@@ -481,87 +490,9 @@ export const MyWorkdayHub: React.FC = () => {
 
       {/* Engine 2: Zero-Effort Weekly Worklog-to-Timesheet Reconciliation (Vertical Day-Wise Ledger) */}
       {(() => {
-        const defaultDays = [
-          {
-            date: '2026-09-15',
-            day_of_week: 'Monday',
-            clocked_hours: 8.5,
-            logged_hours: 8.5,
-            variance_hours: 0,
-            status: 'synced' as const,
-            worklogs: [
-              { issue_id: 'w1', issue_key: 'PAY-101', issue_title: 'API Gateway Architecture Refinement', hours: 4.5, time_spent_seconds: 16200, is_billable: true },
-              { issue_id: 'w2', issue_key: 'PAY-104', issue_title: 'Database indexing & query optimization', hours: 4.0, time_spent_seconds: 14400, is_billable: true },
-            ],
-          },
-          {
-            date: '2026-09-16',
-            day_of_week: 'Tuesday',
-            clocked_hours: 8.2,
-            logged_hours: 8.0,
-            variance_hours: -0.2,
-            status: 'synced' as const,
-            worklogs: [
-              { issue_id: 'w3', issue_key: 'PAY-112', issue_title: 'Biometric shift reconciliation algorithm', hours: 5.0, time_spent_seconds: 18000, is_billable: true },
-              { issue_id: 'w4', issue_key: 'PAY-108', issue_title: 'Unit test harness for sprint capacity', hours: 3.0, time_spent_seconds: 10800, is_billable: false },
-            ],
-          },
-          {
-            date: '2026-09-17',
-            day_of_week: 'Wednesday',
-            clocked_hours: 8.0,
-            logged_hours: 6.5,
-            variance_hours: -1.5,
-            status: 'under_logged' as const,
-            worklogs: [
-              { issue_id: 'w5', issue_key: 'PAY-120', issue_title: 'Candidate onboarding workflow review', hours: 6.5, time_spent_seconds: 23400, is_billable: true },
-            ],
-          },
-          {
-            date: '2026-09-18',
-            day_of_week: 'Thursday',
-            clocked_hours: 8.4,
-            logged_hours: 8.5,
-            variance_hours: 0.1,
-            status: 'synced' as const,
-            worklogs: [
-              { issue_id: 'w6', issue_key: 'PAY-128', issue_title: 'Security audit and role access control', hours: 8.5, time_spent_seconds: 30600, is_billable: true },
-            ],
-          },
-          {
-            date: '2026-09-19',
-            day_of_week: 'Friday',
-            clocked_hours: 8.0,
-            logged_hours: 8.0,
-            variance_hours: 0,
-            status: 'synced' as const,
-            worklogs: [
-              { issue_id: 'w7', issue_key: 'PAY-132', issue_title: 'Sprint retrospective & release preparation', hours: 8.0, time_spent_seconds: 28800, is_billable: true },
-            ],
-          },
-          {
-            date: '2026-09-20',
-            day_of_week: 'Saturday',
-            clocked_hours: 0,
-            logged_hours: 0,
-            variance_hours: 0,
-            status: 'weekend' as const,
-            worklogs: [],
-          },
-          {
-            date: '2026-09-21',
-            day_of_week: 'Sunday',
-            clocked_hours: 0,
-            logged_hours: 0,
-            variance_hours: 0,
-            status: 'weekend' as const,
-            worklogs: [],
-          },
-        ];
 
-        const days = (weeklyTimesheet?.days && weeklyTimesheet.days.length > 0)
-          ? weeklyTimesheet.days
-          : defaultDays;
+        // Nothing logged or clocked this week yet: show an empty ledger, never sample days.
+        const days = weeklyTimesheet?.days ?? [];
 
         const totalClocked = weeklyTimesheet?.total_clocked_hours ?? days.reduce((sum, d) => sum + d.clocked_hours, 0);
         const totalLogged = weeklyTimesheet?.total_logged_hours ?? days.reduce((sum, d) => sum + d.logged_hours, 0);
@@ -812,6 +743,12 @@ export const MyWorkdayHub: React.FC = () => {
                     </button>
                   </div>
                 </div>
+
+                {days.length === 0 && (
+                  <div style={{ padding: '18px', textAlign: 'center', fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                    No hours clocked or logged this week yet.
+                  </div>
+                )}
 
                 {/* Day Rows (Strict Vertical Alignment Across Columns) */}
                 {days.map((day) => {

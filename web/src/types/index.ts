@@ -447,6 +447,8 @@ export interface OnboardingCandidate {
   department_name?: string;
   designation_id?: string;
   designation_title?: string;
+  shift_id?: string;
+  shift_name?: string;
   manager_id?: string;
   manager_name?: string;
   expected_joining_date: string;
@@ -469,6 +471,23 @@ export interface OnboardingCandidate {
   created_at: string;
 }
 
+export interface Department {
+  id: string;
+  tenant_id: string;
+  name: string;
+  lead_id?: string;
+  parent_id?: string;
+  created_at: string;
+}
+
+export interface Designation {
+  id: string;
+  tenant_id: string;
+  title: string;
+  grade_level?: string;
+  created_at: string;
+}
+
 export interface ConvertCandidatePayload {
   candidate_id?: string;
   employee_code?: string;
@@ -476,6 +495,7 @@ export interface ConvertCandidatePayload {
   department_id?: string;
   designation_id?: string;
   manager_id?: string;
+  shift_id?: string;
   hourly_cost_rate?: number;
   initial_password?: string;
   basic_salary?: number;
@@ -567,6 +587,7 @@ export interface InviteCandidatePayload {
   phone?: string;
   department_id?: string;
   designation_id?: string;
+  shift_id?: string;
   manager_id?: string;
   expected_joining_date: string;
   employment_type?: string;

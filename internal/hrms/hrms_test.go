@@ -121,6 +121,7 @@ func TestCalculateSandwichDays(t *testing.T) {
 
 func TestBiometricDebugLoggingAndMatching(t *testing.T) {
 	// 1. Test saveBiometricDebugImage
+	t.Setenv("BIOMETRIC_DEBUG_DUMP", "true")
 	testImg := image.NewRGBA(image.Rect(0, 0, 100, 100))
 	savedPath := saveBiometricDebugImage("test_punch", "emp-unit-test", testImg)
 	if savedPath == "" {

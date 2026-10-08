@@ -478,10 +478,10 @@ export const TeamCapacityDesk: React.FC = () => {
 
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
-                          {member.designation_title || 'Software Engineer'}
+                          {member.designation_title || 'No designation'}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          {member.department_name || 'Engineering'}
+                          {member.department_name || 'No department'}
                         </div>
                       </td>
 

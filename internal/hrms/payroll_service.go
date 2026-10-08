@@ -1,11 +1,14 @@
 package hrms
 
 import (
+	"strconv"
+	"humora-backend/internal/notify"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"humora-backend/configs"
 	"math"
-	"os"
 	"strings"
 	"time"
 
@@ -26,6 +29,8 @@ type PayrollService interface {
 	GetITDeclaration(ctx context.Context, tenantID, employeeID uuid.UUID, financialYear string) (*ITDeclaration, error)
 	SubmitReimbursement(ctx context.Context, tenantID, employeeID uuid.UUID, req *SubmitReimbursementRequest) (*ReimbursementClaim, error)
 	ListReimbursements(ctx context.Context, tenantID, employeeID uuid.UUID) ([]ReimbursementClaim, error)
+	ListTeamReimbursements(ctx context.Context, tenantID uuid.UUID, status string) ([]ReimbursementClaim, error)
+	ReviewReimbursement(ctx context.Context, tenantID, claimID, reviewerID uuid.UUID, reviewerEmployeeID *uuid.UUID, reviewerName, status string) (*ReimbursementClaim, error)
 }
 
 type payrollService struct {
@@ -264,6 +269,19 @@ func (s *payrollService) ExecutePayrollRun(ctx context.Context, tenantID, adminU
 	}
 
 	// Send payslip notification emails asynchronously to employees via Tenant SMTP
+	// In-app notification for every employee paid in this run.
+	periodLabel := time.Month(month).String() + " " + strconv.Itoa(year)
+	for _, item := range preview.Employees {
+		if empID, err := uuid.Parse(item.EmployeeID); err == nil {
+			notify.ToEmployee(tenantID, empID, notify.Message{
+				Category: notify.CategoryPayroll,
+				Title:    "Your payslip for " + periodLabel + " is ready",
+				Body:     fmt.Sprintf("Net pay ₹%s", strconv.FormatFloat(item.NetPay, 'f', 2, 64)),
+				Link:     "payroll",
+			})
+		}
+	}
+
 	if s.companyService != nil && len(preview.Employees) > 0 {
 		go func(items []PayrollPreviewItem, tid uuid.UUID, period string) {
 			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -280,10 +298,7 @@ func (s *payrollService) ExecutePayrollRun(ctx context.Context, tenantID, adminU
 				companyName = companyProfile.LegalName
 			}
 
-			frontendBase := os.Getenv("FRONTEND_URL")
-			if frontendBase == "" {
-				frontendBase = "http://localhost:3000"
-			}
+			frontendBase := configs.AppConfig.Server.FrontendBaseURL
 			payslipsURL := fmt.Sprintf("%s/hrms/payroll", strings.TrimRight(frontendBase, "/"))
 
 			for _, itm := range items {
@@ -482,12 +497,73 @@ func (s *payrollService) SubmitReimbursement(ctx context.Context, tenantID, empl
 	if err := s.repo.CreateReimbursementClaim(ctx, claim); err != nil {
 		return nil, fmt.Errorf("failed to save claim: %w", err)
 	}
+	who := "an employee"
+	if emp, err := s.empRepo.GetEmployeeByID(ctx, tenantID, employeeID); err == nil && emp != nil {
+		who = emp.FirstName + " " + emp.LastName
+	}
+	notify.ToApproversOf(tenantID, employeeID, notify.Message{
+		Category:   notify.CategoryApproval,
+		Title:      "Expense claim from " + who,
+		Body:       fmt.Sprintf("₹%s • %s", strconv.FormatFloat(claim.Amount, 'f', 2, 64), claim.MerchantName),
+		Link:       "approvals",
+		EntityType: "reimbursement",
+		EntityID:   &claim.ID,
+	})
 	return claim, nil
 }
 
 func (s *payrollService) ListReimbursements(ctx context.Context, tenantID, employeeID uuid.UUID) ([]ReimbursementClaim, error) {
 	return s.repo.ListReimbursementClaims(ctx, tenantID, &employeeID)
 }
+
+func (s *payrollService) ListTeamReimbursements(ctx context.Context, tenantID uuid.UUID, status string) ([]ReimbursementClaim, error) {
+	switch status {
+	case "", "pending", "approved", "rejected", "reimbursed":
+	default:
+		return nil, fmt.Errorf("invalid status %q", status)
+	}
+	return s.repo.ListTeamReimbursementClaims(ctx, tenantID, status)
+}
+
+func (s *payrollService) ReviewReimbursement(ctx context.Context, tenantID, claimID, reviewerID uuid.UUID, reviewerEmployeeID *uuid.UUID, reviewerName, status string) (*ReimbursementClaim, error) {
+	if status != "approved" && status != "rejected" {
+		return nil, fmt.Errorf("status must be approved or rejected")
+	}
+	// Segregation of duties: nobody decides on their own expense claim.
+	if reviewerEmployeeID != nil {
+		owner, err := s.repo.ReimbursementClaimOwner(ctx, tenantID, claimID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrClaimNotPending
+		}
+		if err != nil {
+			return nil, err
+		}
+		if owner == *reviewerEmployeeID {
+			return nil, ErrOwnClaim
+		}
+	}
+	claim, err := s.repo.ReviewReimbursementClaim(ctx, tenantID, claimID, reviewerID, reviewerName, status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrClaimNotPending
+	}
+	if err == nil && claim != nil {
+		notify.ToEmployee(tenantID, claim.EmployeeID, notify.Message{
+			Category:   notify.CategoryExpense,
+			Title:      "Your expense claim was " + claim.Status,
+			Body:       fmt.Sprintf("₹%s • %s • reviewed by %s", strconv.FormatFloat(claim.Amount, 'f', 2, 64), claim.MerchantName, reviewerName),
+			Link:       "payroll",
+			EntityType: "reimbursement",
+			EntityID:   &claim.ID,
+		})
+	}
+	return claim, err
+}
+
+// ErrClaimNotPending: the claim does not exist in this tenant or was already decided.
+var ErrClaimNotPending = errors.New("claim not found or already reviewed")
+
+// ErrOwnClaim: a reviewer tried to decide on their own claim.
+var ErrOwnClaim = errors.New("you cannot review your own expense claim")
 
 // numberToWords converts numerical amount into Indian currency text.
 func numberToWords(amount int64) string {

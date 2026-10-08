@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,9 +8,29 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Release signing comes from android/keystore.properties (git-ignored) or HUMORA_KEYSTORE_* env vars.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun signingValue(key: String, env: String): String? =
+    keystoreProps.getProperty(key) ?: System.getenv(env)
+
+val isReleaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+// Production API endpoint: pass -Phumora.apiBaseUrl=https://api.yourdomain/api/v1 (or set it in gradle.properties).
+val releaseApiBaseUrl = providers.gradleProperty("humora.apiBaseUrl").orNull
+if (isReleaseBuild) {
+    require(releaseApiBaseUrl?.startsWith("https://") == true) {
+        "Release builds need -Phumora.apiBaseUrl=https://... (got: $releaseApiBaseUrl)"
+    }
+    require(signingValue("storeFile", "HUMORA_KEYSTORE_FILE") != null) {
+        "Release builds need android/keystore.properties or HUMORA_KEYSTORE_FILE; refusing to sign with the debug key"
+    }
+}
+
 android {
     namespace = "com.paylogic.humora"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.paylogic.humora"
@@ -21,21 +43,44 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // Push notifications (Firebase Cloud Messaging). Optional: set these in gradle.properties from the
+        // Firebase console (Project settings > Your apps > Android). Left empty, push is simply off.
+        fun prop(name: String) = providers.gradleProperty(name).orNull ?: ""
+        buildConfigField("String", "FCM_PROJECT_ID", "\"${prop("humora.fcm.projectId")}\"")
+        buildConfigField("String", "FCM_APP_ID", "\"${prop("humora.fcm.appId")}\"")
+        buildConfigField("String", "FCM_API_KEY", "\"${prop("humora.fcm.apiKey")}\"")
+        buildConfigField("String", "FCM_SENDER_ID", "\"${prop("humora.fcm.senderId")}\"")
+    }
+
+    signingConfigs {
+        create("release") {
+            signingValue("storeFile", "HUMORA_KEYSTORE_FILE")?.let { storeFile = file(it) }
+            storePassword = signingValue("storePassword", "HUMORA_KEYSTORE_PASSWORD")
+            keyAlias = signingValue("keyAlias", "HUMORA_KEY_ALIAS")
+            keyPassword = signingValue("keyPassword", "HUMORA_KEY_PASSWORD")
+        }
     }
 
     buildTypes {
         release {
+            buildConfigField("String", "API_BASE_URL", "\"${releaseApiBaseUrl ?: ""}\"")
+            manifestPlaceholders["usesCleartextTraffic"] = "false"
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
+            // Local backend on the developer LAN over plain HTTP; override with -Phumora.debugApiBaseUrl=...
+            val debugApi = providers.gradleProperty("humora.debugApiBaseUrl").orNull ?: "http://192.168.1.50:8090/api/v1"
+            buildConfigField("String", "API_BASE_URL", "\"$debugApi\"")
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
     }
 
@@ -54,6 +99,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -114,4 +160,12 @@ dependencies {
 
     // Image Loading
     implementation(libs.coil.compose)
+
+    // Pulse end-to-end encrypted messaging: wire protocol, gateway socket, encrypted local store
+    implementation(libs.protobuf.javalite)
+    implementation(libs.okhttp)
+    implementation(libs.sqlcipher.android)
+    implementation(libs.androidx.sqlite.ktx)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.firebase.messaging)
 }
