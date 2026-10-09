@@ -23,6 +23,8 @@ const (
 	maxMembersPerCall     = 1000
 	maxKeyBackupsPerCall  = 500
 	maxKeyBackupBytes     = 4 << 10
+	// A GroupInfo carries the whole ratchet tree: a few hundred bytes per device.
+	maxGroupInfoBytes = 2 << 20
 	// MaxMediaBytes caps one encrypted attachment.
 	MaxMediaBytes  = 100 << 20
 	mediaUploadTTL = 10 * time.Minute
@@ -447,6 +449,28 @@ func (s *Service) MediaDownload(ctx context.Context, tenantID, userID uuid.UUID,
 }
 
 // ───────────────────────────── Key backups ─────────────────────────────
+
+// PutGroupInfo publishes a conversation's GroupInfo for its current epoch.
+// Any member may publish it; the content is signed by a group member and
+// checked by the device that uses it, so the server only stores it.
+func (s *Service) PutGroupInfo(ctx context.Context, tenantID, userID, conversationID uuid.UUID, req *PutGroupInfoRequest) error {
+	if req.Epoch < 1 || len(req.GroupInfo) == 0 || len(req.GroupInfo) > maxGroupInfoBytes {
+		return invalid("group_info is missing or too large, or epoch is invalid")
+	}
+	if _, _, err := s.conversationFor(ctx, tenantID, userID, conversationID); err != nil {
+		return err
+	}
+	return s.repo.PutGroupInfo(ctx, conversationID, req.Epoch, req.GroupInfo)
+}
+
+// GetGroupInfo returns the current GroupInfo to a member, so one of their
+// devices that is not in the encryption group yet can join it.
+func (s *Service) GetGroupInfo(ctx context.Context, tenantID, userID, conversationID uuid.UUID) (*GroupInfo, error) {
+	if _, _, err := s.conversationFor(ctx, tenantID, userID, conversationID); err != nil {
+		return nil, err
+	}
+	return s.repo.GetGroupInfo(ctx, conversationID)
+}
 
 func (s *Service) PutKeyBackups(ctx context.Context, userID uuid.UUID, items []KeyBackup) error {
 	if len(items) == 0 || len(items) > maxKeyBackupsPerCall {

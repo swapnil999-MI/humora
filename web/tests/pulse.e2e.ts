@@ -212,6 +212,55 @@ for (let i = 0; i < 40; i++) {
 samples.sort((a, b) => a - b);
 console.log(`  send -> shown on the other device: p50=${samples[20].toFixed(1)}ms p95=${samples[37].toFixed(1)}ms (15ms poll granularity)`);
 
+// ── 8. Sending never waits for the other side to be online ────────────
+// Every device but a brand-new one of Alice's is offline. It joins the
+// conversation's encryption on its own and sends straight away.
+alice.stop();
+bob.stop();
+bobPhone.stop();
+const tabletStorage = new MemoryStorage();
+let aliceTablet = await client(ALICE, tabletStorage);
+const alone = await aliceTablet.sendText(dm, 'nobody else is online');
+await waitFor('single tick with everyone offline', async () => aliceTablet.tick((await find(aliceTablet, dm, alone))!) === 'sent');
+ok('a new device sends at once (single tick) while every other device is offline');
+bob = await client(BOB, bobStorage);
+await waitFor('bob reads it', has(bob, dm, 'nobody else is online'));
+await waitFor('double tick', async () => aliceTablet.tick((await find(aliceTablet, dm, alone))!) === 'delivered');
+await bob.markRead(dm);
+await waitFor('blue tick', async () => aliceTablet.tick((await find(aliceTablet, dm, alone))!) === 'read');
+ok('it turns into two ticks when the receiver comes online, and blue once read');
+
+// A conversation whose creator never set up its encryption: any member can start it.
+const unset = await http(await jwt(ALICE)).post<{ id: string }>('/pulse/conversations', { kind: 'group', name: 'Never set up', member_ids: [BOB] });
+await bob.idle();
+const first = await bob.sendText(unset.id, 'starting it myself');
+await waitFor('stored', async () => bob.tick((await find(bob, unset.id, first))!) === 'sent');
+await waitFor('alice reads it', has(aliceTablet, unset.id, 'starting it myself'));
+ok('a member can start the encryption of a conversation its creator never opened');
+
+// ── 9. The receiver reinstalls ────────────────────────────────────────
+// Carol's only device is gone. Alice's message waits at one tick; Carol's new
+// device gets it, but two ticks only show once it can actually read it.
+carol.stop();
+bob.stop();
+const forCarol = await aliceTablet.sendText(dm2, 'sent while carol reinstalls');
+const sentSeq = (await waitFor('stored', async () => (await find(aliceTablet, dm2, forCarol))?.seq))!;
+aliceTablet.stop(); // and the sender goes offline too
+const carolNew = await client(CAROL);
+await waitFor('carol has it, unreadable', async () => (await find(carolNew, dm2, forCarol))?.unavailable);
+await carolNew.markRead(dm2);
+await new Promise((r) => setTimeout(r, 500));
+const seen = await http(await jwt(ALICE)).get<{ members: { user_id: string; delivered_seq: number; read_seq: number }[] }>(`/pulse/conversations/${dm2}`);
+const carolMark = seen.members.find((m) => m.user_id === CAROL)!;
+assert(carolMark.delivered_seq < sentSeq && carolMark.read_seq < sentSeq, `carol acked ${carolMark.delivered_seq}/${carolMark.read_seq} before she could read seq ${sentSeq}`);
+ok('no double tick while the new device cannot read the message yet');
+aliceTablet = await client(ALICE, tabletStorage);
+await waitFor('carol reads it after the key arrives', has(carolNew, dm2, 'sent while carol reinstalls'), 15000);
+await waitFor('double tick', async () => aliceTablet.tick((await find(aliceTablet, dm2, forCarol))!) === 'delivered');
+await carolNew.markRead(dm2);
+await waitFor('blue tick', async () => aliceTablet.tick((await find(aliceTablet, dm2, forCarol))!) === 'read');
+ok('once the sender is back online the key is shared: two ticks, then blue once read');
+
 for (const c of clients) c.stop();
 console.log('ALL PASSED');
 process.exit(0);

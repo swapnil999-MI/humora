@@ -360,11 +360,12 @@ class PulseClient internal constructor(
     fun markRead(conversationId: String) = enqueue {
         val conv = convs[conversationId] ?: return@enqueue
         val me = conv.members.firstOrNull { it.userId == userId } ?: return@enqueue
-        val cursor = cursor(conversationId)
-        if (me.readSeq >= cursor) return@enqueue
-        me.readSeq = cursor
-        me.deliveredSeq = maxOf(me.deliveredSeq, cursor)
-        socket?.notify { setRead(Watermark.newBuilder().setConversationId(bs(Ids.uuidToBytes(conversationId))).setSeq(cursor)) }
+        // A message that cannot be read here yet cannot have been read (blue ticks) either.
+        val seq = receiptSeq(conversationId)
+        if (me.readSeq >= seq) return@enqueue
+        me.readSeq = seq
+        me.deliveredSeq = maxOf(me.deliveredSeq, seq)
+        socket?.notify { setRead(Watermark.newBuilder().setConversationId(bs(Ids.uuidToBytes(conversationId))).setSeq(seq)) }
         publishConversations()
     }
 
@@ -446,8 +447,11 @@ class PulseClient internal constructor(
         val directory = lookupDevices(list)
         for (conv in list) {
             ensureGroup(conv)
+            joinOnOwn(conv)
             catchUp(conv.id)
             reconcile(conv, directory)
+            shareHistory(conv)
+            publishGroupInfo(conv)
         }
         persist()
         saveConversations()
@@ -462,12 +466,68 @@ class PulseClient internal constructor(
         return directory
     }
 
-    /** Only the creator starts a group, and only while the server still shows epoch 0. */
+    /**
+     * Starts a conversation's group while the server still shows epoch 0. Any member may: the
+     * server's epoch ordering lets exactly one start win, and the others drop theirs and join it.
+     */
     private fun ensureGroup(conv: PulseConversation) {
         val gid = Ids.uuidToBytes(conv.id)
         if (device.hasGroup(gid)) return
-        if (conv.createdBy != userId || conv.epoch != 0L) return
+        if (conv.epoch != 0L) return
         device.createGroup(gid)
+    }
+
+    /**
+     * Joins a conversation's group without waiting for another device to add this one (an MLS
+     * external commit from the GroupInfo the server holds), so messages can be sent even when
+     * every other device is offline.
+     *
+     * The GroupInfo is signed by a group member and must be for this conversation at the epoch
+     * the server reports; anything else is refused. Devices in the group that are not current
+     * members' devices are removed by [reconcile] before this device sends anything.
+     */
+    private suspend fun joinOnOwn(conv: PulseConversation) {
+        val gid = Ids.uuidToBytes(conv.id)
+        val key = "commit:${conv.id}"
+        val rec = loadCommit(key)
+        if (rec?.join == true && !device.hasGroup(gid)) {
+            // Recorded, but the joined group never reached storage: the commit was never sent.
+            saveCommit(key, null)
+        } else if (rec?.join == true) {
+            driveCommit(conv)
+            return
+        }
+        if (device.hasGroup(gid) || conv.epoch == 0L) return
+
+        val info = api.groupInfo(conv.id) ?: return // none published yet: wait to be added
+        val staged = try {
+            device.joinExternal(gid, Ids.unb64(info.groupInfo), info.epoch)
+        } catch (e: Exception) {
+            Log.e(TAG, "${conv.id}: refused the published group info", e)
+            return
+        }
+        // The record before the keys: a joined group without its record would look usable.
+        saveCommit(key, PendingCommit(Ids.uuidv7(), Ids.b64(staged.commit), staged.epoch, "staged", join = true))
+        persist()
+        driveCommit(conv)
+    }
+
+    /** Whether this device can encrypt for the conversation: in the group, and not still waiting to be let in. */
+    private suspend fun canSend(conversationId: String): Boolean {
+        val gid = Ids.uuidToBytes(conversationId)
+        if (!device.hasGroup(gid) || device.currentEpoch(gid) == 0L) return false
+        val rec = loadCommit("commit:$conversationId")
+        return !(rec?.join == true && rec.stage == "staged")
+    }
+
+    /** Publishes the group's signed public state for the current epoch if the server has none. */
+    private suspend fun publishGroupInfo(conv: PulseConversation) {
+        if (!canSend(conv.id)) return
+        val gid = Ids.uuidToBytes(conv.id)
+        val epoch = device.currentEpoch(gid)
+        if (epoch != conv.epoch || conv.groupInfoEpoch >= epoch) return
+        // false: the epoch moved on meanwhile; whoever moved it publishes the next one.
+        if (api.publishGroupInfo(conv.id, GroupInfo(epoch, Ids.b64(device.groupInfo(gid))))) conv.groupInfoEpoch = epoch
     }
 
     /** Pulls the conversation log forward from this device's cursor. */
@@ -493,13 +553,31 @@ class PulseClient internal constructor(
         }
     }
 
-    /** Tells the senders that this device now holds everything up to its cursor (double tick). */
+    /** The oldest message this device holds but cannot read yet (its key has not been shared). */
+    @Serializable
+    private data class Waiting(val seq: Long, /** Server time of that message. */ val ts: Long)
+
+    private suspend fun loadWaiting(conversationId: String): Waiting? =
+        store.getString("waiting:$conversationId")?.let { json.decodeFromString(Waiting.serializer(), it) }
+
+    /**
+     * How far this device can acknowledge: its cursor, but short of the first message it holds and
+     * cannot read yet, so that message's sender does not see two ticks before it can be read here.
+     */
+    private suspend fun receiptSeq(conversationId: String): Long {
+        val cursor = cursor(conversationId)
+        val waiting = loadWaiting(conversationId) ?: return cursor
+        if (System.currentTimeMillis() - waiting.ts > RECEIPT_HOLD_MS) return cursor
+        return minOf(cursor, waiting.seq - 1)
+    }
+
+    /** Tells the senders that this device now holds everything it can read up to its cursor (double tick). */
     private suspend fun ackDelivered(conversationId: String) {
         val me = convs[conversationId]?.members?.firstOrNull { it.userId == userId } ?: return
-        val cursor = cursor(conversationId)
-        if (me.deliveredSeq >= cursor) return
-        me.deliveredSeq = cursor
-        socket?.notify { setDelivered(Watermark.newBuilder().setConversationId(bs(Ids.uuidToBytes(conversationId))).setSeq(cursor)) }
+        val seq = receiptSeq(conversationId)
+        if (me.deliveredSeq >= seq) return
+        me.deliveredSeq = seq
+        socket?.notify { setDelivered(Watermark.newBuilder().setConversationId(bs(Ids.uuidToBytes(conversationId))).setSeq(seq)) }
     }
 
     // ───────────────────────────── Incoming ─────────────────────────────
@@ -580,12 +658,23 @@ class PulseClient internal constructor(
                 device.mergePending(gid)
                 if (mine != null) saveCommit(key, mine.copy(stage = "merged"))
             } else {
-                if (mine?.stage == "staged") {
+                if (mine?.stage == "staged" && !mine.join) {
                     // Someone else took this epoch first; ours can never be accepted now.
                     device.discardPending(gid)
                     saveCommit(key, null)
                 }
-                device.processCommit(gid, env.ciphertext.toByteArray())
+                // The commit must be signed by the device the server says sent it.
+                val sender = Ids.concat(env.senderId.toByteArray(), env.senderDeviceId.toByteArray())
+                val before = device.memberKey(gid, sender)
+                device.processCommit(gid, env.ciphertext.toByteArray(), sender)
+                val after = device.memberKey(gid, sender)
+                if (after != null && (before == null || !before.contentEquals(after))) {
+                    // A device joined on its own (or rejoined with fresh keys): nobody welcomed it,
+                    // so it has no keys for older messages yet. Every member that can, shares them.
+                    val shares = loadShares(conversationId)
+                    val share = HistoryShare(Ids.bytesToUuid(env.senderDeviceId.toByteArray()), Ids.bytesToUuid(env.senderId.toByteArray()))
+                    if (shares.none { it.deviceId == share.deviceId }) saveShares(conversationId, shares + share)
+                }
             }
             convs[conversationId]?.let { it.epoch = maxOf(it.epoch, epoch) }
         } catch (e: Exception) {
@@ -614,6 +703,7 @@ class PulseClient internal constructor(
         val gid = env.conversationId.toByteArray()
         val frame = env.ciphertext.toByteArray()
 
+        var keyMissing = false
         val content = try {
             val sender = PulseDevice.frameSender(frame)
             // The signed sender inside the ciphertext must be who the server says sent it.
@@ -621,7 +711,18 @@ class PulseClient internal constructor(
             val key = senderKey(gid, sender) ?: error("unknown sender")
             Content.parseFrom(device.decrypt(gid, frame, key).plaintext)
         } catch (e: Exception) {
+            keyMissing = e.message == "no key for this epoch"
             null
+        }
+
+        // Someone else's message this device should be able to read but has no key for yet:
+        // receipts wait for it (a forged or broken message never holds them back).
+        val me = convs[conversationId]?.members?.firstOrNull { it.userId == userId }
+        if (keyMissing && senderId != userId && me != null && seq > me.joinedSeq) {
+            val waiting = loadWaiting(conversationId)
+            if (waiting == null || seq < waiting.seq) {
+                store.setString("waiting:$conversationId", json.encodeToString(Waiting.serializer(), Waiting(seq, ts)))
+            }
         }
 
         if (content != null) {
@@ -724,8 +825,10 @@ class PulseClient internal constructor(
                         device.importEpochKey(gid, epoch, k)
                     }
                     persist()
-                    // Re-read the log so messages stored before this device joined become readable.
+                    // Re-read the log so messages stored before this device joined become readable
+                    // (which also recomputes which ones still are not).
                     val conversationId = Ids.bytesToUuid(gid)
+                    store.setString("waiting:$conversationId", null)
                     setCursor(conversationId, 0)
                     scheduleRefresh(conversationId, 0)
                 }
@@ -778,6 +881,7 @@ class PulseClient internal constructor(
 
         // Finish a commit left over from an earlier attempt before planning a new one.
         if (driveCommit(conv) == "conflict") return
+        if (!canSend(conv.id)) return // still waiting to be let in
 
         val want = LinkedHashMap<String, DeviceInfo>()
         for (m in conv.members) for (d in directory[m.userId].orEmpty()) want[Ids.hex(identityOf(d))] = d
@@ -824,7 +928,22 @@ class PulseClient internal constructor(
         val stage: String,
         val welcome: String? = null,
         val welcomeTo: List<String> = emptyList(),
+        /**
+         * This device joining on its own (external commit). Its group is already in place locally,
+         * but must not be used until the server accepts the commit; if rejected, the group is dropped.
+         */
+        val join: Boolean = false,
     )
+
+    /** A device that joined on its own and still needs this device's older message keys. */
+    @Serializable
+    private data class HistoryShare(val deviceId: String, val userId: String)
+
+    private suspend fun loadShares(conversationId: String): List<HistoryShare> =
+        store.getString("share:$conversationId")?.let { json.decodeFromString(ListSerializer(HistoryShare.serializer()), it) }.orEmpty()
+
+    private suspend fun saveShares(conversationId: String, shares: List<HistoryShare>) =
+        store.setString("share:$conversationId", shares.takeIf { it.isNotEmpty() }?.let { json.encodeToString(ListSerializer(HistoryShare.serializer()), it) })
 
     private suspend fun loadCommit(key: String): PendingCommit? =
         store.getString(key)?.let { json.decodeFromString(PendingCommit.serializer(), it) }
@@ -863,12 +982,17 @@ class PulseClient internal constructor(
             } catch (e: PulseSocketException) {
                 if (!e.conflict) throw e // transient: the record stays and is retried
                 try {
-                    device.discardPending(gid)
-                    // A group still at epoch 0 was our own attempt to start the conversation and lost;
-                    // drop it and wait to be welcomed into the winner's.
-                    if (device.currentEpoch(gid) == 0L) {
+                    if (rec.join) {
+                        // The group changed before our join landed: drop it and join again from the new state.
                         device.dropGroup(gid)
-                        conv.epoch = maxOf(conv.epoch, 1)
+                    } else {
+                        device.discardPending(gid)
+                        // A group still at epoch 0 was our own attempt to start the conversation and lost;
+                        // drop it and join the winner's.
+                        if (device.currentEpoch(gid) == 0L) {
+                            device.dropGroup(gid)
+                            conv.epoch = maxOf(conv.epoch, 1)
+                        }
                     }
                 } catch (err: Exception) {
                     Log.e(TAG, "could not roll back a rejected commit", err)
@@ -879,7 +1003,8 @@ class PulseClient internal constructor(
                 return "conflict"
             }
 
-            if (device.currentEpoch(gid) < rec.epoch) device.mergePending(gid)
+            // A join is merged already; any other commit takes effect now that it is accepted.
+            if (!rec.join && device.currentEpoch(gid) < rec.epoch) device.mergePending(gid)
             persist()
             rec = rec.copy(stage = "merged")
             saveCommit(key, rec)
@@ -893,6 +1018,7 @@ class PulseClient internal constructor(
 
         welcome(conv, rec)
         saveCommit(key, null)
+        publishGroupInfo(conv)
         return "ok"
     }
 
@@ -901,27 +1027,47 @@ class PulseClient internal constructor(
         val welcome = rec.welcome ?: return
         if (rec.welcomeTo.isEmpty()) return
         val gid = Ids.uuidToBytes(conv.id)
-        val s = socket ?: throw PulseSocketException(PulseSocketException.Kind.OFFLINE, message = "not connected")
+        val payloads = listOf(Ids.concat(byteArrayOf(DIRECT_WELCOME.toByte()), Ids.unb64(welcome))) + historyPayloads(gid, rec.epoch)
+        for (target in rec.welcomeTo) sendDirect(target, gid, payloads)
+    }
 
-        val payloads = mutableListOf(Ids.concat(byteArrayOf(DIRECT_WELCOME.toByte()), Ids.unb64(welcome)))
+    /** Sends this device's older message keys to devices that joined on their own. */
+    private suspend fun shareHistory(conv: PulseConversation) {
+        var shares = loadShares(conv.id)
+        if (shares.isEmpty() || !canSend(conv.id)) return
+        val gid = Ids.uuidToBytes(conv.id)
+        val payloads = historyPayloads(gid, device.currentEpoch(gid))
+        for (share in shares.toList()) {
+            // Only to a device still in the group, of a user still in the conversation.
+            val inGroup = device.memberKey(gid, Ids.concat(Ids.uuidToBytes(share.userId), Ids.uuidToBytes(share.deviceId))) != null
+            if (inGroup && conv.members.any { it.userId == share.userId }) sendDirect(share.deviceId, gid, payloads)
+            shares = shares.filter { it.deviceId != share.deviceId }
+            saveShares(conv.id, shares)
+        }
+    }
+
+    /** This device's message keys for every epoch before [upTo], sealed for the current epoch. */
+    private fun historyPayloads(gid: ByteArray, upTo: Long): List<ByteArray> {
         val keys = mutableListOf<ByteArray>()
-        for (epoch in 0 until rec.epoch) {
+        for (epoch in 0 until upTo) {
             val k = device.epochKey(gid, epoch) ?: continue
             keys += ByteBuffer.allocate(40).putLong(epoch).put(k).array()
         }
-        // Sealed for the new epoch, which only the group (now including the new devices) can open.
-        for (chunk in keys.chunked(HISTORY_KEYS_PER_FRAME)) {
-            payloads += Ids.concat(byteArrayOf(DIRECT_HISTORY_KEYS.toByte()), device.encrypt(gid, Ids.concat(*chunk.toTypedArray())))
+        // Sealed for the current epoch, which only the group (including the new devices) can open.
+        return keys.chunked(HISTORY_KEYS_PER_FRAME).map { chunk ->
+            Ids.concat(byteArrayOf(DIRECT_HISTORY_KEYS.toByte()), device.encrypt(gid, Ids.concat(*chunk.toTypedArray())))
         }
+    }
 
-        for (target in rec.welcomeTo) {
-            for (payload in payloads) {
-                try {
-                    s.request { setDirectSend(DirectSend.newBuilder().setToDeviceId(bs(Ids.uuidToBytes(target))).setConversationId(bs(gid)).setPayload(bs(payload))) }
-                } catch (e: Exception) {
-                    if (isTransient(e)) throw e // keep the record; retried on the next pass
-                    break // the device is gone (revoked); nothing to deliver
-                }
+    /** Delivers payloads to one device, in order. A device that is gone (revoked) is skipped. */
+    private suspend fun sendDirect(deviceId: String, gid: ByteArray, payloads: List<ByteArray>) {
+        val s = socket ?: throw PulseSocketException(PulseSocketException.Kind.OFFLINE, message = "not connected")
+        for (payload in payloads) {
+            try {
+                s.request { setDirectSend(DirectSend.newBuilder().setToDeviceId(bs(Ids.uuidToBytes(deviceId))).setConversationId(bs(gid)).setPayload(bs(payload))) }
+            } catch (e: Exception) {
+                if (isTransient(e)) throw e // keep the record; retried on the next pass
+                return
             }
         }
     }
@@ -934,8 +1080,8 @@ class PulseClient internal constructor(
             val s = socket ?: return
             if (!s.connected) return
             val gid = Ids.uuidToBytes(item.conversationId)
-            // No usable key yet (waiting to be welcomed, or the group is still being started).
-            if (!device.hasGroup(gid) || device.currentEpoch(gid) == 0L) continue
+            // No usable key yet (not in the group yet, or the group is still being started).
+            if (!canSend(item.conversationId)) continue
 
             val reply = try {
                 s.request {
@@ -988,6 +1134,11 @@ class PulseClient internal constructor(
         const val KEY_PACKAGE_LOW_WATER = 8
         const val SYNC_PAGE = 200
         const val HISTORY_KEYS_PER_FRAME = 1000
+        /**
+         * Receipts stop short of a message this device cannot read yet, so its sender keeps one tick
+         * until the key arrives. A message whose key has not arrived after this long stops holding them back.
+         */
+        const val RECEIPT_HOLD_MS = 14L * 24 * 60 * 60 * 1000
         // Device-to-device payload types (first byte of a Direct payload).
         const val DIRECT_WELCOME = 1
         const val DIRECT_HISTORY_KEYS = 2

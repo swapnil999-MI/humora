@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS pulse_conversations (
     created_by UUID NOT NULL REFERENCES users(id),
     last_seq BIGINT NOT NULL DEFAULT 0,
     epoch BIGINT NOT NULL DEFAULT 0, -- key-agreement epoch; handshakes must advance it by exactly one
+    group_info BYTEA, -- latest signed MLS GroupInfo (public state only), for devices joining on their own
+    group_info_epoch BIGINT NOT NULL DEFAULT 0, -- epoch group_info is for; served only while it equals epoch
     last_message_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (tenant_id, dm_key)

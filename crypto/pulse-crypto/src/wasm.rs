@@ -96,9 +96,23 @@ impl PulseDevice {
         js(self.0.join(welcome))
     }
 
+    /// Applies another device's commit; `sender` is the identity the server says sent it.
     #[wasm_bindgen(js_name = processCommit)]
-    pub fn process_commit(&self, group_id: &[u8], commit: &[u8]) -> Result<u64, JsError> {
-        js(self.0.process_commit(group_id, commit))
+    pub fn process_commit(&self, group_id: &[u8], commit: &[u8], sender: &[u8]) -> Result<u64, JsError> {
+        js(self.0.process_commit(group_id, commit, sender))
+    }
+
+    /// Signed public snapshot of the group, published so other devices can join on their own.
+    #[wasm_bindgen(js_name = groupInfo)]
+    pub fn group_info(&self, group_id: &[u8]) -> Result<Vec<u8>, JsError> {
+        js(self.0.group_info(group_id))
+    }
+
+    /// Joins from a published snapshot (MLS external commit). The group is in place on
+    /// return but must not be used until the server accepts the commit.
+    #[wasm_bindgen(js_name = joinExternal)]
+    pub fn join_external(&self, group_id: &[u8], group_info: &[u8], epoch: u64) -> Result<Commit, JsError> {
+        js(self.0.join_external(group_id, group_info, epoch)).map(Into::into)
     }
 
     #[wasm_bindgen(js_name = currentEpoch)]

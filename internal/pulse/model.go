@@ -46,18 +46,20 @@ type ClaimedKeyPackage struct {
 // Conversation is a DM, group, or channel. The server knows its membership
 // and message count, never its content.
 type Conversation struct {
-	ID            uuid.UUID  `db:"id" json:"id"`
-	TenantID      uuid.UUID  `db:"tenant_id" json:"-"`
-	Kind          string     `db:"kind" json:"kind"`
-	Name          string     `db:"name" json:"name"`
-	Topic         string     `db:"topic" json:"topic"`
-	IsPrivate     bool       `db:"is_private" json:"is_private"`
-	CreatedBy     uuid.UUID  `db:"created_by" json:"created_by"`
-	LastSeq       int64      `db:"last_seq" json:"last_seq"`
-	Epoch         int64      `db:"epoch" json:"epoch"`
-	LastMessageAt *time.Time `db:"last_message_at" json:"last_message_at,omitempty"`
-	CreatedAt     time.Time  `db:"created_at" json:"created_at"`
-	Members       []Member   `json:"members"`
+	ID        uuid.UUID `db:"id" json:"id"`
+	TenantID  uuid.UUID `db:"tenant_id" json:"-"`
+	Kind      string    `db:"kind" json:"kind"`
+	Name      string    `db:"name" json:"name"`
+	Topic     string    `db:"topic" json:"topic"`
+	IsPrivate bool      `db:"is_private" json:"is_private"`
+	CreatedBy uuid.UUID `db:"created_by" json:"created_by"`
+	LastSeq   int64     `db:"last_seq" json:"last_seq"`
+	Epoch     int64     `db:"epoch" json:"epoch"`
+	// GroupInfoEpoch is the epoch of the stored GroupInfo; below Epoch means none is available yet.
+	GroupInfoEpoch int64      `db:"group_info_epoch" json:"group_info_epoch"`
+	LastMessageAt  *time.Time `db:"last_message_at" json:"last_message_at,omitempty"`
+	CreatedAt      time.Time  `db:"created_at" json:"created_at"`
+	Members        []Member   `json:"members"`
 }
 
 // Member carries the receipt watermarks that drive the tick marks:
@@ -91,6 +93,13 @@ type DirectMessage struct {
 	ConversationID *uuid.UUID `db:"conversation_id"`
 	Payload        []byte     `db:"payload"`
 	CreatedAt      time.Time  `db:"created_at"`
+}
+
+// GroupInfo is a conversation's latest signed MLS GroupInfo: public group
+// state only, from which a member's device can join without anyone online.
+type GroupInfo struct {
+	Epoch     int64  `json:"epoch"`
+	GroupInfo []byte `json:"group_info"`
 }
 
 // KeyBackup is a message key encrypted under the user's recovery key.

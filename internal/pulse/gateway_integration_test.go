@@ -509,6 +509,71 @@ func TestHandshakeEpochOrdering(t *testing.T) {
 	}
 }
 
+func TestGroupInfoFollowsEpoch(t *testing.T) {
+	e := newTestEnv(t)
+	ctx := context.Background()
+	tenant := e.tenant()
+	alice, bob, outsider := e.user(tenant), e.user(tenant), e.user(tenant)
+	conv := e.conversation(alice, KindDM, "", bob)
+	a := e.connect(alice)
+
+	// Nothing published yet.
+	if _, err := e.svc.GetGroupInfo(ctx, tenant, bob.id, conv); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("get before publish: %v, want ErrNotFound", err)
+	}
+	id := uuid.New()
+	a.write(&pulsepb.ClientFrame{ReqId: 1, Body: &pulsepb.ClientFrame_Send{Send: &pulsepb.Send{
+		ConversationId: conv[:], Id: id[:], Kind: pulsepb.MessageKind_MESSAGE_KIND_HANDSHAKE, Ciphertext: []byte("commit"), Epoch: 1,
+	}}})
+	for {
+		if f := a.next(); f.GetSendAck() != nil {
+			break
+		}
+	}
+
+	// Only for the current epoch, only by members, and the first one for an epoch is kept.
+	put := func(u testUser, epoch int64, info string) error {
+		return e.svc.PutGroupInfo(ctx, tenant, u.id, conv, &PutGroupInfoRequest{Epoch: epoch, GroupInfo: []byte(info)})
+	}
+	if err := put(alice, 2, "future"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("future epoch: %v, want ErrConflict", err)
+	}
+	if err := put(outsider, 1, "outsider"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("outsider publish: %v, want ErrNotFound", err)
+	}
+	if err := put(alice, 1, "first"); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	if err := put(bob, 1, "second"); err != nil {
+		t.Fatalf("republish same epoch: %v", err)
+	}
+	g, err := e.svc.GetGroupInfo(ctx, tenant, bob.id, conv)
+	if err != nil || g.Epoch != 1 || string(g.GroupInfo) != "first" {
+		t.Fatalf("get = %+v, %v; want epoch 1 \"first\"", g, err)
+	}
+	if _, err := e.svc.GetGroupInfo(ctx, tenant, outsider.id, conv); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("outsider get: %v, want ErrNotFound", err)
+	}
+	c, _ := e.svc.GetConversation(ctx, tenant, alice.id, conv)
+	if c.GroupInfoEpoch != 1 {
+		t.Fatalf("group_info_epoch = %d, want 1", c.GroupInfoEpoch)
+	}
+
+	// Once the epoch moves on, the old snapshot is no longer served.
+	next := uuid.New()
+	a.write(&pulsepb.ClientFrame{ReqId: 2, Body: &pulsepb.ClientFrame_Send{Send: &pulsepb.Send{
+		ConversationId: conv[:], Id: next[:], Kind: pulsepb.MessageKind_MESSAGE_KIND_HANDSHAKE, Ciphertext: []byte("commit"), Epoch: 2,
+	}}})
+	for {
+		if f := a.next(); f.GetSendAck() != nil {
+			break
+		}
+	}
+	if _, err := e.svc.GetGroupInfo(ctx, tenant, bob.id, conv); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("stale get: %v, want ErrNotFound", err)
+	}
+}
+
 // fakeStorage stands in for object storage; only the presign calls are used.
 type fakeStorage struct{ media.Storage }
 

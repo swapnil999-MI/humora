@@ -35,7 +35,17 @@ class PulseDevice private constructor(private var handle: Long) : Closeable {
     @Synchronized fun discardPending(group: ByteArray) = PulseNative.discardPending(h(), group)
     /** Joins the group a Welcome is for; returns that group's id. */
     @Synchronized fun join(welcome: ByteArray): ByteArray = PulseNative.join(h(), welcome)
-    @Synchronized fun processCommit(group: ByteArray, commit: ByteArray): Long = PulseNative.processCommit(h(), group, commit)
+    /** Applies another device's commit; [sender] is the identity the server says sent it. */
+    @Synchronized fun processCommit(group: ByteArray, commit: ByteArray, sender: ByteArray): Long =
+        PulseNative.processCommit(h(), group, commit, sender)
+    /** Signed public snapshot of the group, published so other devices can join on their own. */
+    @Synchronized fun groupInfo(group: ByteArray): ByteArray = PulseNative.groupInfo(h(), group)
+    /**
+     * Joins from a published snapshot (MLS external commit). The group is in place on return
+     * but must not be used until the server accepts the commit; [dropGroup] it if rejected.
+     */
+    @Synchronized fun joinExternal(group: ByteArray, info: ByteArray, epoch: Long): Commit =
+        decodeCommit(PulseNative.joinExternal(h(), group, info, epoch))
     @Synchronized fun epochKey(group: ByteArray, epoch: Long): ByteArray? = PulseNative.epochKey(h(), group, epoch)
     @Synchronized fun importEpochKey(group: ByteArray, epoch: Long, key: ByteArray) = PulseNative.importEpochKey(h(), group, epoch, key)
     @Synchronized fun memberIdentities(group: ByteArray): List<ByteArray> = PulseNative.memberIdentities(h(), group).toList()

@@ -239,7 +239,7 @@ func (r *Repository) CreateConversation(ctx context.Context, c *Conversation, dm
 	return true, tx.Commit()
 }
 
-const conversationColumns = `c.id, c.tenant_id, c.kind, c.name, c.topic, c.is_private, c.created_by, c.last_seq, c.epoch, c.last_message_at, c.created_at`
+const conversationColumns = `c.id, c.tenant_id, c.kind, c.name, c.topic, c.is_private, c.created_by, c.last_seq, c.epoch, c.group_info_epoch, c.last_message_at, c.created_at`
 
 func (r *Repository) GetConversation(ctx context.Context, tenantID, id uuid.UUID) (*Conversation, error) {
 	var c Conversation
@@ -342,6 +342,50 @@ func (r *Repository) RemoveMember(ctx context.Context, conversationID, userID uu
 		return ErrNotFound
 	}
 	return nil
+}
+
+// PutGroupInfo stores the GroupInfo for the conversation's current epoch. The
+// first one stored for an epoch is kept (any member can publish it, and they
+// are equivalent). A GroupInfo for any other epoch is ErrConflict.
+func (r *Repository) PutGroupInfo(ctx context.Context, conversationID uuid.UUID, epoch int64, info []byte) error {
+	var current int64
+	err := r.db.QueryRowxContext(ctx, `
+		WITH upd AS (
+			UPDATE pulse_conversations SET group_info = $3, group_info_epoch = $2
+			WHERE id = $1 AND epoch = $2 AND group_info_epoch < $2
+			RETURNING epoch
+		)
+		SELECT epoch FROM upd
+		UNION ALL
+		SELECT epoch FROM pulse_conversations WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM upd)
+	`, conversationID, epoch, info).Scan(&current)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if current != epoch {
+		return ErrConflict
+	}
+	return nil
+}
+
+// GetGroupInfo returns the GroupInfo for the conversation's current epoch, or
+// ErrNotFound if none has been published for it yet.
+func (r *Repository) GetGroupInfo(ctx context.Context, conversationID uuid.UUID) (*GroupInfo, error) {
+	var g GroupInfo
+	err := r.db.QueryRowxContext(ctx, `
+		SELECT epoch, group_info FROM pulse_conversations
+		WHERE id = $1 AND group_info IS NOT NULL AND group_info_epoch = epoch
+	`, conversationID).Scan(&g.Epoch, &g.GroupInfo)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &g, nil
 }
 
 // ───────────────────────────── Messages ─────────────────────────────

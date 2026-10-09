@@ -41,6 +41,8 @@ func RegisterRoutes(router fiber.Router, handler *Handler, hub *Hub) {
 	pulseGroup.Get("/conversations/:id", handler.GetConversation)
 	pulseGroup.Post("/conversations/:id/members", handler.AddMembers)
 	pulseGroup.Delete("/conversations/:id/members/:userId", handler.RemoveMember)
+	pulseGroup.Post("/conversations/:id/group-info", handler.PutGroupInfo)
+	pulseGroup.Get("/conversations/:id/group-info", handler.GetGroupInfo)
 
 	// Encrypted attachments
 	pulseGroup.Post("/media/upload-url", handler.MediaUpload)

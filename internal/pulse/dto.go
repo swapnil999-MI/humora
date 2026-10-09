@@ -70,6 +70,9 @@ type MediaDownloadResponse struct {
 	URL string `json:"url"`
 }
 
+// PutGroupInfoRequest publishes the group's public state for one epoch.
+type PutGroupInfoRequest = GroupInfo
+
 type PutKeyBackupsRequest struct {
 	Items []KeyBackup `json:"items"`
 }

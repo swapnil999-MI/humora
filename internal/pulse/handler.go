@@ -42,6 +42,8 @@ func fail(c *fiber.Ctx, err error) error {
 		return response.Error(c, fiber.StatusNotFound, "Not found")
 	case errors.Is(err, ErrForbidden):
 		return response.Error(c, fiber.StatusForbidden, "Forbidden: insufficient permissions")
+	case errors.Is(err, ErrConflict):
+		return response.Error(c, fiber.StatusConflict, "Conflict: the conversation's epoch has moved on")
 	default:
 		return response.Error(c, fiber.StatusInternalServerError, fmt.Sprintf("Pulse request failed {{%s}}", err.Error()))
 	}
@@ -279,6 +281,43 @@ func (h *Handler) GetConversation(c *fiber.Ctx) error {
 		return fail(c, err)
 	}
 	return response.TypedSuccess(c, fiber.StatusOK, "Conversation retrieved", conv)
+}
+
+// PutGroupInfo publishes the encryption group's public state for the current epoch.
+func (h *Handler) PutGroupInfo(c *fiber.Ctx) error {
+	tenantID, userID, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	convID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid conversation ID")
+	}
+	var req PutGroupInfoRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid JSON payload")
+	}
+	if err := h.service.PutGroupInfo(c.UserContext(), tenantID, userID, convID, &req); err != nil {
+		return fail(c, err)
+	}
+	return response.Success(c, fiber.StatusOK, "Group info stored", nil)
+}
+
+// GetGroupInfo returns the encryption group's public state for the current epoch.
+func (h *Handler) GetGroupInfo(c *fiber.Ctx) error {
+	tenantID, userID, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	convID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid conversation ID")
+	}
+	info, err := h.service.GetGroupInfo(c.UserContext(), tenantID, userID, convID)
+	if err != nil {
+		return fail(c, err)
+	}
+	return response.TypedSuccess(c, fiber.StatusOK, "Group info retrieved", info)
 }
 
 // AddMembers adds users to a group or channel.

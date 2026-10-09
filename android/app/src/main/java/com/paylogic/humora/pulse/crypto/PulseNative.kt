@@ -29,7 +29,9 @@ internal object PulseNative {
     @JvmStatic external fun mergePending(handle: Long, group: ByteArray): Long
     @JvmStatic external fun discardPending(handle: Long, group: ByteArray)
     @JvmStatic external fun join(handle: Long, welcome: ByteArray): ByteArray
-    @JvmStatic external fun processCommit(handle: Long, group: ByteArray, commit: ByteArray): Long
+    @JvmStatic external fun processCommit(handle: Long, group: ByteArray, commit: ByteArray, sender: ByteArray): Long
+    @JvmStatic external fun groupInfo(handle: Long, group: ByteArray): ByteArray
+    @JvmStatic external fun joinExternal(handle: Long, group: ByteArray, info: ByteArray, epoch: Long): ByteArray
     @JvmStatic external fun epochKey(handle: Long, group: ByteArray, epoch: Long): ByteArray?
     @JvmStatic external fun importEpochKey(handle: Long, group: ByteArray, epoch: Long, key: ByteArray)
     @JvmStatic external fun memberIdentities(handle: Long, group: ByteArray): Array<ByteArray>

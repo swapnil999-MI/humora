@@ -262,12 +262,36 @@ pub extern "system" fn Java_com_paylogic_humora_pulse_crypto_PulseNative_join<'l
 
 #[no_mangle]
 pub extern "system" fn Java_com_paylogic_humora_pulse_crypto_PulseNative_processCommit<'l>(
-    mut env: JNIEnv<'l>, _: JClass<'l>, handle: jlong, group: JByteArray<'l>, commit: JByteArray<'l>,
+    mut env: JNIEnv<'l>, _: JClass<'l>, handle: jlong, group: JByteArray<'l>, commit: JByteArray<'l>, sender: JByteArray<'l>,
 ) -> jlong {
     guard(&mut env, -1, |env| {
         let gid = input(env, &group)?;
         let c = input(env, &commit)?;
-        Ok(device(handle)?.process_commit(&gid, &c)? as jlong)
+        let from = input(env, &sender)?;
+        Ok(device(handle)?.process_commit(&gid, &c, &from)? as jlong)
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_paylogic_humora_pulse_crypto_PulseNative_groupInfo<'l>(
+    mut env: JNIEnv<'l>, _: JClass<'l>, handle: jlong, group: JByteArray<'l>,
+) -> jbyteArray {
+    guard(&mut env, NULL_ARRAY, |env| {
+        let gid = input(env, &group)?;
+        let info = device(handle)?.group_info(&gid)?;
+        output(env, &info)
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_paylogic_humora_pulse_crypto_PulseNative_joinExternal<'l>(
+    mut env: JNIEnv<'l>, _: JClass<'l>, handle: jlong, group: JByteArray<'l>, info: JByteArray<'l>, epoch: jlong,
+) -> jbyteArray {
+    guard(&mut env, NULL_ARRAY, |env| {
+        let gid = input(env, &group)?;
+        let gi = input(env, &info)?;
+        let commit = device(handle)?.join_external(&gid, &gi, epoch as u64)?;
+        output(env, &encode_commit(commit))
     })
 }
 

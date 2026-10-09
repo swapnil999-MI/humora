@@ -47,6 +47,8 @@ data class PulseConversation(
     @SerialName("created_by") val createdBy: String = "",
     @SerialName("last_seq") var lastSeq: Long = 0,
     var epoch: Long = 0,
+    /** Epoch of the GroupInfo the server holds; below [epoch] means none is published for it yet. */
+    @SerialName("group_info_epoch") var groupInfoEpoch: Long = 0,
     @SerialName("last_message_at") var lastMessageAt: String? = null,
     @SerialName("created_at") val createdAt: String = "",
     val members: List<PulseMember> = emptyList(),
@@ -57,6 +59,10 @@ internal data class DeviceInfo(val id: String, @SerialName("user_id") val userId
 
 @Serializable
 internal data class ClaimedKeyPackage(@SerialName("device_id") val deviceId: String, @SerialName("key_package") val keyPackage: String)
+
+/** A conversation's signed public group state, from which a member's device can join on its own. */
+@Serializable
+internal data class GroupInfo(val epoch: Long, @SerialName("group_info") val groupInfo: String)
 
 @Serializable
 internal data class MediaSlot(@SerialName("object_key") val objectKey: String, val url: String, val fields: Map<String, String>)
@@ -126,6 +132,22 @@ internal class PulseApi(
             PulseConversation.serializer())
 
     // ── Encrypted attachments ──
+
+    /** The GroupInfo for the conversation's current epoch, or null if none is published yet. */
+    suspend fun groupInfo(conversationId: String): GroupInfo? = try {
+        call("GET", "pulse/conversations/$conversationId/group-info", null, GroupInfo.serializer())
+    } catch (e: PulseHttpException) {
+        if (e.status == 404) null else throw e
+    }
+
+    /** Publishes the GroupInfo for the current epoch; returns false if the epoch has moved on. */
+    suspend fun publishGroupInfo(conversationId: String, info: GroupInfo): Boolean = try {
+        call("POST", "pulse/conversations/$conversationId/group-info",
+            json.encodeToString(GroupInfo.serializer(), info), JsonElement.serializer())
+        true
+    } catch (e: PulseHttpException) {
+        if (e.status == 409) false else throw e
+    }
 
     suspend fun mediaUploadSlot(conversationId: String, sizeBytes: Long): MediaSlot =
         call("POST", "pulse/media/upload-url",

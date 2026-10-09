@@ -319,16 +319,87 @@ impl Device {
         Ok(group.group_id().as_slice().to_vec())
     }
 
-    /// Applies another member's commit from the conversation log. Returns the new epoch.
-    pub fn process_commit(&self, group_id: &[u8], commit: &[u8]) -> Result<u64, String> {
+    /// A signed snapshot of the group's public state (members, tree, and the
+    /// epoch's external key), published so a member's other or new devices
+    /// can join without anyone else online. It holds no secrets.
+    pub fn group_info(&self, group_id: &[u8]) -> Result<Vec<u8>, String> {
+        let group = self.group(group_id)?;
+        group
+            .export_group_info(self.provider.crypto(), &self.signer, true)
+            .map_err(err)?
+            .tls_serialize_detached()
+            .map_err(err)
+    }
+
+    /// Joins a group on its own from a published GroupInfo (an MLS external
+    /// commit). The signature on the GroupInfo is verified, and it must be for
+    /// `group_id` at `epoch` (what the server says is current). Returns the
+    /// commit to send for `epoch + 1`.
+    ///
+    /// Unlike other commits, the new group is already in place when this
+    /// returns. The caller must not use it until the server accepts the commit,
+    /// and must call `drop_group` if the server rejects it.
+    pub fn join_external(&self, group_id: &[u8], group_info: &[u8], epoch: u64) -> Result<Commit, String> {
+        if self.group(group_id).is_ok() {
+            return Err("already in this group".into());
+        }
+        let info = match MlsMessageIn::tls_deserialize_exact(group_info).map_err(err)?.extract() {
+            MlsMessageBodyIn::GroupInfo(info) => info,
+            _ => return Err("not a group info".into()),
+        };
+        // Bound to the conversation and epoch the caller expects, so a snapshot
+        // of another conversation or an old epoch is refused before use.
+        if info.group_id().as_slice() != group_id {
+            return Err("group info is for another conversation".into());
+        }
+        if info.epoch().as_u64() != epoch {
+            return Err("group info is not for the current epoch".into());
+        }
+        let config = MlsGroupJoinConfig::builder().use_ratchet_tree_extension(true).build();
+        let (group, bundle) = MlsGroup::external_commit_builder()
+            .with_config(config)
+            .build_group(&self.provider, info, self.credential())
+            .map_err(err)?
+            .load_psks(self.provider.storage())
+            .map_err(err)?
+            .build(self.provider.rand(), self.provider.crypto(), &self.signer, |_| true)
+            .map_err(err)?
+            .finalize(&self.provider)
+            .map_err(err)?;
+        let new_epoch = self.remember_epoch(&group)?;
+        Ok(Commit { commit: bundle.into_commit().tls_serialize_detached().map_err(err)?, welcome: None, epoch: new_epoch })
+    }
+
+    /// Applies another device's commit from the conversation log. `sender` is
+    /// the identity of the device the server says sent it; the commit must be
+    /// signed by that device. Returns the new epoch.
+    ///
+    /// A commit from a device joining on its own (external commit) may only
+    /// add that device, and may only remove an older leaf of the same device.
+    pub fn process_commit(&self, group_id: &[u8], commit: &[u8], sender: &[u8]) -> Result<u64, String> {
         let mut group = self.group(group_id)?;
         let message = MlsMessageIn::tls_deserialize_exact(commit)
             .map_err(err)?
             .try_into_protocol_message()
             .map_err(err)?;
         let processed = group.process_message(&self.provider, message).map_err(err)?;
+        if processed.credential().serialized_content() != sender {
+            return Err("commit not signed by its sender".into());
+        }
+        let joining = matches!(processed.sender(), Sender::NewMemberCommit);
         match processed.into_content() {
             ProcessedMessageContent::StagedCommitMessage(staged) => {
+                if joining {
+                    if staged.add_proposals().next().is_some() {
+                        return Err("a joining device may not add others".into());
+                    }
+                    for remove in staged.remove_proposals() {
+                        let removed = group.member_at(remove.remove_proposal().removed());
+                        if removed.map(|m| m.credential.serialized_content() != sender).unwrap_or(true) {
+                            return Err("a joining device may not remove others".into());
+                        }
+                    }
+                }
                 group.merge_staged_commit(&self.provider, *staged).map_err(err)?;
             }
             _ => return Err("not a commit".into()),

@@ -34,6 +34,8 @@ export interface PulseConversation {
   created_by: string;
   last_seq: number;
   epoch: number;
+  /** Epoch of the GroupInfo the server holds; below `epoch` means none is published for it yet. */
+  group_info_epoch: number;
   last_message_at?: string;
   created_at: string;
   members: PulseMember[];
@@ -102,6 +104,24 @@ interface PendingCommit {
   stage: 'staged' | 'merged';
   welcome?: Uint8Array;
   welcomeTo: string[]; // device ids
+  /**
+   * This device joining on its own (external commit). Its group is already in place locally,
+   * but must not be used until the server accepts the commit; if it is rejected, the group is dropped.
+   */
+  join?: boolean;
+}
+
+/** A device that joined on its own and still needs this device's older message keys. */
+interface HistoryShare {
+  deviceId: string;
+  userId: string;
+}
+
+/** The oldest message this device holds but cannot read yet (its key has not been shared). */
+interface Waiting {
+  seq: number;
+  /** Server time of that message. */
+  ts: number;
 }
 
 type Directory = Map<string, DeviceInfo[]>;
@@ -110,6 +130,11 @@ const KEY_PACKAGE_BATCH = 20;
 const KEY_PACKAGE_LOW_WATER = 8;
 const SYNC_PAGE = 200;
 const HISTORY_KEYS_PER_FRAME = 1000;
+/**
+ * Receipts stop short of a message this device cannot read yet, so its sender keeps one tick
+ * until the key arrives. A message whose key has not arrived after this long stops holding them back.
+ */
+const RECEIPT_HOLD_MS = 14 * 24 * 60 * 60 * 1000;
 
 // Device-to-device payload types (first byte of a Direct payload).
 const DIRECT_WELCOME = 1;
@@ -426,11 +451,12 @@ export class PulseClient {
     return this.run(async () => {
       const conv = this.convs.get(conversationId);
       const me = conv?.members.find((m) => m.user_id === this.userId);
-      const cursor = await this.cursor(conversationId);
-      if (!conv || !me || me.read_seq >= cursor) return;
-      me.read_seq = cursor;
-      me.delivered_seq = Math.max(me.delivered_seq, cursor);
-      this.socket.notify({ case: 'read', value: create(pb.WatermarkSchema, { conversationId: uuidToBytes(conversationId), seq: BigInt(cursor) }) });
+      // A message that cannot be read here yet cannot have been read (blue ticks) either.
+      const seq = await this.receiptSeq(conversationId);
+      if (!conv || !me || me.read_seq >= seq) return;
+      me.read_seq = seq;
+      me.delivered_seq = Math.max(me.delivered_seq, seq);
+      this.socket.notify({ case: 'read', value: create(pb.WatermarkSchema, { conversationId: uuidToBytes(conversationId), seq: BigInt(seq) }) });
       this.emit({ type: 'conversations' });
     });
   }
@@ -505,8 +531,11 @@ export class PulseClient {
     const directory = await this.lookupDevices(convs);
     for (const conv of convs) {
       this.ensureGroup(conv);
+      await this.joinOnOwn(conv);
       await this.catchUp(conv.id);
       await this.reconcile(conv, directory);
+      await this.shareHistory(conv);
+      await this.publishGroupInfo(conv);
     }
     await this.persist();
   }
@@ -526,15 +555,88 @@ export class PulseClient {
   }
 
   /**
-   * Only the creator starts a conversation's group, and only while the server
-   * still shows epoch 0. Everyone else (including the creator's other
-   * devices) waits to be welcomed into it.
+   * Starts a conversation's group while the server still shows epoch 0. Any
+   * member may: the server's epoch ordering lets exactly one start win, and
+   * the others drop theirs and join the winner's.
    */
   private ensureGroup(conv: PulseConversation): void {
     const gid = uuidToBytes(conv.id);
     if (this.device.hasGroup(gid)) return;
-    if (conv.created_by !== this.userId || conv.epoch !== 0) return;
+    if (conv.epoch !== 0) return;
     this.device.createGroup(gid);
+  }
+
+  /**
+   * Joins a conversation's group without waiting for another device to add
+   * this one (an MLS external commit from the GroupInfo the server holds), so
+   * messages can be sent even when every other device is offline.
+   *
+   * The GroupInfo is signed by a group member and must be for this
+   * conversation at the epoch the server reports; anything else is refused.
+   * Devices in the group that are not current members' devices are removed by
+   * `reconcile` before this device sends anything.
+   */
+  private async joinOnOwn(conv: PulseConversation): Promise<void> {
+    const gid = uuidToBytes(conv.id);
+    const key = `commit:${conv.id}`;
+    const rec = await this.storage.get<PendingCommit>(key);
+    if (rec?.join && !this.device.hasGroup(gid)) {
+      // Recorded, but the joined group never reached storage: the commit was never sent.
+      await this.storage.set(key, undefined);
+    } else if (rec?.join) {
+      await this.driveCommit(conv);
+      return;
+    }
+    if (this.device.hasGroup(gid) || conv.epoch === 0) return;
+
+    let info: { epoch: number; group_info: string };
+    try {
+      info = await this.http.get(`/pulse/conversations/${conv.id}/group-info`);
+    } catch (e) {
+      if (e instanceof Error && e.message === 'Not found') return; // none published yet: wait to be added
+      throw e;
+    }
+    let staged: { commit: Uint8Array; epoch: bigint };
+    try {
+      staged = this.device.joinExternal(gid, b64decode(info.group_info), BigInt(info.epoch));
+    } catch (e) {
+      console.error(`[pulse] ${conv.id}: refused the published group info`, e);
+      return;
+    }
+    // The record before the keys: a joined group without its record would look usable.
+    await this.storage.set(key, {
+      id: uuidv7(), commit: staged.commit, epoch: Number(staged.epoch), stage: 'staged', welcomeTo: [], join: true,
+    } satisfies PendingCommit);
+    await this.persist();
+    await this.driveCommit(conv);
+  }
+
+  /** Whether this device can encrypt for the conversation: in the group, and not still waiting to be let in. */
+  private async canSend(conversationId: string): Promise<boolean> {
+    const gid = uuidToBytes(conversationId);
+    if (!this.device.hasGroup(gid) || this.device.currentEpoch(gid) === 0n) return false;
+    const rec = await this.storage.get<PendingCommit>(`commit:${conversationId}`);
+    return !(rec?.join && rec.stage === 'staged');
+  }
+
+  /**
+   * Publishes the group's signed public state for the current epoch if the
+   * server has none, so other devices of the members can join on their own.
+   */
+  private async publishGroupInfo(conv: PulseConversation): Promise<void> {
+    const gid = uuidToBytes(conv.id);
+    if (!(await this.canSend(conv.id))) return;
+    const epoch = Number(this.device.currentEpoch(gid));
+    if (epoch !== conv.epoch || (conv.group_info_epoch ?? 0) >= epoch) return;
+    try {
+      await this.http.post(`/pulse/conversations/${conv.id}/group-info`, {
+        epoch, group_info: b64encode(this.device.groupInfo(gid)),
+      });
+      conv.group_info_epoch = epoch;
+    } catch (e) {
+      // The epoch moved on meanwhile; whoever moved it publishes the next one.
+      if (!(e instanceof Error && e.message.startsWith('Conflict'))) throw e;
+    }
   }
 
   /** Pulls the conversation log forward from this device's cursor. */
@@ -562,13 +664,25 @@ export class PulseClient {
     }
   }
 
-  /** Tells the senders that this device now holds everything up to its cursor (double tick). */
+  /**
+   * How far this device can acknowledge: its cursor, but short of the first
+   * message it holds and cannot read yet, so that message's sender does not
+   * see two ticks before it can actually be read here.
+   */
+  private async receiptSeq(conversationId: string): Promise<number> {
+    const cursor = await this.cursor(conversationId);
+    const waiting = await this.storage.get<Waiting>(`waiting:${conversationId}`);
+    if (!waiting || Date.now() - waiting.ts > RECEIPT_HOLD_MS) return cursor;
+    return Math.min(cursor, waiting.seq - 1);
+  }
+
+  /** Tells the senders that this device now holds everything it can read up to its cursor (double tick). */
   private async ackDelivered(conversationId: string): Promise<void> {
     const me = this.convs.get(conversationId)?.members.find((m) => m.user_id === this.userId);
-    const cursor = await this.cursor(conversationId);
-    if (!me || me.delivered_seq >= cursor) return;
-    me.delivered_seq = cursor;
-    this.socket.notify({ case: 'delivered', value: create(pb.WatermarkSchema, { conversationId: uuidToBytes(conversationId), seq: BigInt(cursor) }) });
+    const seq = await this.receiptSeq(conversationId);
+    if (!me || me.delivered_seq >= seq) return;
+    me.delivered_seq = seq;
+    this.socket.notify({ case: 'delivered', value: create(pb.WatermarkSchema, { conversationId: uuidToBytes(conversationId), seq: BigInt(seq) }) });
   }
 
   // ───────────────────────────── Incoming ─────────────────────────────
@@ -664,12 +778,26 @@ export class PulseClient {
         this.device.mergePending(gid);
         if (mine) await this.storage.set(key, { ...mine, stage: 'merged' } satisfies PendingCommit);
       } else {
-        if (mine?.stage === 'staged') {
+        if (mine?.stage === 'staged' && !mine.join) {
           // Someone else took this epoch first; ours can never be accepted now.
           this.device.discardPending(gid);
           await this.storage.set(key, undefined);
         }
-        this.device.processCommit(gid, env.ciphertext);
+        // The commit must be signed by the device the server says sent it.
+        const sender = concat(env.senderId, env.senderDeviceId);
+        const before = this.device.memberKey(gid, sender);
+        this.device.processCommit(gid, env.ciphertext, sender);
+        const after = this.device.memberKey(gid, sender);
+        if (after && (!before || toHex(before) !== toHex(after))) {
+          // A device joined on its own (or rejoined with fresh keys): nobody welcomed it, so
+          // it has no keys for older messages yet. Every member that can, shares them.
+          const shares = (await this.storage.get<HistoryShare[]>(`share:${conversationId}`)) ?? [];
+          const deviceId = bytesToUuid(env.senderDeviceId);
+          if (!shares.some((x) => x.deviceId === deviceId)) {
+            shares.push({ deviceId, userId: bytesToUuid(env.senderId) });
+            await this.storage.set(`share:${conversationId}`, shares);
+          }
+        }
       }
       const conv = this.convs.get(conversationId);
       if (conv) conv.epoch = Math.max(conv.epoch, epoch);
@@ -704,6 +832,7 @@ export class PulseClient {
     const ts = Number(env.serverTs);
 
     let content: pb.Content | undefined;
+    let keyMissing = false;
     try {
       const identity = PulseDevice.frameSender(env.ciphertext);
       // The signed sender inside the ciphertext must be who the server says sent it.
@@ -711,8 +840,17 @@ export class PulseClient {
       const key = await this.senderKey(env.conversationId, identity);
       if (!key) throw new Error('unknown sender');
       content = fromBinary(pb.ContentSchema, this.device.decrypt(env.conversationId, env.ciphertext, key).plaintext);
-    } catch {
+    } catch (e) {
       content = undefined;
+      keyMissing = e instanceof Error && e.message === 'no key for this epoch';
+    }
+
+    // Someone else's message this device should be able to read but has no key for yet:
+    // receipts wait for it (a forged or broken message never holds them back).
+    const me = this.convs.get(conversationId)?.members.find((m) => m.user_id === this.userId);
+    if (keyMissing && senderId !== this.userId && me && seq > me.joined_seq) {
+      const waiting = await this.storage.get<Waiting>(`waiting:${conversationId}`);
+      if (!waiting || seq < waiting.seq) await this.storage.set(`waiting:${conversationId}`, { seq, ts } satisfies Waiting);
     }
 
     if (content) {
@@ -818,8 +956,10 @@ export class PulseClient {
           this.device.importEpochKey(gid, view.getBigUint64(off), keys.subarray(off + 8, off + 40));
         }
         await this.persist();
-        // Re-read the log so messages stored before this device joined become readable.
+        // Re-read the log so messages stored before this device joined become readable
+        // (which also recomputes which ones still are not).
         const conversationId = bytesToUuid(gid);
+        await this.storage.set(`waiting:${conversationId}`, undefined);
         await this.setCursor(conversationId, 0);
         this.scheduleRefresh(conversationId, 0);
       }
@@ -877,6 +1017,7 @@ export class PulseClient {
 
     // Finish a commit left over from an earlier attempt before planning a new one.
     if ((await this.driveCommit(conv)) === 'conflict') return;
+    if (!(await this.canSend(conv.id))) return; // still waiting to be let in
 
     const want = new Map<string, DeviceInfo>();
     for (const m of conv.members) for (const d of directory.get(m.user_id) ?? []) want.set(toHex(this.identityOf(d)), d);
@@ -962,12 +1103,17 @@ export class PulseClient {
       } catch (e) {
         if (!isCode(e, pb.ErrorCode.CONFLICT)) throw e; // transient: the record stays and is retried
         try {
-          this.device.discardPending(gid);
-          // A group still at epoch 0 was our own attempt to start the conversation and lost;
-          // drop it and wait to be welcomed into the winner's.
-          if (this.device.currentEpoch(gid) === 0n) {
+          if (rec.join) {
+            // The group changed before our join landed: drop it and join again from the new state.
             this.device.dropGroup(gid);
-            conv.epoch = Math.max(conv.epoch, 1);
+          } else {
+            this.device.discardPending(gid);
+            // A group still at epoch 0 was our own attempt to start the conversation and lost;
+            // drop it and join the winner's.
+            if (this.device.currentEpoch(gid) === 0n) {
+              this.device.dropGroup(gid);
+              conv.epoch = Math.max(conv.epoch, 1);
+            }
           }
         } catch (err) {
           console.error('[pulse] could not roll back a rejected commit', err);
@@ -978,7 +1124,8 @@ export class PulseClient {
         return 'conflict';
       }
 
-      if (Number(this.device.currentEpoch(gid)) < rec.epoch) this.device.mergePending(gid);
+      // A join is merged already; any other commit takes effect now that it is accepted.
+      if (!rec.join && Number(this.device.currentEpoch(gid)) < rec.epoch) this.device.mergePending(gid);
       await this.persist();
       rec = { ...rec, stage: 'merged' };
       await this.storage.set(key, rec);
@@ -992,17 +1139,32 @@ export class PulseClient {
 
     await this.welcome(conv, rec);
     await this.storage.set(key, undefined);
+    await this.publishGroupInfo(conv);
     return 'ok';
   }
 
-  /** Sends the welcome, then this device's older message keys, to each newly added device. */
-  private async welcome(conv: PulseConversation, rec: PendingCommit): Promise<void> {
-    if (!rec.welcome || rec.welcomeTo.length === 0) return;
+  /** Sends this device's older message keys to devices that joined on their own. */
+  private async shareHistory(conv: PulseConversation): Promise<void> {
+    const key = `share:${conv.id}`;
+    let shares = (await this.storage.get<HistoryShare[]>(key)) ?? [];
+    if (!shares.length || !(await this.canSend(conv.id))) return;
     const gid = uuidToBytes(conv.id);
+    const payloads = this.historyPayloads(gid, Number(this.device.currentEpoch(gid)));
+    for (const share of [...shares]) {
+      // Only to a device still in the group, of a user still in the conversation.
+      const inGroup = this.device.memberKey(gid, concat(uuidToBytes(share.userId), uuidToBytes(share.deviceId)));
+      if (inGroup && conv.members.some((m) => m.user_id === share.userId)) {
+        await this.sendDirect(share.deviceId, gid, payloads);
+      }
+      shares = shares.filter((x) => x.deviceId !== share.deviceId);
+      await this.storage.set(key, shares.length ? shares : undefined);
+    }
+  }
 
-    const payloads: Uint8Array[] = [concat(Uint8Array.of(DIRECT_WELCOME), rec.welcome)];
+  /** This device's message keys for every epoch before `upTo`, sealed for the current epoch. */
+  private historyPayloads(gid: Uint8Array, upTo: number): Uint8Array[] {
     const keys: Uint8Array[] = [];
-    for (let epoch = 0; epoch < rec.epoch; epoch++) {
+    for (let epoch = 0; epoch < upTo; epoch++) {
       const key = this.device.epochKey(gid, BigInt(epoch));
       if (!key) continue;
       const entry = new Uint8Array(40);
@@ -1010,25 +1172,36 @@ export class PulseClient {
       entry.set(key, 8);
       keys.push(entry);
     }
-    // Sealed for the new epoch, which only the group (now including the new devices) can open.
+    // Sealed for the current epoch, which only the group (including the new devices) can open.
+    const payloads: Uint8Array[] = [];
     for (let i = 0; i < keys.length; i += HISTORY_KEYS_PER_FRAME) {
       const frame = this.device.encrypt(gid, concat(...keys.slice(i, i + HISTORY_KEYS_PER_FRAME)));
       payloads.push(concat(Uint8Array.of(DIRECT_HISTORY_KEYS), frame));
     }
+    return payloads;
+  }
 
-    for (const deviceId of rec.welcomeTo) {
-      for (const payload of payloads) {
-        try {
-          await this.socket.request({
-            case: 'directSend',
-            value: create(pb.DirectSendSchema, { toDeviceId: uuidToBytes(deviceId), conversationId: gid, payload }),
-          });
-        } catch (e) {
-          if (isTransient(e)) throw e; // keep the record; retried on the next pass
-          break; // the device is gone (revoked); nothing to deliver
-        }
+  /** Delivers payloads to one device, in order. A device that is gone (revoked) is skipped. */
+  private async sendDirect(deviceId: string, gid: Uint8Array, payloads: Uint8Array[]): Promise<void> {
+    for (const payload of payloads) {
+      try {
+        await this.socket.request({
+          case: 'directSend',
+          value: create(pb.DirectSendSchema, { toDeviceId: uuidToBytes(deviceId), conversationId: gid, payload }),
+        });
+      } catch (e) {
+        if (isTransient(e)) throw e; // keep the record; retried on the next pass
+        return;
       }
     }
+  }
+
+  /** Sends the welcome, then this device's older message keys, to each newly added device. */
+  private async welcome(conv: PulseConversation, rec: PendingCommit): Promise<void> {
+    if (!rec.welcome || rec.welcomeTo.length === 0) return;
+    const gid = uuidToBytes(conv.id);
+    const payloads = [concat(Uint8Array.of(DIRECT_WELCOME), rec.welcome), ...this.historyPayloads(gid, rec.epoch)];
+    for (const deviceId of rec.welcomeTo) await this.sendDirect(deviceId, gid, payloads);
   }
 
   // ───────────────────────────── Outbox ─────────────────────────────
@@ -1038,8 +1211,8 @@ export class PulseClient {
     for (const item of await this.storage.listOutbox()) {
       if (!this.socket.connected) return;
       const gid = uuidToBytes(item.conversationId);
-      // No usable key yet (waiting to be welcomed, or the group is still being started).
-      if (!this.device.hasGroup(gid) || this.device.currentEpoch(gid) === 0n) continue;
+      // No usable key yet (not in the group yet, or the group is still being started).
+      if (!(await this.canSend(item.conversationId))) continue;
 
       let reply: pb.ServerFrame;
       try {
