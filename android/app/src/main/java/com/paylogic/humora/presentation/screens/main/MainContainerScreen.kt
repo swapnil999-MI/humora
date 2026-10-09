@@ -5,6 +5,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.paylogic.humora.presentation.components.BackendSettingsDialog
 import com.paylogic.humora.presentation.components.GlassMeshBackground
@@ -44,11 +45,24 @@ fun MainContainerScreen(
     // Real geofence status for the top bar: load the offices and check the last known location once.
     val attendanceRepo = com.paylogic.humora.HumoraApp.instance.attendanceRepository
     val attendanceGeofence by attendanceRepo.geofence.collectAsState()
-    LaunchedEffect(Unit) {
-        attendanceRepo.fetchOfficeLocations()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    fun refreshGeofence() = scope.launch {
         attendanceRepo.checkGeofence(
             com.paylogic.humora.core.location.LocationProvider.getLastKnownLocation(com.paylogic.humora.HumoraApp.instance)
         )
+    }
+    // Punching, the geofence badge and office checks all need the device location, so it is
+    // asked for once here; without it every location lookup silently returns nothing.
+    val locationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants -> if (grants.values.any { it }) refreshGeofence() }
+    LaunchedEffect(Unit) {
+        attendanceRepo.fetchOfficeLocations()
+        refreshGeofence()
+        if (!com.paylogic.humora.core.location.LocationProvider.hasPermission(context)) {
+            locationPermission.launch(com.paylogic.humora.core.location.LocationProvider.PERMISSIONS)
+        }
     }
 
     LaunchedEffect(authState.isAdmin) {

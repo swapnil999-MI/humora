@@ -65,16 +65,20 @@ fun BiometricFingerprintPunchSheet(
         )
     }
 
+    // Punching needs the device location as well as the camera, so both are asked for up front.
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasCameraPermission = isGranted
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        hasCameraPermission = grants[Manifest.permission.CAMERA] ?: hasCameraPermission
     }
 
     LaunchedEffect(Unit) {
-        if (!hasCameraPermission) {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
-        }
+        val missing = listOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        ).filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())
     }
 
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }

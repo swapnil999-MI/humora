@@ -8,9 +8,21 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
 object LocationProvider {
+
+    /** What to ask for: precise if the user allows it, approximate otherwise. */
+    val PERMISSIONS = arrayOf(
+        android.Manifest.permission.ACCESS_FINE_LOCATION,
+        android.Manifest.permission.ACCESS_COARSE_LOCATION,
+    )
+
+    /** Whether the app may read the location at all (precise or approximate). */
+    fun hasPermission(context: Context): Boolean = PERMISSIONS.any {
+        androidx.core.content.ContextCompat.checkSelfPermission(context, it) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
 
     @SuppressLint("MissingPermission")
     fun getLastKnownLocation(context: Context): Location? {
@@ -38,7 +50,15 @@ object LocationProvider {
 
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return last
 
-        return suspendCancellableCoroutine { cont ->
+        // A GPS fix can take forever indoors; fall back to the last known location instead of hanging.
+        return withTimeoutOrNull(FIX_TIMEOUT_MS) { awaitFix(context, lm, last) } ?: last
+    }
+
+    private const val FIX_TIMEOUT_MS = 15_000L
+
+    @SuppressLint("MissingPermission")
+    private suspend fun awaitFix(context: Context, lm: LocationManager, last: Location?): Location? =
+        suspendCancellableCoroutine { cont ->
             val listener = object : LocationListener {
                 override fun onLocationChanged(location: Location) {
                     try {
@@ -77,5 +97,4 @@ object LocationProvider {
                 cont.resume(last)
             }
         }
-    }
 }

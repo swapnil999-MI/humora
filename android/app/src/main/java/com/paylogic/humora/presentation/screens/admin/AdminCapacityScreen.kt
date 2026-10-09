@@ -1273,6 +1273,11 @@ fun AdminGeofenceSection(
     }
     var isDetectingLocation by remember { mutableStateOf(false) }
     var validationError by remember { mutableStateOf<String?>(null) }
+    val locationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.none { it }) validationError = "Location permission is needed to detect the office position."
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -1440,16 +1445,20 @@ fun AdminGeofenceSection(
                 // Quick GPS Detect Button
                 Button(
                     onClick = {
-                        isDetectingLocation = true
-                        validationError = null
-                        scope.launch {
-                            val loc = com.paylogic.humora.core.location.LocationProvider.getCurrentLocation(context)
-                            isDetectingLocation = false
-                            if (loc != null) {
-                                latStr = "%.7f".format(java.util.Locale.US, loc.latitude)
-                                lonStr = "%.7f".format(java.util.Locale.US, loc.longitude)
-                            } else {
-                                validationError = "GPS signal unavailable. Please ensure device location is enabled."
+                        if (!com.paylogic.humora.core.location.LocationProvider.hasPermission(context)) {
+                            locationPermission.launch(com.paylogic.humora.core.location.LocationProvider.PERMISSIONS)
+                        } else {
+                            isDetectingLocation = true
+                            validationError = null
+                            scope.launch {
+                                val loc = com.paylogic.humora.core.location.LocationProvider.getCurrentLocation(context)
+                                isDetectingLocation = false
+                                if (loc != null) {
+                                    latStr = "%.7f".format(java.util.Locale.US, loc.latitude)
+                                    lonStr = "%.7f".format(java.util.Locale.US, loc.longitude)
+                                } else {
+                                    validationError = "GPS signal unavailable. Please ensure device location is enabled."
+                                }
                             }
                         }
                     },
