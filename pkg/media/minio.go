@@ -188,25 +188,20 @@ func (m *MinioStorage) EnsureBucketExists(ctx context.Context, bucketName string
 	return nil
 }
 
+// PrivatePrefixes are object paths in the default bucket that must never be
+// downloadable anonymously: enrolment face images and punch selfies are
+// biometric data. The server reads them with its own credentials.
+var PrivatePrefixes = []string{"biometrics/", "selfies/"}
+
 // SetBucketPublicRead configures anonymous download access on the MinIO bucket for browser/media viewing.
 // Only GetObject is granted: anonymous ListBucket would let anyone enumerate every stored file.
+// PrivatePrefixes are explicitly denied, which overrides the allow.
 func (m *MinioStorage) SetBucketPublicRead(ctx context.Context, bucketName string) error {
 	bucket, err := m.resolveBucket(bucketName)
 	if err != nil {
 		return err
 	}
-	policy := fmt.Sprintf(`{
-		"Version": "2012-10-17",
-		"Statement": [
-			{
-				"Effect": "Allow",
-				"Principal": {"AWS": ["*"]},
-				"Action": ["s3:GetObject"],
-				"Resource": ["arn:aws:s3:::%s/*"]
-			}
-		]
-	}`, bucket)
-	return m.client.SetBucketPolicy(ctx, bucket, policy)
+	return m.client.SetBucketPolicy(ctx, bucket, publicReadPolicy(bucket))
 }
 
 // UploadFile uploads content from an io.Reader into MinIO storage under the given bucket and object name.
@@ -469,4 +464,29 @@ func (m *MinioStorage) ListFiles(ctx context.Context, bucketName, prefix string)
 	}
 
 	return objects, nil
+}
+
+// publicReadPolicy allows anonymous GetObject on the bucket except under PrivatePrefixes.
+func publicReadPolicy(bucket string) string {
+	denied := make([]string, len(PrivatePrefixes))
+	for i, p := range PrivatePrefixes {
+		denied[i] = fmt.Sprintf(`"arn:aws:s3:::%s/%s*"`, bucket, p)
+	}
+	return fmt.Sprintf(`{
+		"Version": "2012-10-17",
+		"Statement": [
+			{
+				"Effect": "Allow",
+				"Principal": {"AWS": ["*"]},
+				"Action": ["s3:GetObject"],
+				"Resource": ["arn:aws:s3:::%s/*"]
+			},
+			{
+				"Effect": "Deny",
+				"Principal": {"AWS": ["*"]},
+				"Action": ["s3:GetObject"],
+				"Resource": [%s]
+			}
+		]
+	}`, bucket, strings.Join(denied, ", "))
 }

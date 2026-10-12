@@ -24,6 +24,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../api/client';
 import { PeopleOSLogo } from '../../components/PeopleOSLogo';
+import { startOAuth } from '../../api/oauth';
 
 export const LoginView: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -786,7 +787,7 @@ export const LoginView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        window.location.href = '/api/v1/auth/oauth/google?client=web';
+                        void startOAuth('google');
                       }}
                       style={{
                         width: '100%',
@@ -819,7 +820,7 @@ export const LoginView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        window.location.href = '/api/v1/auth/oauth/github?client=web';
+                        void startOAuth('github');
                       }}
                       style={{
                         width: '100%',
@@ -849,7 +850,7 @@ export const LoginView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        window.location.href = '/api/v1/auth/oauth/microsoft?client=web';
+                        void startOAuth('microsoft');
                       }}
                       style={{
                         width: '100%',

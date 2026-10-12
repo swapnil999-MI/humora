@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
     device_public_key TEXT, -- Ed25519 public key for mobile offline punch verification
     presence_status VARCHAR(50) NOT NULL DEFAULT 'offline', -- 'offline', 'in_office_active', 'on_leave'
     last_login_at TIMESTAMPTZ,
+    sessions_valid_after TIMESTAMPTZ, -- refresh tokens issued before this are refused
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (tenant_id, email)

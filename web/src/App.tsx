@@ -9,6 +9,7 @@ import {
 } from './store/uiSlice';
 import { fetchMe } from './store/authSlice';
 import { useAuthStore } from './store/authStore';
+import { finishOAuth } from './api/oauth';
 import { fetchEmployees, fetchAttendanceSummary } from './store/hrmsSlice';
 import { fetchProjects } from './store/workSlice';
 import { fetchMyWorkday } from './store/fusionSlice';
@@ -89,17 +90,19 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  // Handle Social OAuth Callback Redirect (?token=...&refresh=...)
+  // Social sign-in came back with a one-time code (?oauth_code=...). Tokens never
+  // arrive in the URL, and a code is only redeemed if this tab started the sign-in.
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-    const refresh = urlParams.get('refresh');
-
-    if (token) {
-      useAuthStore.getState().setSessionFromTokens(token, refresh || '');
-      const cleanUrl = window.location.pathname + (window.location.hash || '#/hub');
-      window.history.replaceState({}, document.title, cleanUrl);
-    }
+    const code = new URLSearchParams(window.location.search).get('oauth_code');
+    if (!code) return;
+    window.history.replaceState({}, document.title, window.location.pathname + (window.location.hash || '#/hub'));
+    finishOAuth(code)
+      .then((tokens) => {
+        if (tokens) void useAuthStore.getState().setSessionFromTokens(tokens.access_token, tokens.refresh_token);
+      })
+      .catch(() => {
+        /* expired or already used: the login page stays */
+      });
   }, []);
 
   // Initial landing page setup based on role

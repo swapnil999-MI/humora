@@ -27,8 +27,10 @@ type User struct {
 	DevicePublicKey *string    `db:"device_public_key" json:"device_public_key,omitempty"`
 	PresenceStatus  string     `db:"presence_status" json:"presence_status"` // 'offline', 'in_office_active', 'on_leave'
 	LastLoginAt     *time.Time `db:"last_login_at" json:"last_login_at,omitempty"`
-	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
-	UpdatedAt       time.Time  `db:"updated_at" json:"updated_at"`
+	// SessionsValidAfter: refresh tokens issued before this are refused (set by a password reset).
+	SessionsValidAfter *time.Time `db:"sessions_valid_after" json:"-"`
+	CreatedAt          time.Time  `db:"created_at" json:"created_at"`
+	UpdatedAt          time.Time  `db:"updated_at" json:"updated_at"`
 }
 
 // Role defines an authorization group with JSONB permissions.

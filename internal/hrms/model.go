@@ -28,38 +28,38 @@ type Designation struct {
 
 // Employee represents an enterprise workforce member.
 type Employee struct {
-	ID                  uuid.UUID  `db:"id" json:"id"`
-	TenantID            uuid.UUID  `db:"tenant_id" json:"tenant_id"`
-	UserID              *uuid.UUID `db:"user_id" json:"user_id,omitempty"`
-	EmployeeCode        string     `db:"employee_code" json:"employee_code"`
-	FirstName           string     `db:"first_name" json:"first_name"`
-	LastName            string     `db:"last_name" json:"last_name"`
-	WorkEmail           string     `db:"work_email" json:"work_email"`
-	PersonalEmail       *string    `db:"personal_email" json:"personal_email,omitempty"`
-	Phone               *string    `db:"phone" json:"phone,omitempty"`
-	DepartmentID        *uuid.UUID `db:"department_id" json:"department_id,omitempty"`
-	DepartmentName      *string    `db:"department_name" json:"department_name,omitempty"`
-	DesignationID       *uuid.UUID `db:"designation_id" json:"designation_id,omitempty"`
-	DesignationTitle    *string    `db:"designation_title" json:"designation_title,omitempty"`
-	ManagerID           *uuid.UUID `db:"manager_id" json:"manager_id,omitempty"`
-	ManagerName         *string    `db:"manager_name" json:"manager_name,omitempty"`
-	SecondaryManagerID  *uuid.UUID `db:"secondary_manager_id" json:"secondary_manager_id,omitempty"`
-	DateOfJoining       time.Time  `db:"date_of_joining" json:"date_of_joining"`
-	DateOfExit          *time.Time `db:"date_of_exit" json:"date_of_exit,omitempty"`
-	EmploymentType      string     `db:"employment_type" json:"employment_type"`
-	Status              string     `db:"status" json:"status"`
-	HourlyCostRate      float64    `db:"hourly_cost_rate" json:"hourly_cost_rate"`
-	CustomProfileFields string     `db:"custom_profile_fields" json:"custom_profile_fields"` // JSONB string
-	AvatarURL                  *string    `db:"avatar_url" json:"avatar_url,omitempty"`
-	BannerURL                  *string    `db:"banner_url" json:"banner_url,omitempty"`
-	BiometricFaceURL           *string    `db:"biometric_face_url" json:"biometric_face_url,omitempty"`
-	FaceEmbedding              *string    `db:"face_embedding" json:"-"` // biometric template: server-side only
-	BiometricFaceRegisteredAt  *time.Time `db:"biometric_face_registered_at" json:"biometric_face_registered_at,omitempty"`
-	BiometricSampleCount       int        `db:"biometric_sample_count" json:"biometric_sample_count"`
-	EffectiveFrom              time.Time  `db:"effective_from" json:"effective_from"`
-	EffectiveTo                time.Time  `db:"effective_to" json:"effective_to"`
-	CreatedAt                  time.Time  `db:"created_at" json:"created_at"`
-	UpdatedAt                  time.Time  `db:"updated_at" json:"updated_at"`
+	ID                        uuid.UUID  `db:"id" json:"id"`
+	TenantID                  uuid.UUID  `db:"tenant_id" json:"tenant_id"`
+	UserID                    *uuid.UUID `db:"user_id" json:"user_id,omitempty"`
+	EmployeeCode              string     `db:"employee_code" json:"employee_code"`
+	FirstName                 string     `db:"first_name" json:"first_name"`
+	LastName                  string     `db:"last_name" json:"last_name"`
+	WorkEmail                 string     `db:"work_email" json:"work_email"`
+	PersonalEmail             *string    `db:"personal_email" json:"personal_email,omitempty"`
+	Phone                     *string    `db:"phone" json:"phone,omitempty"`
+	DepartmentID              *uuid.UUID `db:"department_id" json:"department_id,omitempty"`
+	DepartmentName            *string    `db:"department_name" json:"department_name,omitempty"`
+	DesignationID             *uuid.UUID `db:"designation_id" json:"designation_id,omitempty"`
+	DesignationTitle          *string    `db:"designation_title" json:"designation_title,omitempty"`
+	ManagerID                 *uuid.UUID `db:"manager_id" json:"manager_id,omitempty"`
+	ManagerName               *string    `db:"manager_name" json:"manager_name,omitempty"`
+	SecondaryManagerID        *uuid.UUID `db:"secondary_manager_id" json:"secondary_manager_id,omitempty"`
+	DateOfJoining             time.Time  `db:"date_of_joining" json:"date_of_joining"`
+	DateOfExit                *time.Time `db:"date_of_exit" json:"date_of_exit,omitempty"`
+	EmploymentType            string     `db:"employment_type" json:"employment_type"`
+	Status                    string     `db:"status" json:"status"`
+	HourlyCostRate            float64    `db:"hourly_cost_rate" json:"hourly_cost_rate"`
+	CustomProfileFields       string     `db:"custom_profile_fields" json:"custom_profile_fields"` // JSONB string
+	AvatarURL                 *string    `db:"avatar_url" json:"avatar_url,omitempty"`
+	BannerURL                 *string    `db:"banner_url" json:"banner_url,omitempty"`
+	BiometricFaceURL          *string    `db:"biometric_face_url" json:"-"` // biometric: never sent to clients
+	FaceEmbedding             *string    `db:"face_embedding" json:"-"`     // biometric template: server-side only
+	BiometricFaceRegisteredAt *time.Time `db:"biometric_face_registered_at" json:"biometric_face_registered_at,omitempty"`
+	BiometricSampleCount      int        `db:"biometric_sample_count" json:"biometric_sample_count"`
+	EffectiveFrom             time.Time  `db:"effective_from" json:"effective_from"`
+	EffectiveTo               time.Time  `db:"effective_to" json:"effective_to"`
+	CreatedAt                 time.Time  `db:"created_at" json:"created_at"`
+	UpdatedAt                 time.Time  `db:"updated_at" json:"updated_at"`
 }
 
 // OfficeLocation represents a geofenced corporate workplace.
@@ -256,28 +256,28 @@ type PayrollRun struct {
 
 // Payslip represents an itemized monthly official payslip.
 type Payslip struct {
-	ID                 uuid.UUID  `db:"id" json:"id"`
-	TenantID           uuid.UUID  `db:"tenant_id" json:"tenant_id"`
-	PayrollRunID       *uuid.UUID `db:"payroll_run_id" json:"payroll_run_id,omitempty"`
-	EmployeeID         uuid.UUID  `db:"employee_id" json:"employee_id"`
-	EmployeeName       string     `db:"employee_name" json:"employee_name"`
-	EmployeeCode       string     `db:"employee_code" json:"employee_code"`
-	DesignationTitle   string     `db:"designation_title" json:"designation_title"`
-	DepartmentName     string     `db:"department_name" json:"department_name"`
-	DateOfJoining      *time.Time `db:"date_of_joining" json:"date_of_joining,omitempty"`
-	BankName           string     `db:"bank_name" json:"bank_name"`
+	ID                uuid.UUID  `db:"id" json:"id"`
+	TenantID          uuid.UUID  `db:"tenant_id" json:"tenant_id"`
+	PayrollRunID      *uuid.UUID `db:"payroll_run_id" json:"payroll_run_id,omitempty"`
+	EmployeeID        uuid.UUID  `db:"employee_id" json:"employee_id"`
+	EmployeeName      string     `db:"employee_name" json:"employee_name"`
+	EmployeeCode      string     `db:"employee_code" json:"employee_code"`
+	DesignationTitle  string     `db:"designation_title" json:"designation_title"`
+	DepartmentName    string     `db:"department_name" json:"department_name"`
+	DateOfJoining     *time.Time `db:"date_of_joining" json:"date_of_joining,omitempty"`
+	BankName          string     `db:"bank_name" json:"bank_name"`
 	BankAccountMasked string     `db:"bank_account_masked" json:"bank_account_masked"`
-	BankIFSC           string     `db:"bank_ifsc" json:"bank_ifsc"`
-	PAN                string     `db:"pan" json:"pan"`
-	UAN                string     `db:"uan" json:"uan"`
-	Month              int        `db:"month" json:"month"`
-	Year               int        `db:"year" json:"year"`
-	PayPeriod          string     `db:"pay_period" json:"pay_period"`
-	PaymentDate        *time.Time `db:"payment_date" json:"payment_date,omitempty"`
-	Status             string     `db:"status" json:"status"` // 'paid', 'processing', 'hold'
-	TotalDays          int        `db:"total_days" json:"total_days"`
-	PayableDays        float64    `db:"payable_days" json:"payable_days"`
-	LOPDays            float64    `db:"lop_days" json:"lop_days"`
+	BankIFSC          string     `db:"bank_ifsc" json:"bank_ifsc"`
+	PAN               string     `db:"pan" json:"pan"`
+	UAN               string     `db:"uan" json:"uan"`
+	Month             int        `db:"month" json:"month"`
+	Year              int        `db:"year" json:"year"`
+	PayPeriod         string     `db:"pay_period" json:"pay_period"`
+	PaymentDate       *time.Time `db:"payment_date" json:"payment_date,omitempty"`
+	Status            string     `db:"status" json:"status"` // 'paid', 'processing', 'hold'
+	TotalDays         int        `db:"total_days" json:"total_days"`
+	PayableDays       float64    `db:"payable_days" json:"payable_days"`
+	LOPDays           float64    `db:"lop_days" json:"lop_days"`
 	// Itemized Earnings
 	Basic            float64 `db:"basic" json:"basic"`
 	HRA              float64 `db:"hra" json:"hra"`
@@ -294,29 +294,29 @@ type Payslip struct {
 	OtherDeductions float64 `db:"other_deductions" json:"other_deductions"`
 	TotalDeductions float64 `db:"total_deductions" json:"total_deductions"`
 	// Net Pay
-	NetPay        float64 `db:"net_pay" json:"net_pay"`
-	NetPayInWords string  `db:"net_pay_in_words" json:"net_pay_in_words"`
+	NetPay        float64   `db:"net_pay" json:"net_pay"`
+	NetPayInWords string    `db:"net_pay_in_words" json:"net_pay_in_words"`
 	CreatedAt     time.Time `db:"created_at" json:"created_at"`
 }
 
 // ITDeclaration represents employee's income tax regime and deduction declarations.
 type ITDeclaration struct {
-	ID                     uuid.UUID `db:"id" json:"id"`
-	TenantID               uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	EmployeeID             uuid.UUID `db:"employee_id" json:"employee_id"`
-	FinancialYear          string    `db:"financial_year" json:"financial_year"`
-	Regime                 string    `db:"regime" json:"regime"` // 'new', 'old'
-	Sec80CTotal            float64   `db:"sec_80c_total" json:"sec_80c_total"`
-	Sec80DHealthInsurance  float64   `db:"sec_80d_health_insurance" json:"sec_80d_health_insurance"`
-	Sec80DParents          float64   `db:"sec_80d_parents" json:"sec_80d_parents"`
-	HRAAnnualRentPaid      float64   `db:"hra_annual_rent_paid" json:"hra_annual_rent_paid"`
-	HRALandlordPAN         *string   `db:"hra_landlord_pan" json:"hra_landlord_pan,omitempty"`
-	HomeLoanInterest       float64   `db:"home_loan_interest" json:"home_loan_interest"`
-	NPSContribution        float64   `db:"nps_contribution" json:"nps_contribution"`
-	ProjectedAnnualTax     float64   `db:"projected_annual_tax" json:"projected_annual_tax"`
-	MonthlyTDS             float64   `db:"monthly_tds" json:"monthly_tds"`
-	CreatedAt              time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt              time.Time `db:"updated_at" json:"updated_at"`
+	ID                    uuid.UUID `db:"id" json:"id"`
+	TenantID              uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	EmployeeID            uuid.UUID `db:"employee_id" json:"employee_id"`
+	FinancialYear         string    `db:"financial_year" json:"financial_year"`
+	Regime                string    `db:"regime" json:"regime"` // 'new', 'old'
+	Sec80CTotal           float64   `db:"sec_80c_total" json:"sec_80c_total"`
+	Sec80DHealthInsurance float64   `db:"sec_80d_health_insurance" json:"sec_80d_health_insurance"`
+	Sec80DParents         float64   `db:"sec_80d_parents" json:"sec_80d_parents"`
+	HRAAnnualRentPaid     float64   `db:"hra_annual_rent_paid" json:"hra_annual_rent_paid"`
+	HRALandlordPAN        *string   `db:"hra_landlord_pan" json:"hra_landlord_pan,omitempty"`
+	HomeLoanInterest      float64   `db:"home_loan_interest" json:"home_loan_interest"`
+	NPSContribution       float64   `db:"nps_contribution" json:"nps_contribution"`
+	ProjectedAnnualTax    float64   `db:"projected_annual_tax" json:"projected_annual_tax"`
+	MonthlyTDS            float64   `db:"monthly_tds" json:"monthly_tds"`
+	CreatedAt             time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt             time.Time `db:"updated_at" json:"updated_at"`
 }
 
 // ReimbursementClaim represents an expense or flexible benefit claim.
@@ -332,10 +332,9 @@ type ReimbursementClaim struct {
 	MerchantName string     `db:"merchant_name" json:"merchant_name"`
 	Description  *string    `db:"description" json:"description,omitempty"`
 	ReceiptURL   *string    `db:"receipt_url" json:"receipt_url,omitempty"`
-	Status       string     `db:"status" json:"status"` // 'pending', 'approved', 'rejected', 'reimbursed'
+	Status       string     `db:"status" json:"status"`                         // 'pending', 'approved', 'rejected', 'reimbursed'
 	EmployeeName string     `db:"employee_name" json:"employee_name,omitempty"` // team listings only
 	ReviewerName *string    `db:"reviewer_name" json:"reviewer_name,omitempty"`
 	ReviewedBy   *uuid.UUID `db:"reviewed_by" json:"reviewed_by,omitempty"`
 	CreatedAt    time.Time  `db:"created_at" json:"created_at"`
 }
-

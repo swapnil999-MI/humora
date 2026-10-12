@@ -11,6 +11,7 @@ RUN bun run build
 
 FROM nginx:1.29-alpine
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --chmod=755 15-humora-realip.sh /docker-entrypoint.d/15-humora-realip.sh
 COPY --from=build /app/dist /usr/share/nginx/html
 # Where nginx forwards /api; override per environment.
 ENV BACKEND_UPSTREAM=http://backend:8090

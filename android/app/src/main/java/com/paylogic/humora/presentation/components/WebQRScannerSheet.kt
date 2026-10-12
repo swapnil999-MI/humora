@@ -39,6 +39,28 @@ fun WebQRScannerSheet(
     var isAuthorizing by remember { mutableStateOf(false) }
     var authSuccess by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    // The nonce from the QR code proves this phone saw it; the session id alone is not enough.
+    var detectedNonce by remember { mutableStateOf("") }
+    // Which browser is asking, fetched before the user can approve.
+    var requester by remember { mutableStateOf<com.paylogic.humora.data.model.QRInfo?>(null) }
+
+    fun accept(payload: String) {
+        val parts = payload.trim().split(":")
+        if (payload.trim().startsWith("humora:auth:qr:") && parts.size >= 5) {
+            detectedSessionId = parts[3]
+            detectedNonce = parts[4]
+        }
+    }
+
+    LaunchedEffect(detectedSessionId, detectedNonce) {
+        val id = detectedSessionId ?: return@LaunchedEffect
+        requester = null
+        errorMessage = null
+        authViewModel.loadQRInfo(id, detectedNonce) { info, err ->
+            requester = info
+            if (info == null) errorMessage = err ?: "This QR code is invalid or has expired"
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -165,7 +187,10 @@ fun WebQRScannerSheet(
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            text = "A web browser on your network is requesting access to your corporate workspace.",
+                            text = requester?.let {
+                                "Only approve if this is your own browser, on a computer in front of you.\n\n" +
+                                    "Browser: ${it.requesterAgent.ifBlank { "unknown" }}\nIP address: ${it.requesterIp.ifBlank { "unknown" }}"
+                            } ?: "Checking which browser is asking…",
                             fontSize = 12.sp,
                             color = TextMutedDark,
                             textAlign = TextAlign.Center,
@@ -188,7 +213,7 @@ fun WebQRScannerSheet(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Button(
-                                onClick = { detectedSessionId = null },
+                                onClick = { detectedSessionId = null; detectedNonce = ""; requester = null },
                                 colors = ButtonDefaults.buttonColors(containerColor = ClaySurfacePressed),
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp)
@@ -200,7 +225,7 @@ fun WebQRScannerSheet(
                                 onClick = {
                                     isAuthorizing = true
                                     errorMessage = null
-                                    authViewModel.confirmQRLogin(detectedSessionId!!) { success, err ->
+                                    authViewModel.confirmQRLogin(detectedSessionId!!, detectedNonce) { success, err ->
                                         isAuthorizing = false
                                         if (success) {
                                             authSuccess = true
@@ -212,7 +237,7 @@ fun WebQRScannerSheet(
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A884)),
                                 modifier = Modifier.weight(1.3f),
                                 shape = RoundedCornerShape(12.dp),
-                                enabled = !isAuthorizing
+                                enabled = !isAuthorizing && requester != null
                             ) {
                                 if (isAuthorizing) {
                                     CircularProgressIndicator(
@@ -283,19 +308,11 @@ fun WebQRScannerSheet(
                                 value = rawInput,
                                 onValueChange = { input ->
                                     rawInput = input
-                                    // Detect humora:auth:qr:<session_id>:<nonce>
-                                    if (input.startsWith("humora:auth:qr:")) {
-                                        val parts = input.split(":")
-                                        if (parts.size >= 4) {
-                                            detectedSessionId = parts[3]
-                                        }
-                                    } else if (input.length == 36 && input.contains("-")) {
-                                        // Plain UUID session ID
-                                        detectedSessionId = input
-                                    }
+                                    // humora:auth:qr:<session_id>:<nonce>: the whole code is needed.
+                                    accept(input)
                                 },
                                 placeholder = {
-                                    Text("Paste QR code payload or Session ID", fontSize = 12.sp, color = TextMutedDark)
+                                    Text("Paste the QR code payload", fontSize = 12.sp, color = TextMutedDark)
                                 },
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = Color.Transparent,
@@ -310,10 +327,8 @@ fun WebQRScannerSheet(
                             if (rawInput.isNotBlank()) {
                                 IconButton(
                                     onClick = {
-                                        val id = if (rawInput.startsWith("humora:auth:qr:")) {
-                                            rawInput.split(":").getOrNull(3) ?: rawInput
-                                        } else rawInput
-                                        detectedSessionId = id.trim()
+                                        accept(rawInput)
+                                        if (detectedSessionId == null) errorMessage = "Paste the whole QR code payload (humora:auth:qr:…)"
                                     }
                                 ) {
                                     Icon(

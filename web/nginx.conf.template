@@ -24,7 +24,10 @@ server {
         proxy_pass ${BACKEND_UPSTREAM};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Exactly one address: what nginx sees (after real-IP processing for trusted
+        # proxies, see 15-humora-realip.sh). A client-supplied X-Forwarded-For is never
+        # passed on, or anyone could dodge the API's per-IP rate limits.
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         # Pulse realtime gateway (/api/v1/pulse/ws)
         proxy_set_header Upgrade $http_upgrade;

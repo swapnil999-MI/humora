@@ -2,7 +2,7 @@
 # Production image for the Humora backend.
 # cgo is required: face recognition loads ONNX Runtime through onnxruntime_go.
 
-ARG GO_VERSION=1.27
+ARG GO_VERSION=1.27.2
 ARG ORT_VERSION=1.30.0
 
 FROM golang:${GO_VERSION}-bookworm AS build

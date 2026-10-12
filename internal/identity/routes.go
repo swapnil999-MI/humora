@@ -28,6 +28,7 @@ func RegisterRoutes(router fiber.Router, handler *Handler) {
 	authGroup.Get("/providers", handler.GetAuthProviders)
 	authGroup.Get("/oauth/:provider", moderate, handler.InitiateOAuth)
 	authGroup.Get("/oauth/:provider/callback", moderate, handler.OAuthCallback)
+	authGroup.Post("/oauth/exchange", moderate, handler.ExchangeOAuthCode)
 
 	// WhatsApp-Style QR Login (Public Challenge Initiation & Status Poll)
 	authGroup.Post("/qr/initiate", moderate, handler.InitiateQR)
@@ -41,5 +42,6 @@ func RegisterRoutes(router fiber.Router, handler *Handler) {
 	protected.Post("/device-key", handler.RegisterDeviceKey)
 
 	// QR Login Confirmation (Authorized by mobile device)
+	protected.Get("/qr/info", handler.GetQRInfo)
 	protected.Post("/qr/confirm", handler.ConfirmQR)
 }

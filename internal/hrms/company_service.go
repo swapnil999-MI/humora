@@ -221,6 +221,12 @@ func (s *companyService) GetSMTPConfig(ctx context.Context, tenantID uuid.UUID) 
 	}, nil
 }
 
+// allowedSMTPPorts are the mail submission ports. The settings page makes the
+// server open a connection, so it must not reach arbitrary internal services.
+var allowedSMTPPorts = map[int]bool{25: true, 465: true, 587: true, 2525: true}
+
+var errSMTPPort = errors.New("SMTP port must be 25, 465, 587 or 2525")
+
 func (s *companyService) SaveSMTPConfig(ctx context.Context, tenantID uuid.UUID, req *SaveSMTPConfigRequest) (*TenantSMTPConfigResponse, error) {
 	host := strings.TrimSpace(req.Host)
 	username := strings.TrimSpace(req.Username)
@@ -234,6 +240,9 @@ func (s *companyService) SaveSMTPConfig(ctx context.Context, tenantID uuid.UUID,
 	port := req.Port
 	if port <= 0 {
 		port = 587
+	}
+	if !allowedSMTPPorts[port] {
+		return nil, errSMTPPort
 	}
 	if encryption == "" {
 		encryption = "starttls"
@@ -313,6 +322,9 @@ func (s *companyService) TestSMTPConfig(ctx context.Context, tenantID uuid.UUID,
 				port = 587
 			}
 		}
+		if !allowedSMTPPorts[port] {
+			return errSMTPPort
+		}
 		if fromEmail == "" {
 			fromEmail = username
 		}
@@ -320,10 +332,15 @@ func (s *companyService) TestSMTPConfig(ctx context.Context, tenantID uuid.UUID,
 			fromName = "Humora HRMS"
 		}
 
-		// If password is not in the request, try to load existing encrypted password from DB
+		// If password is not in the request, reuse the saved one, but only for the server and
+		// account it was saved for: otherwise anyone allowed to run a test could point it at
+		// their own server and receive the company's mail password.
 		if password == "" {
 			var encPass string
-			_ = s.db.GetContext(ctx, &encPass, `SELECT password_encrypted FROM tenant_smtp_configs WHERE tenant_id = $1`, tenantID)
+			_ = s.db.GetContext(ctx, &encPass, `
+				SELECT password_encrypted FROM tenant_smtp_configs
+				WHERE tenant_id = $1 AND LOWER(host) = LOWER($2) AND username = $3
+			`, tenantID, host, username)
 			if encPass != "" {
 				if dec, err := decryptText(encPass); err == nil {
 					password = dec

@@ -238,6 +238,7 @@ API_PID=$!; pids+=("$API_PID")
 wait_for api http_ok 127.0.0.1 8090 /readyz
 
 # ── Web + reverse proxy ──
+write_realip_conf /etc/nginx/humora-realip.conf
 nginx -g 'daemon off;' &
 pids+=("$!")
 

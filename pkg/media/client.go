@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"humora-backend/configs"
+	"humora-backend/pkg/logger"
 )
 
 var (
@@ -46,6 +47,17 @@ func Init() error {
 		return fmt.Errorf("failed to initialize default media storage: %w", err)
 	}
 	SetDefaultStorage(storage)
+
+	// Re-apply the default bucket's policy on every start, so a policy from an older
+	// version (which left biometric images public) is replaced. Best effort: the
+	// bucket may not exist yet, in which case it gets this policy when created.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if exists, err := storage.Client().BucketExists(ctx, storage.DefaultBucket()); err == nil && exists {
+		if err := storage.SetBucketPublicRead(ctx, storage.DefaultBucket()); err != nil {
+			logger.Warn(fmt.Sprintf("could not update the media bucket policy: %v", err))
+		}
+	}
 	return nil
 }
 

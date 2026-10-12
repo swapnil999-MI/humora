@@ -66,6 +66,9 @@ func (h *Handler) ListEmployees(c *fiber.Ctx) error {
 	deptID := c.Query("department_id", "")
 
 	employees, total, err := h.service.ListEmployees(c.UserContext(), tenantID, p.Search, deptID, p.Limit, p.Offset)
+	for i := range employees {
+		redactForViewer(c, &employees[i])
+	}
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, err.Error())
 	}
@@ -92,6 +95,7 @@ func (h *Handler) GetEmployee(c *fiber.Ctx) error {
 	if err != nil || emp == nil {
 		return response.Error(c, fiber.StatusNotFound, "Employee not found")
 	}
+	redactForViewer(c, emp)
 
 	return response.TypedSuccess(c, fiber.StatusOK, "Employee retrieved", emp)
 }
@@ -764,4 +768,17 @@ func (h *Handler) CreateDesignation(c *fiber.Ctx) error {
 	return response.TypedSuccess(c, fiber.StatusCreated, "Designation created", desig)
 }
 
-
+// redactForViewer clears a colleague's private contact details unless the viewer
+// is HR/management or the employee themself: any employee can browse the
+// directory, but personal email and phone are not for everyone.
+func redactForViewer(c *fiber.Ctx, e *Employee) {
+	switch role, _ := c.Locals("role").(string); role {
+	case "superadmin", "admin", "hr_admin":
+		return
+	}
+	if viewer, _ := c.Locals("user_id").(string); e.UserID != nil && e.UserID.String() == viewer {
+		return
+	}
+	e.PersonalEmail = nil
+	e.Phone = nil
+}

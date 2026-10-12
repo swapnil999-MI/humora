@@ -133,7 +133,22 @@ type QRStatusResponse struct {
 	Auth   *AuthResponse `json:"auth,omitempty"`
 }
 
-// QRConfirmRequest is sent by an authenticated mobile app to approve a QR session
+// QRConfirmRequest is sent by an authenticated mobile app to approve a QR session.
+// The nonce comes from the scanned QR code and proves the phone actually saw it.
 type QRConfirmRequest struct {
 	SessionID string `json:"session_id"`
+	Nonce     string `json:"nonce"`
+}
+
+// QRInfoResponse describes the browser asking to be signed in, shown before approving.
+type QRInfoResponse struct {
+	RequesterIP    string `json:"requester_ip"`
+	RequesterAgent string `json:"requester_agent"`
+	ExpiresIn      int64  `json:"expires_in"`
+}
+
+// OAuthExchangeRequest collects a finished social login with the PKCE verifier.
+type OAuthExchangeRequest struct {
+	Code     string `json:"code"`
+	Verifier string `json:"verifier"`
 }

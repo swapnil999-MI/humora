@@ -266,6 +266,10 @@ func (s *onboardingService) GetCandidateByToken(ctx context.Context, token strin
 		LEFT JOIN hrms_designations des ON c.designation_id = des.id
 		LEFT JOIN hrms_employees m ON c.manager_id = m.id
 		WHERE c.invite_token = $1
+		  -- The link holds bank and identity details: it works only while onboarding is open,
+		  -- and for a limited time (HR can always send a new invite).
+		  AND c.status IN ('invited', 'in_progress', 'submitted')
+		  AND c.created_at > NOW() - INTERVAL '30 days'
 		LIMIT 1
 	`
 
@@ -339,9 +343,13 @@ func (s *onboardingService) GetCandidateByID(ctx context.Context, tenantID, cand
 
 func (s *onboardingService) SaveCandidateDossier(ctx context.Context, token string, req *SaveDossierRequest) error {
 	var candidateID uuid.UUID
-	err := s.db.GetContext(ctx, &candidateID, `SELECT id FROM hrms_onboarding_candidates WHERE invite_token = $1`, token)
+	// Editable only until it is submitted, and only while the link is valid.
+	err := s.db.GetContext(ctx, &candidateID, `
+		SELECT id FROM hrms_onboarding_candidates
+		WHERE invite_token = $1 AND status IN ('invited', 'in_progress') AND created_at > NOW() - INTERVAL '30 days'
+	`, token)
 	if err != nil {
-		return errors.New("candidate not found")
+		return errors.New("this onboarding link has expired or was already submitted")
 	}
 
 	personalJSON := req.PersonalDetails

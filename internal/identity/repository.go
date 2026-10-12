@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -183,7 +185,7 @@ func (r *repository) GetUserByEmailAndTenant(ctx context.Context, tenantID uuid.
 func (r *repository) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	var user User
 	query := `
-		SELECT id, tenant_id, email, password_hash, status, device_public_key, presence_status, last_login_at, created_at, updated_at
+		SELECT id, tenant_id, email, password_hash, status, device_public_key, presence_status, last_login_at, sessions_valid_after, created_at, updated_at
 		FROM users
 		WHERE id = $1
 		LIMIT 1
@@ -450,8 +452,22 @@ func (r *repository) SavePasswordResetOTP(ctx context.Context, tenantID, userID 
 		INSERT INTO password_reset_otps (id, tenant_id, email, otp_code, expires_at, used, created_at)
 		VALUES ($1, $2, $3, $4, $5, FALSE, NOW())
 	`
-	_, err := r.db.ExecContext(ctx, query, uuid.New(), tenantID, strings.ToLower(email), otp, expiresAt)
+	_, err := r.db.ExecContext(ctx, query, uuid.New(), tenantID, strings.ToLower(email), otpDigest(email, otp), expiresAt)
 	return err
+}
+
+// maxOTPAttempts is how many wrong guesses burn a reset code. With a 6-digit
+// code that leaves a 1-in-200,000 chance per code issued.
+const maxOTPAttempts = 5
+
+// otpDigest is what is stored for a reset code: an HMAC keyed by the server
+// secret and bound to the email, so a database read does not reveal live codes.
+func otpDigest(email, otp string) string {
+	mac := hmac.New(sha256.New, []byte(configs.AppConfig.Server.PasswordSecret))
+	mac.Write([]byte(strings.ToLower(strings.TrimSpace(email))))
+	mac.Write([]byte{0})
+	mac.Write([]byte(strings.TrimSpace(otp)))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 func (r *repository) VerifyPasswordResetOTP(ctx context.Context, email, otp string) (uuid.UUID, error) {
@@ -461,31 +477,45 @@ func (r *repository) VerifyPasswordResetOTP(ctx context.Context, email, otp stri
 		ExpiresAt time.Time `db:"expires_at"`
 		Used      bool      `db:"used"`
 	}
+	invalid := errors.New("invalid or expired OTP verification code")
+	// Only the newest live code counts, and it is checked here rather than in
+	// the query so that every wrong guess can be counted against it.
+	var code string
 	query := `
-		SELECT o.id, u.id AS user_id, o.expires_at, o.used
+		SELECT o.id, u.id AS user_id, o.expires_at, o.used, o.otp_code
 		FROM password_reset_otps o
-		JOIN users u ON LOWER(o.email) = LOWER(u.email)
-		WHERE LOWER(o.email) = LOWER($1) AND o.otp_code = $2 AND o.used = FALSE
+		JOIN users u ON LOWER(o.email) = LOWER(u.email) AND u.tenant_id = o.tenant_id
+		WHERE LOWER(o.email) = LOWER($1) AND o.used = FALSE AND o.expires_at > NOW()
 		ORDER BY o.created_at DESC
 		LIMIT 1
 	`
-	err := r.db.GetContext(ctx, &record, query, strings.ToLower(email), strings.TrimSpace(otp))
+	row := r.db.QueryRowxContext(ctx, query, strings.ToLower(email))
+	if err := row.Scan(&record.ID, &record.UserID, &record.ExpiresAt, &record.Used, &code); err != nil {
+		return uuid.Nil, invalid
+	}
+
+	if !hmac.Equal([]byte(code), []byte(otpDigest(email, otp))) {
+		// A wrong guess: count it, and burn the code once too many have been made.
+		_, _ = r.db.ExecContext(ctx, `
+			UPDATE password_reset_otps SET attempts = attempts + 1, used = (attempts + 1 >= $2) WHERE id = $1
+		`, record.ID, maxOTPAttempts)
+		return uuid.Nil, invalid
+	}
+
+	// Single use: only the request that flips it may proceed.
+	res, err := r.db.ExecContext(ctx, `UPDATE password_reset_otps SET used = TRUE WHERE id = $1 AND used = FALSE`, record.ID)
 	if err != nil {
-		return uuid.Nil, errors.New("invalid or expired OTP verification code")
+		return uuid.Nil, invalid
 	}
-
-	if time.Now().After(record.ExpiresAt) {
-		return uuid.Nil, errors.New("OTP verification code has expired. Please request a new one")
+	if n, _ := res.RowsAffected(); n != 1 {
+		return uuid.Nil, invalid
 	}
-
-	// Mark as used
-	_, _ = r.db.ExecContext(ctx, `UPDATE password_reset_otps SET used = TRUE WHERE id = $1`, record.ID)
-
 	return record.UserID, nil
 }
 
 func (r *repository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
-	query := `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`
+	// Signs out every existing session: refresh tokens issued before now are refused.
+	query := `UPDATE users SET password_hash = $1, sessions_valid_after = date_trunc('second', NOW()), updated_at = NOW() WHERE id = $2`
 	_, err := r.db.ExecContext(ctx, query, passwordHash, userID)
 	return err
 }

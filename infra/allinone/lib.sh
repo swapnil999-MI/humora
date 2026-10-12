@@ -170,3 +170,16 @@ CREATE ROLE humora LOGIN PASSWORD '$DB_PASSWORD';
 CREATE DATABASE humora OWNER humora;
 SQL
 }
+
+# Writes nginx real-IP settings for the TLS proxies listed in HUMORA_TRUSTED_PROXIES
+# (comma separated IPs/CIDRs). Empty: clients connect directly and their own address is used.
+write_realip_conf() {
+  local out=$1 cidr
+  : > "$out"
+  [ -n "${HUMORA_TRUSTED_PROXIES:-}" ] || return 0
+  for cidr in ${HUMORA_TRUSTED_PROXIES//,/ }; do
+    echo "set_real_ip_from $cidr;" >> "$out"
+  done
+  echo "real_ip_header X-Forwarded-For;" >> "$out"
+  echo "real_ip_recursive on;" >> "$out"
+}

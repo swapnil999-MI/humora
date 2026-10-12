@@ -189,10 +189,28 @@ class HumoraApiClient(
         }
     }
 
-    suspend fun confirmQR(sessionId: String): NetworkResult<Unit> {
+    suspend fun confirmQR(sessionId: String, nonce: String): NetworkResult<Unit> {
         return executeRequest {
             post(endpoint("auth/qr/confirm")) {
-                setBody(QRConfirmRequest(sessionId))
+                setBody(QRConfirmRequest(sessionId, nonce))
+            }
+        }
+    }
+
+    suspend fun qrInfo(sessionId: String, nonce: String): NetworkResult<QRInfo> {
+        return executeRequest {
+            get(endpoint("auth/qr/info")) {
+                url.parameters.append("session_id", sessionId)
+                url.parameters.append("nonce", nonce)
+            }
+        }
+    }
+
+    /** Collects a finished social login with the PKCE verifier this app holds. */
+    suspend fun exchangeOAuth(code: String, verifier: String): NetworkResult<AuthResponse> {
+        return executeRequest {
+            post(endpoint("auth/oauth/exchange")) {
+                setBody(OAuthExchangeRequest(code, verifier))
             }
         }
     }

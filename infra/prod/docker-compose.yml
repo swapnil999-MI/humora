@@ -44,5 +44,7 @@ services:
     restart: unless-stopped
     environment:
       BACKEND_UPSTREAM: http://backend:8090
+      # Only if a TLS proxy / load balancer sits in front: its IPs/CIDRs (see web/15-humora-realip.sh).
+      TRUSTED_PROXIES: ${WEB_TRUSTED_PROXIES:-}
     ports: ["8080:8080"]
     depends_on: [backend]

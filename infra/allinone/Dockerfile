@@ -6,7 +6,7 @@
 #   docker run -d --name humora -p 8080:8080 -v humora-data:/data -v /mnt/backup-disk/humora:/backups \
 #     -e HUMORA_URL=http://<host>:8080 humora
 
-ARG GO_VERSION=1.27
+ARG GO_VERSION=1.27.2
 # Built from source without LLVM JIT, ICU, Perl or readline: the distro packages pull in ~340 MB
 # (libLLVM alone is 117 MB) that Humora never uses.
 ARG PG_VERSION=17.11

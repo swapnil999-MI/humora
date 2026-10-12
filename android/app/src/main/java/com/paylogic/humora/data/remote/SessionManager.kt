@@ -2,6 +2,7 @@ package com.paylogic.humora.data.remote
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.paylogic.humora.core.security.SecretBox
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,18 +17,32 @@ class SessionManager(context: Context) {
     private val _userName = MutableStateFlow(userNameStored)
     val userName: StateFlow<String> = _userName.asStateFlow()
 
+    // Tokens are stored sealed with a Keystore key (SecretBox); values written by older versions
+    // are read as they are and sealed the next time they are written.
     var accessToken: String
-        get() = prefs.getString(KEY_ACCESS_TOKEN, "") ?: ""
+        get() = SecretBox.open(prefs.getString(KEY_ACCESS_TOKEN, ""))
         set(value) {
-            prefs.edit().putString(KEY_ACCESS_TOKEN, value).apply()
+            prefs.edit().putString(KEY_ACCESS_TOKEN, SecretBox.seal(value)).apply()
             _isLoggedIn.value = value.isNotBlank()
         }
 
     var refreshToken: String
-        get() = prefs.getString(KEY_REFRESH_TOKEN, "") ?: ""
+        get() = SecretBox.open(prefs.getString(KEY_REFRESH_TOKEN, ""))
         set(value) {
-            prefs.edit().putString(KEY_REFRESH_TOKEN, value).apply()
+            prefs.edit().putString(KEY_REFRESH_TOKEN, SecretBox.seal(value)).apply()
         }
+
+    /** Remembers the PKCE verifier of a social sign-in in progress. */
+    fun pendingOAuthVerifier(verifier: String) {
+        prefs.edit().putString(KEY_OAUTH_VERIFIER, SecretBox.seal(verifier)).commit()
+    }
+
+    /** The verifier of the sign-in in progress, if any; it can be used once. */
+    fun takeOAuthVerifier(): String? {
+        val v = SecretBox.open(prefs.getString(KEY_OAUTH_VERIFIER, null))
+        prefs.edit().remove(KEY_OAUTH_VERIFIER).commit()
+        return v.ifBlank { null }
+    }
 
     /** The signed-in user's id (UUID), needed for end-to-end encrypted chat. */
     var userId: String
@@ -38,7 +53,7 @@ class SessionManager(context: Context) {
 
     /** Replaces the token pair after a refresh, keeping the rest of the session. */
     fun updateTokens(access: String, refresh: String) {
-        prefs.edit().putString(KEY_ACCESS_TOKEN, access).putString(KEY_REFRESH_TOKEN, refresh).commit()
+        prefs.edit().putString(KEY_ACCESS_TOKEN, SecretBox.seal(access)).putString(KEY_REFRESH_TOKEN, SecretBox.seal(refresh)).commit()
         _isLoggedIn.value = access.isNotBlank()
     }
 
@@ -96,8 +111,8 @@ class SessionManager(context: Context) {
     ) {
         prefs.edit()
             .putString(KEY_USER_ID, userId)
-            .putString(KEY_ACCESS_TOKEN, access)
-            .putString(KEY_REFRESH_TOKEN, refresh)
+            .putString(KEY_ACCESS_TOKEN, SecretBox.seal(access))
+            .putString(KEY_REFRESH_TOKEN, SecretBox.seal(refresh))
             .putString(KEY_USER_EMAIL, email)
             .putString(KEY_USER_ROLE, role)
             .putString(KEY_TENANT_SLUG, tenant)
@@ -125,5 +140,6 @@ class SessionManager(context: Context) {
         private const val KEY_USER_ROLE = "user_role"
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_USER_ID = "user_id"
+        private const val KEY_OAUTH_VERIFIER = "oauth_verifier"
     }
 }

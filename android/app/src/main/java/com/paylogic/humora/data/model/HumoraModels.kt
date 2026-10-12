@@ -56,8 +56,21 @@ data class AuthProvidersResponse(
 
 @Serializable
 data class QRConfirmRequest(
-    @SerialName("session_id") val sessionId: String
+    @SerialName("session_id") val sessionId: String,
+    /** From the scanned QR code: proves this phone actually saw it. */
+    val nonce: String
 )
+
+/** The browser asking to be signed in by a QR code, shown before approving. */
+@Serializable
+data class QRInfo(
+    @SerialName("requester_ip") val requesterIp: String = "",
+    @SerialName("requester_agent") val requesterAgent: String = "",
+    @SerialName("expires_in") val expiresIn: Long = 0
+)
+
+@Serializable
+data class OAuthExchangeRequest(val code: String, val verifier: String)
 
 // ==========================================
 // 2. ATTENDANCE & PUNCH DTOs

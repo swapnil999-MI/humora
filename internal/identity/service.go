@@ -159,17 +159,19 @@ func (s *service) Login(ctx context.Context, req *LoginRequest) (*AuthResponse, 
 	}
 
 	if err != nil || user == nil || tenant == nil {
+		// Spend the same time as a real check, so response time does not reveal which emails exist.
+		_, _ = verifyPassword(req.Password, dummyPasswordHash)
+		return nil, errors.New("invalid email or password")
+	}
+
+	// The password first: only someone who knows it learns the account's status.
+	valid, err := verifyPassword(req.Password, user.PasswordHash)
+	if err != nil || !valid {
 		return nil, errors.New("invalid email or password")
 	}
 
 	if user.Status != "active" {
 		return nil, fmt.Errorf("account is %s. please contact your administrator", user.Status)
-	}
-
-	// Verify Argon2id or legacy password
-	valid, err := verifyPassword(req.Password, user.PasswordHash)
-	if err != nil || !valid {
-		return nil, errors.New("invalid email or password")
 	}
 
 	// Update last login
@@ -221,6 +223,10 @@ func (s *service) RefreshToken(ctx context.Context, refreshToken string) (*AuthR
 	}
 	if user.Status != "active" {
 		return nil, fmt.Errorf("account is %s. please contact your administrator", user.Status)
+	}
+	// Sessions from before a password reset are over.
+	if user.SessionsValidAfter != nil && (claims.IssuedAt == nil || claims.IssuedAt.Time.Before(*user.SessionsValidAfter)) {
+		return nil, errors.New("invalid or expired refresh token")
 	}
 
 	tenant, err := s.repo.GetTenantByID(ctx, user.TenantID)
@@ -285,6 +291,10 @@ func (s *service) UpdatePresence(ctx context.Context, userID uuid.UUID, status s
 func (s *service) RegisterDeviceKey(ctx context.Context, userID uuid.UUID, publicKey string) error {
 	return s.repo.RegisterDevicePublicKey(ctx, userID, publicKey)
 }
+
+// dummyPasswordHash is checked against when no account matches, so a login for an
+// unknown email takes as long as one for a real account.
+var dummyPasswordHash, _ = hashPassword("humora-timing-equaliser")
 
 // Helper: Token Generation
 func generateTokens(user *User, tenant *Tenant, roles, perms []string) (string, string, error) {
@@ -409,9 +419,9 @@ func (s *service) RequestPasswordReset(ctx context.Context, req *ForgotPasswordR
 
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	user, tenant, err := s.repo.GetUserByEmail(ctx, email)
-	if err != nil || user == nil || tenant == nil {
-		// Return specific error
-		return errors.New("no active account found with this email address")
+	if err != nil || user == nil || tenant == nil || user.Status != "active" {
+		// Same answer as for a real account, so this cannot be used to find out who has one.
+		return nil
 	}
 
 	// Generate 6-digit numeric OTP

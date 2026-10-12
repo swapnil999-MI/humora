@@ -29,7 +29,8 @@ var AllowedMediaExtensions = map[string]struct{}{
 	".gif":  {},
 	".bmp":  {},
 	".webp": {},
-	".svg":  {},
+	// No .svg: an SVG can carry script, and uploads are served from the app's own
+	// origin. Blocklist filtering (ValidateSVGContent) is not a safe enough guard.
 	".mp4":  {},
 	".mov":  {},
 	".avi":  {},

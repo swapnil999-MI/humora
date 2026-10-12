@@ -3,6 +3,9 @@ package identity
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -26,19 +29,38 @@ type QRSession struct {
 	Status    string // "pending", "authenticated", "expired"
 	Auth      *AuthResponse
 	ExpiresAt time.Time
+	// Who asked for it, shown on the phone before approving so a QR code
+	// relayed by a phisher can be recognised.
+	RequesterIP    string
+	RequesterAgent string
 }
 
 type OAuthState struct {
 	State      string
 	Provider   string
 	ClientType string // "web" or "mobile"
-	ExpiresAt  time.Time
+	// Challenge is the SHA-256 (base64url) of a secret only the client that
+	// started the login holds; the tokens are released only for that secret.
+	Challenge string
+	ExpiresAt time.Time
+}
+
+// OAuthCode is a finished social login waiting to be collected. Tokens never
+// travel in a redirect URL (browser history, logs, an app that hijacks the
+// humora:// scheme); only this one-time code does.
+type OAuthCode struct {
+	Auth      *AuthResponse
+	Challenge string
+	ExpiresAt time.Time
 }
 
 var (
 	qrSessions  = sync.Map{}
 	oauthStates = sync.Map{}
+	oauthCodes  = sync.Map{}
 )
+
+const oauthCodeTTL = 2 * time.Minute
 
 func init() {
 	// Background cleanup of expired sessions and states every 60 seconds
@@ -59,6 +81,12 @@ func init() {
 				}
 				return true
 			})
+			oauthCodes.Range(func(key, value any) bool {
+				if oc, ok := value.(*OAuthCode); ok && oc.ExpiresAt.Before(now) {
+					oauthCodes.Delete(key)
+				}
+				return true
+			})
 		}
 	}()
 }
@@ -67,11 +95,13 @@ func init() {
 
 type AuthExtService interface {
 	GetEnabledProviders() *AuthProvidersResponse
-	InitiateOAuth(provider, clientType string) (string, error)
+	InitiateOAuth(provider, clientType, challenge string) (string, error)
 	HandleOAuthCallback(ctx context.Context, provider, code, state string) (string, error)
-	InitiateQRLogin(ctx context.Context) (*QRInitiateResponse, error)
+	ExchangeOAuthCode(code, verifier string) (*AuthResponse, error)
+	InitiateQRLogin(ctx context.Context, requesterIP, requesterAgent string) (*QRInitiateResponse, error)
 	GetQRStatus(ctx context.Context, sessionID string) (*QRStatusResponse, error)
-	ConfirmQRLogin(ctx context.Context, sessionID string, userID uuid.UUID) error
+	GetQRInfo(sessionID, nonce string) (*QRInfoResponse, error)
+	ConfirmQRLogin(ctx context.Context, sessionID, nonce string, userID uuid.UUID) error
 }
 
 type authExtService struct {
@@ -96,10 +126,14 @@ func (s *authExtService) GetEnabledProviders() *AuthProvidersResponse {
 
 // ── OAuth Initiation ────────────────────────────────────────────────────────
 
-func (s *authExtService) InitiateOAuth(provider, clientType string) (string, error) {
+func (s *authExtService) InitiateOAuth(provider, clientType, challenge string) (string, error) {
 	provider = strings.ToLower(strings.TrimSpace(provider))
-	if clientType == "" {
+	if clientType != "mobile" {
 		clientType = "web"
+	}
+	// base64url of a SHA-256 digest is 43 characters.
+	if len(challenge) != 43 || strings.Trim(challenge, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_") != "" {
+		return "", errors.New("a code challenge is required to sign in with a provider")
 	}
 
 	stateBytes := make([]byte, 16)
@@ -112,6 +146,7 @@ func (s *authExtService) InitiateOAuth(provider, clientType string) (string, err
 		State:      state,
 		Provider:   provider,
 		ClientType: clientType,
+		Challenge:  challenge,
 		ExpiresAt:  time.Now().UTC().Add(10 * time.Minute),
 	})
 
@@ -177,9 +212,12 @@ func (s *authExtService) HandleOAuthCallback(ctx context.Context, provider, code
 	if st.ExpiresAt.Before(time.Now().UTC()) {
 		return "", errors.New("OAuth session expired. Please try again.")
 	}
+	if st.Provider != strings.ToLower(provider) {
+		return "", errors.New("invalid or expired OAuth state")
+	}
 
-	// 1. Fetch user info from provider
-	email, firstName, lastName, err := s.exchangeCodeForProfile(provider, code)
+	// 1. Fetch the verified email from the provider
+	email, _, _, err := s.exchangeCodeForProfile(provider, code)
 	if err != nil {
 		return "", fmt.Errorf("failed to verify with %s: %w", provider, err)
 	}
@@ -189,41 +227,17 @@ func (s *authExtService) HandleOAuthCallback(ctx context.Context, provider, code
 		return "", errors.New("no verified email returned by identity provider")
 	}
 
-	// 2. Match or provision user
+	// 2. Match an existing account. A social login never creates one: anybody
+	// can hold a Google, GitHub or Microsoft account, so people get into an
+	// organisation only by being invited to it.
 	user, tenant, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return "", fmt.Errorf("database lookup failed: %w", err)
 	}
-
 	if user == nil || tenant == nil {
-		// Auto-provision user in the default tenant
-		tenant, err = s.repo.GetFirstTenant(ctx)
-		if err != nil || tenant == nil {
-			return "", errors.New("no organization found to associate user")
-		}
-
-		dummyHash, _ := hashPassword(uuid.NewString())
-		user = &User{
-			ID:             uuid.New(),
-			TenantID:       tenant.ID,
-			Email:          email,
-			PasswordHash:   dummyHash,
-			Status:         "active",
-			PresenceStatus: "in_office_active",
-		}
-		if err := s.repo.CreateUser(ctx, user); err != nil {
-			return "", fmt.Errorf("failed to create user account: %w", err)
-		}
-
-		// Assign default employee role
-		role, _ := s.repo.GetRoleByName(ctx, tenant.ID, "employee")
-		if role != nil {
-			_ = s.repo.AssignRoleToUser(ctx, user.ID, role.ID)
-		}
-
-		// Create default HRMS employee record
-		_ = s.repo.CreateDefaultHRMSEmployee(ctx, tenant.ID, user.ID, email, firstName, lastName)
-	} else if user.Status != "active" {
+		return "", errors.New("no Humora account uses this email address. Ask your administrator to invite you")
+	}
+	if user.Status != "active" {
 		return "", fmt.Errorf("account is %s. please contact administrator", user.Status)
 	}
 
@@ -235,17 +249,63 @@ func (s *authExtService) HandleOAuthCallback(ctx context.Context, provider, code
 		return "", fmt.Errorf("failed to generate authentication tokens: %w", err)
 	}
 
-	// 3. Construct destination redirect URL
-	if st.ClientType == "mobile" {
-		// Mobile deep link (Chrome Custom Tab catches this and hands control to Android app)
-		return fmt.Sprintf("humora://auth/callback?token=%s&refresh=%s",
-			url.QueryEscape(accessToken), url.QueryEscape(refreshToken)), nil
+	// 3. Park the tokens behind a one-time code for the client that started this login.
+	codeBytes := make([]byte, 32)
+	if _, err := rand.Read(codeBytes); err != nil {
+		return "", fmt.Errorf("failed to generate login code: %w", err)
 	}
+	code = hex.EncodeToString(codeBytes)
+	oauthCodes.Store(code, &OAuthCode{
+		Auth:      authResponse(user, tenant, roles, perms, accessToken, refreshToken),
+		Challenge: st.Challenge,
+		ExpiresAt: time.Now().UTC().Add(oauthCodeTTL),
+	})
 
-	// Web frontend redirect
+	if st.ClientType == "mobile" {
+		return "humora://auth/callback?code=" + url.QueryEscape(code), nil
+	}
 	baseURL := strings.TrimRight(configs.AppConfig.Server.FrontendBaseURL, "/")
-	return fmt.Sprintf("%s/auth/callback?token=%s&refresh=%s",
-		baseURL, url.QueryEscape(accessToken), url.QueryEscape(refreshToken)), nil
+	return baseURL + "/?oauth_code=" + url.QueryEscape(code), nil
+}
+
+// ExchangeOAuthCode releases a finished social login's tokens, once, to the
+// client that proves it started it (PKCE: SHA-256 of the verifier must match
+// the challenge it sent at the start).
+func (s *authExtService) ExchangeOAuthCode(code, verifier string) (*AuthResponse, error) {
+	invalid := errors.New("this sign-in link is invalid or has expired. Please sign in again")
+	val, ok := oauthCodes.LoadAndDelete(code)
+	if !ok {
+		return nil, invalid
+	}
+	oc := val.(*OAuthCode)
+	if oc.ExpiresAt.Before(time.Now().UTC()) {
+		return nil, invalid
+	}
+	digest := sha256.Sum256([]byte(verifier))
+	if subtle.ConstantTimeCompare([]byte(base64.RawURLEncoding.EncodeToString(digest[:])), []byte(oc.Challenge)) != 1 {
+		return nil, invalid
+	}
+	return oc.Auth, nil
+}
+
+func authResponse(user *User, tenant *Tenant, roles, perms []string, accessToken, refreshToken string) *AuthResponse {
+	return &AuthResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    int64(configs.AppConfig.Server.JWTAccessTokenExpiry.Seconds()),
+		User: UserSummary{
+			ID:             user.ID.String(),
+			TenantID:       tenant.ID.String(),
+			TenantName:     tenant.Name,
+			TenantSlug:     tenant.Slug,
+			Email:          user.Email,
+			Status:         user.Status,
+			PresenceStatus: user.PresenceStatus,
+			Roles:          roles,
+			Permissions:    perms,
+		},
+	}
 }
 
 // ── Provider Token & Profile Exchange ───────────────────────────────────────
@@ -287,13 +347,17 @@ func (s *authExtService) exchangeCodeForProfile(provider, code string) (email, f
 		defer profileResp.Body.Close()
 
 		var profile struct {
-			Email      string `json:"email"`
-			GivenName  string `json:"given_name"`
-			FamilyName string `json:"family_name"`
-			Name       string `json:"name"`
+			Email         string `json:"email"`
+			EmailVerified bool   `json:"email_verified"`
+			GivenName     string `json:"given_name"`
+			FamilyName    string `json:"family_name"`
+			Name          string `json:"name"`
 		}
 		if err := json.NewDecoder(profileResp.Body).Decode(&profile); err != nil {
 			return "", "", "", err
+		}
+		if !profile.EmailVerified {
+			return "", "", "", errors.New("Google has not verified this account's email address")
 		}
 		firstName = profile.GivenName
 		lastName = profile.FamilyName
@@ -346,31 +410,33 @@ func (s *authExtService) exchangeCodeForProfile(provider, code string) (email, f
 		}
 		_ = json.NewDecoder(uResp.Body).Decode(&ghUser)
 
-		email = ghUser.Email
-		if email == "" {
-			// Fetch emails if email is private on GitHub profile
-			eReq, _ := http.NewRequest("GET", "https://api.github.com/user/emails", nil)
-			eReq.Header.Set("Authorization", "Bearer "+tokRes.AccessToken)
-			eResp, err := client.Do(eReq)
-			if err == nil {
-				defer eResp.Body.Close()
-				var emails []struct {
-					Email    string `json:"email"`
-					Primary  bool   `json:"primary"`
-					Verified bool   `json:"verified"`
-				}
-				if json.NewDecoder(eResp.Body).Decode(&emails) == nil {
-					for _, em := range emails {
-						if em.Primary && em.Verified {
-							email = em.Email
-							break
-						}
-					}
-					if email == "" && len(emails) > 0 {
-						email = emails[0].Email
-					}
-				}
+		// Only the primary address GitHub has verified: the profile email and
+		// other listed addresses can be ones the user has not proven they own.
+		email = ""
+		eReq, _ := http.NewRequest("GET", "https://api.github.com/user/emails", nil)
+		eReq.Header.Set("Authorization", "Bearer "+tokRes.AccessToken)
+		eReq.Header.Set("Accept", "application/vnd.github.v3+json")
+		eResp, err := client.Do(eReq)
+		if err != nil {
+			return "", "", "", err
+		}
+		defer eResp.Body.Close()
+		var emails []struct {
+			Email    string `json:"email"`
+			Primary  bool   `json:"primary"`
+			Verified bool   `json:"verified"`
+		}
+		if err := json.NewDecoder(eResp.Body).Decode(&emails); err != nil {
+			return "", "", "", err
+		}
+		for _, em := range emails {
+			if em.Primary && em.Verified {
+				email = em.Email
+				break
 			}
+		}
+		if email == "" {
+			return "", "", "", errors.New("GitHub has no verified primary email for this account")
 		}
 
 		name := ghUser.Name
@@ -406,7 +472,7 @@ func (s *authExtService) exchangeCodeForProfile(provider, code string) (email, f
 		}
 
 		// Fetch profile from Microsoft Graph
-		mReq, _ := http.NewRequest("GET", "https://graph.microsoftonline.com/v1.0/me", nil)
+		mReq, _ := http.NewRequest("GET", "https://graph.microsoft.com/v1.0/me", nil)
 		mReq.Header.Set("Authorization", "Bearer "+tokRes.AccessToken)
 		mResp, err := client.Do(mReq)
 		if err != nil {
@@ -424,9 +490,12 @@ func (s *authExtService) exchangeCodeForProfile(provider, code string) (email, f
 		if err := json.NewDecoder(mResp.Body).Decode(&msUser); err != nil {
 			return "", "", "", err
 		}
-		email = msUser.Mail
-		if email == "" {
-			email = msUser.UserPrincipalName
+		// `mail` can be set to any address by the account's own tenant admin
+		// ("nOAuth"), so it is never trusted. The UPN must be on a domain that
+		// tenant has verified; guest accounts (#EXT#) are refused.
+		email = msUser.UserPrincipalName
+		if !strings.Contains(email, "@") || strings.Contains(strings.ToUpper(email), "#EXT#") {
+			return "", "", "", errors.New("Microsoft did not return a verified work address for this account")
 		}
 		firstName = msUser.GivenName
 		lastName = msUser.Surname
@@ -458,7 +527,7 @@ func getOAuthCallbackURL(provider string) string {
 
 // ── WhatsApp-Style QR Login ─────────────────────────────────────────────────
 
-func (s *authExtService) InitiateQRLogin(ctx context.Context) (*QRInitiateResponse, error) {
+func (s *authExtService) InitiateQRLogin(ctx context.Context, requesterIP, requesterAgent string) (*QRInitiateResponse, error) {
 	sessionID := uuid.NewString()
 	nonceBytes := make([]byte, 16)
 	if _, err := rand.Read(nonceBytes); err != nil {
@@ -470,10 +539,12 @@ func (s *authExtService) InitiateQRLogin(ctx context.Context) (*QRInitiateRespon
 	expiresIn := int64(120) // 2 minutes
 
 	qrSessions.Store(sessionID, &QRSession{
-		SessionID: sessionID,
-		Nonce:     nonce,
-		Status:    "pending",
-		ExpiresAt: time.Now().UTC().Add(time.Duration(expiresIn) * time.Second),
+		SessionID:      sessionID,
+		Nonce:          nonce,
+		Status:         "pending",
+		ExpiresAt:      time.Now().UTC().Add(time.Duration(expiresIn) * time.Second),
+		RequesterIP:    requesterIP,
+		RequesterAgent: requesterAgent,
 	})
 
 	return &QRInitiateResponse{
@@ -507,12 +578,41 @@ func (s *authExtService) GetQRStatus(ctx context.Context, sessionID string) (*QR
 	return &QRStatusResponse{Status: "pending"}, nil
 }
 
-func (s *authExtService) ConfirmQRLogin(ctx context.Context, sessionID string, userID uuid.UUID) error {
+// pendingQRSession returns a live QR session, checking the nonce from the QR
+// code itself: knowing only the session id (e.g. from the status poll) is not enough.
+func pendingQRSession(sessionID, nonce string) (*QRSession, error) {
 	val, ok := qrSessions.Load(sessionID)
 	if !ok {
-		return errors.New("QR login session not found or expired")
+		return nil, errors.New("QR login session not found or expired")
 	}
 	sess := val.(*QRSession)
+	if subtle.ConstantTimeCompare([]byte(sess.Nonce), []byte(nonce)) != 1 || sess.Status != "pending" {
+		return nil, errors.New("QR login session not found or expired")
+	}
+	return sess, nil
+}
+
+// GetQRInfo tells the phone which browser is asking to be signed in, before the user approves it.
+func (s *authExtService) GetQRInfo(sessionID, nonce string) (*QRInfoResponse, error) {
+	sess, err := pendingQRSession(sessionID, nonce)
+	if err != nil {
+		return nil, err
+	}
+	if sess.ExpiresAt.Before(time.Now().UTC()) {
+		return nil, errors.New("QR code has expired. Please refresh the QR code on your browser.")
+	}
+	return &QRInfoResponse{
+		RequesterIP:    sess.RequesterIP,
+		RequesterAgent: sess.RequesterAgent,
+		ExpiresIn:      int64(time.Until(sess.ExpiresAt).Seconds()),
+	}, nil
+}
+
+func (s *authExtService) ConfirmQRLogin(ctx context.Context, sessionID, nonce string, userID uuid.UUID) error {
+	sess, err := pendingQRSession(sessionID, nonce)
+	if err != nil {
+		return err
+	}
 
 	if sess.ExpiresAt.Before(time.Now().UTC()) {
 		qrSessions.Delete(sessionID)

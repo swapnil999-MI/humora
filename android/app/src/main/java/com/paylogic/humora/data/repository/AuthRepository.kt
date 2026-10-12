@@ -2,6 +2,7 @@ package com.paylogic.humora.data.repository
 
 import com.paylogic.humora.data.model.AuthResponse
 import com.paylogic.humora.data.model.LoginRequest
+import com.paylogic.humora.data.model.QRInfo
 import com.paylogic.humora.data.model.UserSummary
 import com.paylogic.humora.data.remote.HumoraApiClient
 import com.paylogic.humora.data.remote.NetworkResult
@@ -110,9 +111,13 @@ class AuthRepository(
         return apiClient.getAuthProviders()
     }
 
-    suspend fun confirmQR(sessionId: String): NetworkResult<Unit> {
-        return apiClient.confirmQR(sessionId)
+    suspend fun confirmQR(sessionId: String, nonce: String): NetworkResult<Unit> {
+        return apiClient.confirmQR(sessionId, nonce)
     }
+
+    suspend fun qrInfo(sessionId: String, nonce: String): NetworkResult<QRInfo> = apiClient.qrInfo(sessionId, nonce)
+
+    suspend fun exchangeOAuth(code: String, verifier: String): NetworkResult<AuthResponse> = apiClient.exchangeOAuth(code, verifier)
 
     fun logout() {
         sessionManager.clearSession()

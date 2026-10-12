@@ -138,7 +138,7 @@ func (h *Handler) ForgotPassword(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, err.Error())
 	}
 
-	return response.Success(c, fiber.StatusOK, "Password reset OTP dispatched to your registered email", nil)
+	return response.Success(c, fiber.StatusOK, "If an account exists for this email, a verification code has been sent to it", nil)
 }
 
 // ResetPassword verifies the OTP code and sets a new password.
@@ -166,7 +166,7 @@ func (h *Handler) InitiateOAuth(c *fiber.Ctx) error {
 	provider := c.Params("provider")
 	clientType := c.Query("client", "web")
 
-	redirectURL, err := h.authExt.InitiateOAuth(provider, clientType)
+	redirectURL, err := h.authExt.InitiateOAuth(provider, clientType, c.Query("challenge"))
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, err.Error())
 	}
@@ -194,7 +194,7 @@ func (h *Handler) OAuthCallback(c *fiber.Ctx) error {
 
 // InitiateQR creates a temporary QR login session challenge.
 func (h *Handler) InitiateQR(c *fiber.Ctx) error {
-	res, err := h.authExt.InitiateQRLogin(c.UserContext())
+	res, err := h.authExt.InitiateQRLogin(c.UserContext(), c.IP(), truncate(c.Get(fiber.HeaderUserAgent), 200))
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Failed to create QR login session")
 	}
@@ -227,14 +227,42 @@ func (h *Handler) ConfirmQR(c *fiber.Ctx) error {
 	}
 
 	var req QRConfirmRequest
-	if err := c.BodyParser(&req); err != nil || req.SessionID == "" {
-		return response.Error(c, fiber.StatusBadRequest, "session_id is required")
+	if err := c.BodyParser(&req); err != nil || req.SessionID == "" || req.Nonce == "" {
+		return response.Error(c, fiber.StatusBadRequest, "session_id and nonce are required")
 	}
 
-	if err := h.authExt.ConfirmQRLogin(c.UserContext(), req.SessionID, userID); err != nil {
+	if err := h.authExt.ConfirmQRLogin(c.UserContext(), req.SessionID, req.Nonce, userID); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, err.Error())
 	}
 
 	return response.Success(c, fiber.StatusOK, "Web session authorized successfully", nil)
 }
 
+// GetQRInfo shows the phone which browser a scanned QR code would sign in, before approving.
+func (h *Handler) GetQRInfo(c *fiber.Ctx) error {
+	info, err := h.authExt.GetQRInfo(c.Query("session_id"), c.Query("nonce"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+	return response.TypedSuccess(c, fiber.StatusOK, "QR login request", info)
+}
+
+// ExchangeOAuthCode collects the tokens of a finished social login.
+func (h *Handler) ExchangeOAuthCode(c *fiber.Ctx) error {
+	var req OAuthExchangeRequest
+	if err := c.BodyParser(&req); err != nil || req.Code == "" || req.Verifier == "" {
+		return response.Error(c, fiber.StatusBadRequest, "code and verifier are required")
+	}
+	res, err := h.authExt.ExchangeOAuthCode(req.Code, req.Verifier)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, err.Error())
+	}
+	return response.TypedSuccess(c, fiber.StatusOK, "Signed in", res)
+}
+
+func truncate(s string, n int) string {
+	if len(s) > n {
+		return s[:n]
+	}
+	return s
+}

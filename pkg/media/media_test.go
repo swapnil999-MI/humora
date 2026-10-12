@@ -326,56 +326,27 @@ func TestValidateSVGContent(t *testing.T) {
 }
 
 func TestValidateFileHeader_SVG(t *testing.T) {
-	// 1. Test valid clean SVG upload
-	cleanSVG := []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="red"/></svg>`)
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	h := make(textproto.MIMEHeader)
-	h.Set("Content-Disposition", `form-data; name="file"; filename="logo.svg"`)
-	h.Set("Content-Type", "image/svg+xml")
-	part, _ := writer.CreatePart(h)
-	_, _ = part.Write(cleanSVG)
-	writer.Close()
+	// SVG can carry script and uploads are served from the app's origin, so no
+	// SVG upload is accepted, however harmless it looks.
+	for _, svg := range [][]byte{
+		[]byte(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="red"/></svg>`),
+		[]byte(`<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><rect width="100" height="100"/></svg>`),
+	} {
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		h := make(textproto.MIMEHeader)
+		h.Set("Content-Disposition", `form-data; name="file"; filename="logo.svg"`)
+		h.Set("Content-Type", "image/svg+xml")
+		part, _ := writer.CreatePart(h)
+		_, _ = part.Write(svg)
+		writer.Close()
 
-	reader := multipart.NewReader(body, writer.Boundary())
-	form, err := reader.ReadForm(1024)
-	if err != nil {
-		t.Fatalf("failed to read multipart form: %v", err)
-	}
-
-	ext, detectedType, r, closer, err := ValidateFileHeader(form.File["file"][0])
-	if err != nil {
-		t.Fatalf("expected clean SVG to succeed, got error: %v", err)
-	}
-	closer.Close()
-	if ext != ".svg" {
-		t.Errorf("expected .svg, got %s", ext)
-	}
-	if detectedType != "image/svg+xml" {
-		t.Errorf("expected image/svg+xml, got %s", detectedType)
-	}
-	if r == nil {
-		t.Errorf("expected non-nil reader")
-	}
-
-	// 2. Test malicious SVG upload rejection
-	maliciousSVG := []byte(`<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><rect width="100" height="100"/></svg>`)
-	body2 := &bytes.Buffer{}
-	writer2 := multipart.NewWriter(body2)
-	part2, _ := writer2.CreatePart(h)
-	_, _ = part2.Write(maliciousSVG)
-	writer2.Close()
-
-	reader2 := multipart.NewReader(body2, writer2.Boundary())
-	form2, err := reader2.ReadForm(1024)
-	if err != nil {
-		t.Fatalf("failed to read multipart form: %v", err)
-	}
-
-	_, _, _, _, err = ValidateFileHeader(form2.File["file"][0])
-	if err == nil {
-		t.Fatalf("expected malicious SVG to be rejected, but got no error")
+		form, err := multipart.NewReader(body, writer.Boundary()).ReadForm(1024)
+		if err != nil {
+			t.Fatalf("failed to read multipart form: %v", err)
+		}
+		if _, _, _, _, err := ValidateFileHeader(form.File["file"][0]); err == nil {
+			t.Fatalf("an SVG upload must be refused")
+		}
 	}
 }
-
-

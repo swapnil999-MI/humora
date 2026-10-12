@@ -498,9 +498,7 @@ fun LoginScreen(
                                 color = Color(0xFFEA4335),
                                 modifier = Modifier.weight(1f),
                                 onClick = {
-                                    val url = "${authState.currentBaseUrl}/auth/oauth/google?client=mobile"
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                    context.startActivity(intent)
+                                    context.startActivity(com.paylogic.humora.core.security.OAuthPkce.startIntent(authState.currentBaseUrl, "google"))
                                 }
                             )
                         }
@@ -511,9 +509,7 @@ fun LoginScreen(
                                 color = Color(0xFF818CF8),
                                 modifier = Modifier.weight(1f),
                                 onClick = {
-                                    val url = "${authState.currentBaseUrl}/auth/oauth/github?client=mobile"
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                    context.startActivity(intent)
+                                    context.startActivity(com.paylogic.humora.core.security.OAuthPkce.startIntent(authState.currentBaseUrl, "github"))
                                 }
                             )
                         }
@@ -524,9 +520,7 @@ fun LoginScreen(
                                 color = Color(0xFF00A4EF),
                                 modifier = Modifier.weight(1f),
                                 onClick = {
-                                    val url = "${authState.currentBaseUrl}/auth/oauth/microsoft?client=mobile"
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                    context.startActivity(intent)
+                                    context.startActivity(com.paylogic.humora.core.security.OAuthPkce.startIntent(authState.currentBaseUrl, "microsoft"))
                                 }
                             )
                         }

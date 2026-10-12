@@ -327,6 +327,7 @@ Then open `HUMORA_URL` and choose **Register Organization** to create the first 
 | `/backups` | Where backups go. Put it on a **different disk or a NAS**. Without it, backups fall back to the data volume and Humora warns on every start. |
 | `BACKUP_TIME` / `BACKUP_KEEP` | Daily full backup time (UTC, default `02:00`) and how many days to keep (default `7`). |
 | Port `8080` | The only port. For HTTPS, put a TLS proxy (Caddy, Traefik, nginx, a cloud load balancer) in front and set `HUMORA_URL=https://...`. The proxy must pass the original `Host` header. |
+| `HUMORA_TRUSTED_PROXIES` | Only when a TLS proxy or load balancer is in front: its IP address(es) or CIDR range(s), comma separated. Login and other rate limits then use the client address it reports. Leave unset when clients connect directly; never set it to a range clients can come from. |
 
 ### Data safety
 

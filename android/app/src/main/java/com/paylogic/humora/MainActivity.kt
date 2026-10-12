@@ -60,11 +60,9 @@ class MainActivity : FragmentActivity() {
     private fun handleAuthDeepLink(intent: android.content.Intent?) {
         val uri = intent?.data ?: return
         if (uri.scheme == "humora" && uri.host == "auth") {
-            val token = uri.getQueryParameter("token")
-            val refresh = uri.getQueryParameter("refresh")
-            if (!token.isNullOrBlank()) {
-                authViewModel.handleOAuthSuccess(token, refresh)
-            }
+            // Tokens never come in the link: only a one-time code this app must redeem itself.
+            uri.getQueryParameter("code")?.takeIf { it.isNotBlank() }?.let { authViewModel.finishOAuth(it) }
+            intent.data = null
         }
     }
 }

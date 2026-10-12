@@ -236,10 +236,38 @@ class AuthViewModel(
         }
     }
 
-    fun confirmQRLogin(sessionId: String, onResult: (Boolean, String?) -> Unit) {
+    /** Who is asking to be signed in by a QR code, so the user can check before approving. */
+    fun loadQRInfo(sessionId: String, nonce: String, onResult: (com.paylogic.humora.data.model.QRInfo?, String?) -> Unit) {
+        viewModelScope.launch {
+            when (val res = authRepo.qrInfo(sessionId, nonce)) {
+                is NetworkResult.Success -> onResult(res.data, null)
+                is NetworkResult.Error -> onResult(null, res.message)
+                is NetworkResult.Exception -> onResult(null, res.throwable.message ?: "Could not check this QR code")
+            }
+        }
+    }
+
+    /**
+     * A social sign-in came back with a one-time code. It is only redeemed if this app started
+     * that sign-in (it holds the PKCE verifier), so a crafted humora:// link cannot sign the user
+     * into someone else's account, and an app hijacking the link cannot redeem the code.
+     */
+    fun finishOAuth(code: String) {
+        val verifier = HumoraApp.instance.sessionManager.takeOAuthVerifier() ?: return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            when (val res = authRepo.confirmQR(sessionId)) {
+            when (val res = authRepo.exchangeOAuth(code, verifier)) {
+                is NetworkResult.Success -> handleOAuthSuccess(res.data.accessToken, res.data.refreshToken)
+                is NetworkResult.Error -> _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = res.message)
+                is NetworkResult.Exception -> _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = res.throwable.message ?: "Sign-in failed")
+            }
+        }
+    }
+
+    fun confirmQRLogin(sessionId: String, nonce: String, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            when (val res = authRepo.confirmQR(sessionId, nonce)) {
                 is NetworkResult.Success -> {
                     _uiState.value = _uiState.value.copy(isLoading = false)
                     onResult(true, null)
