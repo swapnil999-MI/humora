@@ -316,6 +316,7 @@ export const CandidateOnboardingWizard: React.FC<{
 
       {/* 5-Step Progress Indicators */}
       <div
+        className="wizard-steps"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(5, 1fr)',

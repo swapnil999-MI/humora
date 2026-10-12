@@ -508,6 +508,7 @@ export const AttendanceDesk: React.FC = () => {
     >
       {/* 1. Subnav Tabs Header: Attendance Summary | Regularization | On Duty */}
       <div
+        className="responsive-toolbar"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -1299,6 +1300,7 @@ export const AttendanceDesk: React.FC = () => {
 
             {/* Bottom Time Axis Markers Bar: 10AM to 07PM */}
             <div
+              className="hide-on-phone"
               style={{
                 height: '36px',
                 borderTop: '1px solid var(--border-hairline)',
@@ -1622,6 +1624,7 @@ export const AttendanceDesk: React.FC = () => {
 
           {/* 4. Bottom Summary Bar */}
           <div
+            className="responsive-toolbar"
             style={{
               height: '48px',
               background: 'var(--surface-1)',

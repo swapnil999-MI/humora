@@ -22,6 +22,7 @@ import {
   CheckCheck,
   MoreVertical,
   Copy,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   usePulseStore,
@@ -189,6 +190,9 @@ export const PulseDesk: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll message stream to bottom
+  // Phones show one pane at a time: the chat list, or the open conversation (CSS in index.css).
+  const [mobilePane, setMobilePane] = useState<'list' | 'chat'>('list');
+
   const currentMessages = messages[activeId] || [];
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -392,7 +396,10 @@ export const PulseDesk: React.FC = () => {
   // WhatsApp UX: Direct Message a Member
   const handleDirectMessageMember = (member: GroupMember) => {
     setIsInfoDrawerOpen(false);
-    if (member.dmId) setActiveConversation(member.dmId, 'dm');
+    if (member.dmId) {
+      setActiveConversation(member.dmId, 'dm');
+      setMobilePane('chat');
+    }
   };
 
   // Create Channel/Group submission
@@ -425,6 +432,7 @@ export const PulseDesk: React.FC = () => {
   return (
     <div
       className="pulse-desk"
+      data-mobile-pane={mobilePane}
       style={{
         display: 'flex',
         height: '100%',
@@ -451,6 +459,7 @@ export const PulseDesk: React.FC = () => {
       {/* 1. WHATSAPP WEB STYLE LEFT SIDEBAR: CHATS LIST & FILTER PILLS             */}
       {/* ========================================================================= */}
       <aside
+        className="pulse-list"
         style={{
           width: '340px',
           borderRight: '1px solid var(--border-hairline)',
@@ -667,6 +676,7 @@ export const PulseDesk: React.FC = () => {
                 key={item.id}
                 onClick={() => {
                   setActiveConversation(item.id, isGroup ? 'channel' : 'dm');
+                  setMobilePane('chat');
                 }}
                 className={`pulse-channel-item ${isActive ? 'active' : ''}`}
                 style={{
@@ -787,6 +797,7 @@ export const PulseDesk: React.FC = () => {
       {/* 2. MAIN ACTIVE CONVERSATION CANVAS (WHATSAPP WEB UX)                     */}
       {/* ========================================================================= */}
       <main
+        className="pulse-chat"
         style={{
           flex: 1,
           display: 'flex',
@@ -798,6 +809,7 @@ export const PulseDesk: React.FC = () => {
       >
         {/* WhatsApp Chat Top Navigation Header */}
         <header
+          className="pulse-chat-header"
           style={{
             padding: '10px 20px',
             borderBottom: '1px solid var(--border-hairline)',
@@ -808,6 +820,17 @@ export const PulseDesk: React.FC = () => {
             zIndex: 10,
           }}
         >
+          {/* Phones: back to the chat list. */}
+          <button
+            type="button"
+            className="btn btn-ghost mobile-only"
+            onClick={() => setMobilePane('list')}
+            aria-label="Back to chats"
+            title="Back to chats"
+            style={{ padding: '6px', marginRight: '4px', flexShrink: 0 }}
+          >
+            <ArrowLeft size={18} />
+          </button>
           {/* Left Avatar & Clickable Info Area */}
           <div
             onClick={() => setIsInfoDrawerOpen(true)}

@@ -10,6 +10,8 @@ import {
 import { fetchMe } from './store/authSlice';
 import { useAuthStore } from './store/authStore';
 import { finishOAuth } from './api/oauth';
+import { useUiStore } from './store/uiStore';
+import { COMPACT_QUERY, useMediaQuery } from './utils/useMediaQuery';
 import { fetchEmployees, fetchAttendanceSummary } from './store/hrmsSlice';
 import { fetchProjects } from './store/workSlice';
 import { fetchMyWorkday } from './store/fusionSlice';
@@ -75,6 +77,15 @@ export const App: React.FC = () => {
 
   // Candidate self-service onboarding token from URL pathname, hash, or params
   const [candidateWizardToken, setCandidateWizardToken] = useState<string | null>(extractCandidateToken);
+
+  // Tablets and phones: the section menu is a drawer over the page. It starts closed and
+  // closes again after picking a page, so the page itself always gets the full width.
+  const isMobile = useMediaQuery(COMPACT_QUERY);
+  const activePage = useUiStore((s) => s.activePage);
+  const isSidebarCollapsed = useUiStore((s) => s.isSidebarCollapsed);
+  useEffect(() => {
+    if (isMobile) useUiStore.getState().setSidebarCollapsed(true);
+  }, [isMobile, activePage]);
 
   useEffect(() => {
     const handleUrlChange = () => {
@@ -267,6 +278,13 @@ export const App: React.FC = () => {
 
       {/* Tier 2: 230px Collapsible Sub-Navigation Pane */}
       <SubNavPane />
+      {isMobile && !isSidebarCollapsed && (
+        <div
+          className="mobile-drawer-backdrop"
+          onClick={() => useUiStore.getState().setSidebarCollapsed(true)}
+          aria-hidden="true"
+        />
+      )}
 
       {/* Tier 3: Main Application Canvas & Header */}
       <div

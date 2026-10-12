@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/store';
-import { setCreateIssueOpen, navigateToPage, toggleNotificationDrawer } from '../store/uiSlice';
+import { setCreateIssueOpen, navigateToPage, toggleNotificationDrawer, toggleSidebar } from '../store/uiSlice';
 import { recordPunch } from '../store/hrmsSlice';
 import { GoogleSearchBar } from './GoogleSearchBar';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
@@ -19,6 +19,7 @@ import {
   Moon,
   HelpCircle,
   Bell,
+  Menu,
 } from 'lucide-react';
 
 export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
@@ -116,6 +117,7 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
 
   return (
     <header
+      className="app-header"
       style={{
         height: '52px',
         background: 'var(--surface-1)',
@@ -131,9 +133,21 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
       }}
     >
       {/* Left: PeopleOS Brand Emblem + Contextual Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '13px' }}>
+      <div className="app-header-left" style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '13px' }}>
+        {/* Phones: the section menu is a drawer, opened from here. */}
         <button
           type="button"
+          className="btn btn-secondary btn-sm mobile-only"
+          onClick={() => dispatch(toggleSidebar())}
+          title="Menu"
+          aria-label="Open menu"
+          style={{ padding: '6px', flexShrink: 0 }}
+        >
+          <Menu size={16} strokeWidth={1.8} />
+        </button>
+        <button
+          type="button"
+          className="hdr-brand"
           onClick={() => dispatch(navigateToPage(isAdmin ? 'company_settings' : 'hub'))}
           style={{
             background: 'none',
@@ -150,7 +164,7 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
           <PeopleOSLogo size={26} showBrandName brandTextSize={15} subText={isAdmin ? "Management" : "Enterprise"} />
         </button>
 
-        <div style={{ width: '1px', height: '18px', background: 'var(--border-subtle)' }} />
+        <div className="hdr-sep" style={{ width: '1px', height: '18px', background: 'var(--border-subtle)' }} />
 
         {workspace === 'employee' ? (
           <>
@@ -206,6 +220,8 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
                 : 'Management Overview'}
             </span>
           </>
+        ) : workspace === 'pulse' ? (
+          <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Team Pulse</span>
         ) : (
           <>
             <button
@@ -234,10 +250,12 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
       </div>
 
       {/* Center: High-Level Google-Style Search Bar with Attached Dropdown */}
-      <GoogleSearchBar />
+      <div className="app-header-search" style={{ display: 'contents' }}>
+        <GoogleSearchBar />
+      </div>
 
       {/* Right: Workforce Clock Widget & Action Trigger */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div className="app-header-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         {/* Attendance Punch Mini Desk with Live Stopwatch — ONLY for Employees */}
         {!isAdmin ? (
           <div
@@ -271,7 +289,7 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
               </svg>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+            <div className="hdr-clock-text" style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
               <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {attendanceSummary?.punched_in ? (
                   <>
@@ -319,6 +337,7 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
           </div>
         ) : (
           <div
+            className="hdr-mgmt-badge"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -393,7 +412,7 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
         {/* Theme Toggle Button */}
         <button
           type="button"
-          className="btn btn-secondary btn-sm"
+          className="btn btn-secondary btn-sm hdr-optional"
           style={{ width: '32px', height: '32px', padding: 0 }}
           title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
           onClick={toggleTheme}
@@ -404,7 +423,7 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
         {/* Keyboard Shortcuts Help Button */}
         <button
           type="button"
-          className="btn btn-secondary btn-sm"
+          className="btn btn-secondary btn-sm hdr-optional"
           style={{ width: '32px', height: '32px', padding: 0 }}
           title="Keyboard Shortcuts Guide (?)"
           onClick={() => setIsShortcutsOpen(true)}

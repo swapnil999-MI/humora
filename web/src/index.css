@@ -3045,3 +3045,259 @@ div[style*="position: fixed"] > div[style*="background: var(--surface-3)"],
   font-weight: 700;
   box-shadow: var(--clay-btn-active-shadow);
 }
+
+/* Segmented tab switcher (e.g. Directory: list / org canvas). */
+.workspace-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.workspace-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  background: var(--clay-btn-bg);
+  border: 1px solid var(--clay-surface-border);
+  box-shadow: var(--clay-btn-shadow);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.workspace-pill:hover {
+  color: var(--text-primary);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.workspace-pill.active {
+  background: var(--accent-subtle);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  font-weight: 700;
+  box-shadow: var(--clay-btn-active-shadow);
+}
+
+/* ==========================================================================
+   RESPONSIVE LAYOUT
+   Two tiers: compact (<= 1100px, tablets and small laptops) and phone (<= 768px).
+   Pages are mostly styled inline, so the page-level rules override inline styles
+   with attribute selectors (the same technique as the clay overrides above).
+   Keep the widths in sync with utils/useMediaQuery.ts.
+   ========================================================================== */
+.mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 1100px) {
+  /* --- Section menu: a drawer beside the rail, opened from the rail's sidebar button --- */
+  .sub-nav-pane {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 64px;
+    width: min(84vw, 280px);
+    z-index: 90;
+    overflow-y: auto;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.5);
+  }
+  .mobile-drawer-backdrop {
+    position: fixed;
+    inset: 0 0 0 64px;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 85;
+  }
+
+  /* --- Header: current page title and essential actions --- */
+  .app-header {
+    padding: 0 12px !important;
+    gap: 10px;
+  }
+  .app-header-left {
+    gap: 8px !important;
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+  .app-header-left .hdr-sep,
+  .app-header-left .breadcrumb-btn,
+  .app-header-left .lucide-chevron-right {
+    display: none !important;
+  }
+  .app-header-left > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  /* Only the current page from the breadcrumb trail. */
+  .app-header-left > span:not(:last-of-type) {
+    display: none;
+  }
+  .app-header-search > * {
+    display: none !important;
+  }
+  .app-header-right {
+    gap: 6px !important;
+    flex-shrink: 0;
+  }
+  .hdr-clock-text,
+  .hdr-mgmt-badge,
+  .hdr-optional {
+    display: none !important;
+  }
+
+  /* --- Pages --- */
+  /* Rows of cards, toolbars and stats wrap onto the next line instead of running off screen.
+     (Not in the chat, whose rows are laid out for narrow widths already.) */
+  .main-content [style*="display: flex"]:not([style*="flex-direction: column"]):not(.pulse-desk, .pulse-desk *) {
+    flex-wrap: wrap;
+  }
+  /* Rows that must stay on one line (scales, segmented controls). */
+  .main-content .keep-row {
+    flex-wrap: nowrap !important;
+  }
+  /* Fixed-height toolbars grow to fit their wrapped controls. */
+  .main-content .responsive-toolbar {
+    height: auto !important;
+    min-height: 48px;
+    padding: 8px 12px !important;
+    row-gap: 8px;
+  }
+  /* Wide tables scroll sideways instead of widening the page. */
+  .main-content table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  /* Fixed-width panels and dialogs never exceed the screen. */
+  .main-content [style*="min-width"] {
+    min-width: 0 !important;
+  }
+  .main-content [style*="width"] {
+    max-width: 100% !important;
+  }
+  .main-content img,
+  .main-content video,
+  .main-content canvas {
+    max-width: 100%;
+  }
+}
+
+/* Phones: the rail becomes a bottom tab bar, the menu a full-height drawer, pages one column. */
+@media (max-width: 768px) {
+  .mobile-only {
+    display: inline-flex !important;
+  }
+
+  .app-shell {
+    height: 100dvh !important;
+  }
+
+  /* --- Bottom tab bar --- */
+  .app-rail {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: calc(58px + env(safe-area-inset-bottom));
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 6px env(safe-area-inset-bottom);
+    border-right: none;
+    border-top: 1px solid var(--border-subtle);
+    box-shadow: 0 -4px 20px rgba(10, 9, 8, 0.35);
+    z-index: 80;
+  }
+  .app-rail > div {
+    flex-direction: row !important;
+    width: auto !important;
+    gap: 6px !important;
+    align-items: center !important;
+  }
+  .app-rail > div > div {
+    width: auto !important;
+  }
+  .app-rail .rail-brand,
+  .app-rail .rail-sep,
+  .app-rail .rail-desktop-only,
+  .app-rail .app-rail-indicator {
+    display: none !important;
+  }
+  .app-rail-btn:hover {
+    transform: none;
+  }
+  .app-rail-profile-flyout {
+    position: fixed !important;
+    left: auto !important;
+    right: 8px !important;
+    bottom: calc(66px + env(safe-area-inset-bottom)) !important;
+    width: min(280px, calc(100vw - 16px)) !important;
+  }
+
+  /* --- Drawer from the screen edge, above the tab bar --- */
+  .sub-nav-pane {
+    left: 0;
+    bottom: calc(58px + env(safe-area-inset-bottom));
+  }
+  .mobile-drawer-backdrop {
+    inset: 0 0 calc(58px + env(safe-area-inset-bottom)) 0;
+  }
+
+  .main-layout {
+    padding-bottom: calc(58px + env(safe-area-inset-bottom));
+  }
+  /* Toasts sit above the tab bar, across the screen. */
+  .toast-container {
+    bottom: calc(68px + env(safe-area-inset-bottom)) !important;
+    left: 8px !important;
+    right: 8px !important;
+    transform: none !important;
+  }
+
+  .app-header {
+    padding: 0 10px !important;
+    gap: 8px;
+  }
+  .app-header-left .hdr-brand {
+    display: none !important;
+  }
+
+  /* --- Pages --- */
+  /* Multi-column layouts stack; 7-column calendars and other repeat() grids keep their columns. */
+  .main-content [style*="grid-template-columns"]:not([style*="repeat(7"]):not([style*="repeat(auto"]) {
+    grid-template-columns: 1fr !important;
+  }
+  .hide-on-phone {
+    display: none !important;
+  }
+  /* Candidate portal steps: one scrollable row instead of five squeezed columns. */
+  .wizard-steps {
+    display: flex !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .wizard-steps > * {
+    flex-shrink: 0;
+  }
+
+  /* Pulse: one pane at a time, like a phone messenger. */
+  .pulse-desk .pulse-list {
+    width: 100% !important;
+    border-right: none !important;
+  }
+  .pulse-desk[data-mobile-pane='list'] .pulse-chat,
+  .pulse-desk[data-mobile-pane='chat'] .pulse-list {
+    display: none !important;
+  }
+  .pulse-desk .pulse-chat-header {
+    padding: 8px 10px !important;
+  }
+}

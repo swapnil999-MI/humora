@@ -63,6 +63,7 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
         {/* Brand Emblem */}
         <button
           type="button"
+          className="rail-brand"
           style={{
             width: '38px',
             height: '38px',
@@ -83,7 +84,7 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
           <PeopleOSLogo size={24} />
         </button>
 
-        <div style={{ width: '28px', height: '1px', background: 'var(--border-hairline)' }} />
+        <div className="rail-sep" style={{ width: '28px', height: '1px', background: 'var(--border-hairline)' }} />
 
         {/* Domain 1: Employee Self-Service Space (ESS) - ONLY for Employees */}
         {!isAdmin && (
@@ -190,7 +191,7 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
         {/* Toggle Sub-Nav Pane */}
         <button
           type="button"
-          className="app-rail-btn"
+          className="app-rail-btn rail-desktop-only"
           style={{ width: '34px', height: '34px' }}
           onClick={() => dispatch(toggleSidebar())}
           title={isSidebarCollapsed ? 'Expand Sidebar (Cmd+\\)' : 'Collapse Sidebar (Cmd+\\)'}
@@ -432,7 +433,7 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
         {/* Sign Out Button */}
         <button
           type="button"
-          className="app-rail-btn"
+          className="app-rail-btn rail-desktop-only"
           style={{ width: '30px', height: '30px', color: 'var(--text-dim)' }}
           onClick={() => {
             if (confirm('Sign out from Humora?')) dispatch(logout());

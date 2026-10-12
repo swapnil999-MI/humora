@@ -76,6 +76,7 @@ export interface UiState {
   setWorkTab: (tab: WorkTab) => void;
   setViewMode: (mode: ViewMode) => void;
   toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   setCreateIssueOpen: (open: boolean) => void;
   setCreateProjectOpen: (open: boolean) => void;
   setApplyLeaveOpen: (open: boolean) => void;
@@ -250,6 +251,7 @@ export const useUiStore = create<UiState>((set) => ({
   },
 
   toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+  setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
 
   setCreateIssueOpen: (open) => set({ isCreateIssueOpen: open }),
   setCreateProjectOpen: (open) => set({ isCreateProjectOpen: open }),
