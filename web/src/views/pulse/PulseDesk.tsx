@@ -21,6 +21,7 @@ import {
   Check,
   CheckCheck,
   MoreVertical,
+  Copy,
 } from 'lucide-react';
 import {
   usePulseStore,
@@ -120,6 +121,31 @@ export const PulseDesk: React.FC = () => {
   useEffect(() => {
     if (pulseError) addToast({ type: 'error', message: pulseError });
   }, [pulseError, addToast]);
+
+  const copyMessageText = (text: string) => {
+    const copied = () => addToast({ type: 'success', message: 'Message copied' });
+    const failed = () => addToast({ type: 'error', message: 'Could not copy: the browser blocked clipboard access.' });
+    // The Clipboard API only exists on https or localhost; a LAN install on plain http needs the old way.
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(copied, failed);
+      return;
+    }
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    try {
+      if (document.execCommand('copy')) copied();
+      else failed();
+    } catch {
+      failed();
+    } finally {
+      area.remove();
+    }
+  };
 
   // Local state for message input
   const [inputText, setInputText] = useState('');
@@ -1069,6 +1095,18 @@ export const PulseDesk: React.FC = () => {
                     >
                       <Reply size={12} />
                     </button>
+                    {msg.content && (
+                      <button
+                        type="button"
+                        onClick={() => copyMessageText(msg.content)}
+                        className="reaction-emoji-btn"
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 2px' }}
+                        title="Copy text"
+                        aria-label="Copy text"
+                      >
+                        <Copy size={12} />
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1138,6 +1176,10 @@ export const PulseDesk: React.FC = () => {
                         color: 'var(--text-primary)',
                         wordBreak: 'break-word',
                         whiteSpace: 'pre-wrap',
+                        // The app shell disables selection; message text must stay selectable.
+                        userSelect: 'text',
+                        WebkitUserSelect: 'text',
+                        cursor: 'text',
                       }}
                     >
                       {msg.content}

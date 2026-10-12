@@ -611,12 +611,17 @@ export class PulseClient {
     await this.driveCommit(conv);
   }
 
+  /** Whether this device joined on its own and the server has not accepted that yet. */
+  private async isJoining(conversationId: string): Promise<boolean> {
+    const rec = await this.storage.get<PendingCommit>(`commit:${conversationId}`);
+    return !!rec?.join && rec.stage === 'staged';
+  }
+
   /** Whether this device can encrypt for the conversation: in the group, and not still waiting to be let in. */
   private async canSend(conversationId: string): Promise<boolean> {
     const gid = uuidToBytes(conversationId);
     if (!this.device.hasGroup(gid) || this.device.currentEpoch(gid) === 0n) return false;
-    const rec = await this.storage.get<PendingCommit>(`commit:${conversationId}`);
-    return !(rec?.join && rec.stage === 'staged');
+    return !(await this.isJoining(conversationId));
   }
 
   /**
@@ -797,6 +802,8 @@ export class PulseClient {
             shares.push({ deviceId, userId: bytesToUuid(env.senderId) });
             await this.storage.set(`share:${conversationId}`, shares);
           }
+          // Shared by the refresh (setUp), right away rather than on the next reconnect.
+          this.scheduleRefresh(conversationId, 0);
         }
       }
       const conv = this.convs.get(conversationId);
@@ -939,6 +946,13 @@ export class PulseClient {
     const body = direct.payload.subarray(1);
     try {
       if (type === DIRECT_WELCOME) {
+        const gid = direct.conversationId;
+        if (gid.length && this.device.hasGroup(gid) && (await this.isJoining(bytesToUuid(gid)))) {
+          // Another member added this device while it was joining on its own. The welcome is
+          // for a commit the server accepted, so it wins: drop the unaccepted join and use it.
+          this.device.dropGroup(gid);
+          await this.storage.set(`commit:${bytesToUuid(gid)}`, undefined);
+        }
         if (!this.device.hasGroup(direct.conversationId)) {
           const conversationId = bytesToUuid(this.device.join(body));
           await this.persist();
@@ -1017,7 +1031,7 @@ export class PulseClient {
 
     // Finish a commit left over from an earlier attempt before planning a new one.
     if ((await this.driveCommit(conv)) === 'conflict') return;
-    if (!(await this.canSend(conv.id))) return; // still waiting to be let in
+    if (await this.isJoining(conv.id)) return; // still waiting to be let in
 
     const want = new Map<string, DeviceInfo>();
     for (const m of conv.members) for (const d of directory.get(m.user_id) ?? []) want.set(toHex(this.identityOf(d)), d);

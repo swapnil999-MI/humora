@@ -512,12 +512,17 @@ class PulseClient internal constructor(
         driveCommit(conv)
     }
 
+    /** Whether this device joined on its own and the server has not accepted that yet. */
+    private suspend fun isJoining(conversationId: String): Boolean {
+        val rec = loadCommit("commit:$conversationId")
+        return rec?.join == true && rec.stage == "staged"
+    }
+
     /** Whether this device can encrypt for the conversation: in the group, and not still waiting to be let in. */
     private suspend fun canSend(conversationId: String): Boolean {
         val gid = Ids.uuidToBytes(conversationId)
         if (!device.hasGroup(gid) || device.currentEpoch(gid) == 0L) return false
-        val rec = loadCommit("commit:$conversationId")
-        return !(rec?.join == true && rec.stage == "staged")
+        return !isJoining(conversationId)
     }
 
     /** Publishes the group's signed public state for the current epoch if the server has none. */
@@ -674,6 +679,8 @@ class PulseClient internal constructor(
                     val shares = loadShares(conversationId)
                     val share = HistoryShare(Ids.bytesToUuid(env.senderDeviceId.toByteArray()), Ids.bytesToUuid(env.senderId.toByteArray()))
                     if (shares.none { it.deviceId == share.deviceId }) saveShares(conversationId, shares + share)
+                    // Shared by the refresh (setUp), right away rather than on the next reconnect.
+                    scheduleRefresh(conversationId, 0)
                 }
             }
             convs[conversationId]?.let { it.epoch = maxOf(it.epoch, epoch) }
@@ -809,10 +816,18 @@ class PulseClient internal constructor(
             val body = payload.copyOfRange(1, payload.size)
             val gid = direct.conversationId.toByteArray()
             when (payload[0].toInt()) {
-                DIRECT_WELCOME -> if (gid.isEmpty() || !device.hasGroup(gid)) {
-                    val conversationId = Ids.bytesToUuid(device.join(body))
-                    persist()
-                    scheduleRefresh(conversationId, 0)
+                DIRECT_WELCOME -> {
+                    if (gid.isNotEmpty() && device.hasGroup(gid) && isJoining(Ids.bytesToUuid(gid))) {
+                        // Another member added this device while it was joining on its own. The welcome
+                        // is for a commit the server accepted, so it wins: drop the unaccepted join.
+                        device.dropGroup(gid)
+                        saveCommit("commit:${Ids.bytesToUuid(gid)}", null)
+                    }
+                    if (gid.isEmpty() || !device.hasGroup(gid)) {
+                        val conversationId = Ids.bytesToUuid(device.join(body))
+                        persist()
+                        scheduleRefresh(conversationId, 0)
+                    }
                 }
                 DIRECT_HISTORY_KEYS -> if (device.hasGroup(gid)) {
                     val sender = PulseDevice.frameSender(body)
@@ -881,7 +896,7 @@ class PulseClient internal constructor(
 
         // Finish a commit left over from an earlier attempt before planning a new one.
         if (driveCommit(conv) == "conflict") return
-        if (!canSend(conv.id)) return // still waiting to be let in
+        if (isJoining(conv.id)) return // still waiting to be let in
 
         val want = LinkedHashMap<String, DeviceInfo>()
         for (m in conv.members) for (d in directory[m.userId].orEmpty()) want[Ids.hex(identityOf(d))] = d
