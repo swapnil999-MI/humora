@@ -1,4 +1,4 @@
-# 01. Project Overview & Vision: Humora Platform
+# 01. Project Overview & Vision: Humora
 
 ## Executive Summary
 **Humora** is a next-generation, unified enterprise platform that seamlessly fuses **Human Capital Management (Zoho People / HR)** with **Agile Work & Project Management (Jira)**. Engineered to 2026 enterprise benchmarks with **zero reliance on AI**, Humora operates on a single high-performance codebase, single PostgreSQL relational schema, and single identity layer.

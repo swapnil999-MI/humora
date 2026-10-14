@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAppDispatch, useAppSelector, usePulseStore } from '../store/store';
 import { navigateToPage, setWorkspace, toggleSidebar } from '../store/uiSlice';
 import { logout } from '../store/authSlice';
-import { PeopleOSLogo } from './PeopleOSLogo';
+import { HumoraLogo } from './HumoraLogo';
 import {
   Kanban,
   Search,
@@ -78,10 +78,10 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
             transition: 'transform var(--transition-fast), border-color var(--transition-fast)',
             padding: 0,
           }}
-          title={isAdmin ? "Humora Management Console" : "Humora Platform (My Workday Hub)"}
+          title={isAdmin ? "Humora Management Console" : "Humora (My Workday Hub)"}
           onClick={() => dispatch(navigateToPage(isAdmin ? 'company_settings' : 'hub'))}
         >
-          <PeopleOSLogo size={24} />
+          <HumoraLogo size={24} />
         </button>
 
         <div className="rail-sep" style={{ width: '28px', height: '1px', background: 'var(--border-hairline)' }} />
@@ -260,11 +260,14 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
                 position: 'absolute',
                 left: 'calc(100% + 14px)',
                 bottom: '-10px',
-                width: '240px',
-                backgroundColor: 'var(--surface-1)',
+                width: '260px',
+                background: 'var(--surface-4)',
+                backgroundColor: '#1d1914',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 'var(--radius-lg)',
-                boxShadow: 'var(--shadow-popover)',
+                boxShadow: '0 20px 48px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 245, 230, 0.12)',
                 padding: '14px',
                 zIndex: 1000,
                 display: 'flex',

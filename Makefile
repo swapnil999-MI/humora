@@ -13,7 +13,7 @@ RESET := \033[0m
 
 ## help: Display available commands
 help:
-	@echo "$(GREEN)Humora Platform Commands:$(RESET)"
+	@echo "$(GREEN)Humora Commands:$(RESET)"
 	@echo "  make run     - Build and start local docker containers (Backend, Postgres, Redis, MinIO)"
 	@echo "  make stop    - Stop local docker containers"
 	@echo "  make logs    - Tail live backend container logs"

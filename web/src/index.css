@@ -408,6 +408,25 @@ p, span, div {
   box-shadow: 2px 0 8px rgba(245, 158, 11, 0.5);
 }
 
+.app-rail-profile-flyout {
+  background: var(--surface-4) !important;
+  background-color: #24201a !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(255, 245, 230, 0.16) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.82), 0 0 0 1px rgba(255, 245, 230, 0.1) !important;
+  border-radius: var(--radius-lg) !important;
+  z-index: 1200 !important;
+}
+
+[data-theme='light'] .app-rail-profile-flyout {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06) !important;
+}
+
+
 /* ==========================================================================
    SUB-NAVIGATION PANE (RECESSED SCULPTED CLAY BAY)
    ========================================================================== */
@@ -810,13 +829,16 @@ p, span, div {
   top: 100%;
   left: 0;
   right: 0;
-  background: var(--surface-1);
+  background: var(--surface-4);
+  background-color: #24201a;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid var(--accent-primary);
   border-top: none;
   border-radius: 0 0 18px 18px;
-  box-shadow: 0 18px 36px -4px rgba(18, 17, 16, 0.6);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(245, 158, 11, 0.25);
   overflow: hidden;
-  z-index: 100;
+  z-index: 1000;
   animation: googleDropdownSlide 130ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -3116,7 +3138,7 @@ div[style*="position: fixed"] > div[style*="background: var(--surface-3)"],
   /* --- Header: current page title and essential actions --- */
   .app-header {
     padding: 0 12px !important;
-    gap: 10px;
+    gap: 8px;
   }
   .app-header-left {
     gap: 8px !important;
@@ -3124,23 +3146,22 @@ div[style*="position: fixed"] > div[style*="background: var(--surface-3)"],
     flex: 1;
     overflow: hidden;
   }
-  .app-header-left .hdr-sep,
-  .app-header-left .breadcrumb-btn,
-  .app-header-left .lucide-chevron-right {
+  .app-header-breadcrumbs .breadcrumb-btn,
+  .app-header-breadcrumbs .hdr-chevron,
+  .app-header-breadcrumbs .hdr-project-crumb {
     display: none !important;
   }
-  .app-header-left > span {
+  .app-header-left .hdr-sep {
+    display: none !important;
+  }
+  .hdr-current-page {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
   }
-  /* Only the current page from the breadcrumb trail. */
-  .app-header-left > span:not(:last-of-type) {
-    display: none;
-  }
-  .app-header-search > * {
-    display: none !important;
+  .app-header-search {
+    flex: 0 1 260px;
   }
   .app-header-right {
     gap: 6px !important;
@@ -3154,8 +3175,8 @@ div[style*="position: fixed"] > div[style*="background: var(--surface-3)"],
 
   /* --- Pages --- */
   /* Rows of cards, toolbars and stats wrap onto the next line instead of running off screen.
-     (Not in the chat, whose rows are laid out for narrow widths already.) */
-  .main-content [style*="display: flex"]:not([style*="flex-direction: column"]):not(.pulse-desk, .pulse-desk *) {
+     (Not in the chat or list-toolbar, whose rows are laid out responsively.) */
+  .main-content [style*="display: flex"]:not([style*="flex-direction: column"]):not(.pulse-desk, .pulse-desk *):not(.list-toolbar, .list-toolbar *) {
     flex-wrap: wrap;
   }
   /* Rows that must stay on one line (scales, segmented controls). */
@@ -3298,7 +3319,37 @@ div[style*="position: fixed"] > div[style*="background: var(--surface-3)"],
     display: none !important;
   }
   .pulse-desk .pulse-chat-header {
-    padding: 8px 10px !important;
+    padding: 10px 14px !important;
+  }
+
+  /* In active mobile chat: hide bottom rail, remove main layout padding, give full mobile screen */
+  body.mobile-chat-open .app-rail,
+  .app-shell:has(.pulse-desk[data-mobile-pane='chat']) .app-rail {
+    display: none !important;
+  }
+  body.mobile-chat-open .main-layout,
+  .app-shell:has(.pulse-desk[data-mobile-pane='chat']) .main-layout {
+    padding-bottom: 0 !important;
+    height: 100dvh !important;
+  }
+  body.mobile-chat-open .pulse-desk,
+  .app-shell:has(.pulse-desk[data-mobile-pane='chat']) .pulse-desk {
+    height: 100dvh !important;
+  }
+  body.mobile-chat-open .pulse-chat,
+  .app-shell:has(.pulse-desk[data-mobile-pane='chat']) .pulse-chat {
+    height: 100dvh !important;
+  }
+  .pulse-desk[data-mobile-pane='chat'] footer {
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom)) 10px !important;
+  }
+  .pulse-desk[data-mobile-pane='chat'] .whatsapp-chat-canvas {
+    padding: 10px 12px !important;
+  }
+
+  /* Hide global header when inside pulse on mobile so WhatsApp header sits cleanly at top */
+  .app-shell.is-pulse-active .app-header {
+    display: none !important;
   }
 }
 
@@ -3387,8 +3438,8 @@ div[style*="position: fixed"] > div[style*="background: var(--surface-3)"],
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: 1px solid var(--border-subtle);
   background: var(--surface-3);
@@ -3397,10 +3448,28 @@ div[style*="position: fixed"] > div[style*="background: var(--surface-3)"],
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
   z-index: 15;
+  transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
-.pulse-quick-reply:hover { color: var(--text-primary); }
+/* Invisible hover bridge connecting bubble to reply button so cursor never drops hover */
+.pulse-quick-reply::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  bottom: -14px;
+  left: -20px;
+  right: -20px;
+  pointer-events: auto;
+}
+.pulse-quick-reply:hover {
+  color: var(--primary);
+  background: var(--surface-2);
+  transform: translateY(-50%) scale(1.1);
+}
+.pulse-quick-reply:active {
+  transform: translateY(-50%) scale(0.95);
+}
 
 /* After jumping to a quoted message it flashes once */
 .pulse-msg-flash > .whatsapp-bubble-out,
@@ -3481,10 +3550,22 @@ div[style*="position: fixed"] > div[style*="background: var(--surface-3)"],
   background: radial-gradient(circle at 70% 30%, rgba(0, 0, 0, 0.35), transparent 75%);
   color: var(--text-secondary);
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.pulse-msg-row:hover .pulse-bubble-chevron,
+.pulse-bubble-chevron:focus,
+.pulse-bubble-chevron.is-visible {
+  opacity: 1;
 }
 [data-theme="light"] .pulse-bubble-chevron,
 .light .pulse-bubble-chevron { background: radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.9), transparent 75%); }
 .pulse-bubble-chevron:hover { color: var(--text-primary); }
+@media (hover: none), (max-width: 768px) {
+  .pulse-bubble-chevron {
+    opacity: 0.65;
+  }
+}
 
 /* ── Pulse: full emoji picker (message box and reactions) ── */
 .pulse-emoji-picker {
@@ -3573,4 +3654,241 @@ div[style*="position: fixed"] > div[style*="background: var(--surface-3)"],
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Global App Header Responsiveness
+   ========================================================================== */
+.app-header {
+  height: 52px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  gap: 12px;
+  min-width: 0;
+  overflow: visible;
+  user-select: none;
+  z-index: 500;
+  flex-shrink: 0;
+}
+
+.app-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+
+.app-header-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.hdr-project-crumb {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 13px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+}
+
+.hdr-current-page {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.hdr-chevron {
+  flex-shrink: 0;
+}
+
+.app-header-search {
+  flex: 0 1 480px;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  overflow: visible;
+}
+
+@media (max-width: 1280px) {
+  .hdr-project-crumb {
+    max-width: 90px;
+  }
+}
+
+@media (max-width: 920px) {
+  .app-header-search {
+    display: none !important;
+  }
+  .hdr-mgmt-badge,
+  .hdr-optional {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   High-Density List View Toolbar (Responsive)
+   ========================================================================== */
+.list-view-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px 28px;
+  gap: 16px;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.list-toolbar-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.list-search-wrapper {
+  position: relative;
+  flex: 1 1 200px;
+  min-width: 170px;
+  max-width: 320px;
+}
+
+.list-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.list-search-input {
+  width: 100%;
+  padding-left: 32px !important;
+  padding-right: 28px !important;
+  height: 34px !important;
+  font-size: 12px !important;
+}
+
+.list-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 50%;
+}
+.list-search-clear:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.list-filters-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.list-select {
+  width: auto;
+  min-width: 110px;
+  height: 34px !important;
+  font-size: 12px !important;
+  padding: 0 28px 0 10px !important;
+  flex-shrink: 0;
+}
+
+.list-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.list-count-badge {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.list-create-btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .list-view-container {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+  .list-toolbar {
+    gap: 10px;
+  }
+  .list-toolbar-filters {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  .list-search-wrapper {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+  .list-filters-group {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .list-select {
+    width: 100%;
+    min-width: 0;
+  }
+  .list-actions-group {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-hairline);
+  }
+}
+
+@media (max-width: 520px) {
+  .list-filters-group {
+    grid-template-columns: 1fr;
+  }
 }

@@ -23,7 +23,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../api/client';
-import { PeopleOSLogo } from '../../components/PeopleOSLogo';
+import { HumoraLogo } from '../../components/HumoraLogo';
 import { startOAuth } from '../../api/oauth';
 
 export const LoginView: React.FC = () => {
@@ -341,7 +341,7 @@ export const LoginView: React.FC = () => {
                 marginBottom: '10px',
               }}
             >
-              <PeopleOSLogo size={40} />
+              <HumoraLogo size={40} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span
@@ -354,21 +354,6 @@ export const LoginView: React.FC = () => {
                 }}
               >
                 HUMORA
-              </span>
-              <span
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  background: 'rgba(245, 158, 11, 0.15)',
-                  color: '#f59e0b',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                Platform
               </span>
             </div>
           </div>

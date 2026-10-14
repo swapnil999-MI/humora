@@ -85,7 +85,7 @@ fun HumoraTopBar(
                     contentAlignment = Alignment.Center
                 ) {
                     androidx.compose.foundation.Image(
-                        painter = androidx.compose.ui.res.painterResource(id = com.paylogic.humora.R.drawable.ic_peopleos_logo),
+                        painter = androidx.compose.ui.res.painterResource(id = com.paylogic.humora.R.drawable.ic_humora_logo),
                         contentDescription = "Humora Logo",
                         modifier = Modifier.size(26.dp)
                     )

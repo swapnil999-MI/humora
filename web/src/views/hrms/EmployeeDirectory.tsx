@@ -1,17 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/store';
-import { fetchEmployees, fetchOrgTree, enrollBiometricFace } from '../../store/hrmsSlice';
+import { fetchEmployees, enrollBiometricFace } from '../../store/hrmsSlice';
 import { addToast } from '../../store/uiSlice';
-import { OrgNode, Employee } from '../../types';
+import { Employee } from '../../types';
 import {
   Search,
   Users,
-  Network,
   Mail,
   Briefcase,
   User,
-  ChevronDown,
-  ChevronRight,
   Sparkles,
   Kanban,
   ShieldCheck,
@@ -25,11 +22,10 @@ import {
 
 export const EmployeeDirectory: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { employees, orgTree, attendanceSummary } = useAppSelector((state) => state.hrms);
+  const { employees, attendanceSummary } = useAppSelector((state) => state.hrms);
   const { kanbanBoard, backlog } = useAppSelector((state) => state.work);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'grid' | 'tree'>('grid');
 
   // Biometric Enrollment State
   const [enrollingEmp, setEnrollingEmp] = useState<Employee | null>(null);
@@ -38,7 +34,6 @@ export const EmployeeDirectory: React.FC = () => {
 
   useEffect(() => {
     dispatch(fetchEmployees(searchTerm));
-    dispatch(fetchOrgTree());
   }, [dispatch, searchTerm]);
 
   // Cross-domain issue counts per employee
@@ -63,7 +58,7 @@ export const EmployeeDirectory: React.FC = () => {
           gap: '16px',
         }}
       >
-        <div style={{ position: 'relative', width: '380px' }}>
+        <div style={{ position: 'relative', width: '380px', maxWidth: '100%' }}>
           <Search
             size={16}
             style={{
@@ -77,33 +72,44 @@ export const EmployeeDirectory: React.FC = () => {
           <input
             type="text"
             className="input-field"
-            style={{ paddingLeft: '40px' }}
+            style={{ paddingLeft: '40px', paddingRight: searchTerm ? '36px' : '14px' }}
             placeholder="Search by name, email, department, or code..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '2px',
+              }}
+              title="Clear search"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
 
-        <div className="workspace-switcher">
-          <button
-            className={`workspace-pill ${activeTab === 'grid' ? 'active' : ''}`}
-            onClick={() => setActiveTab('grid')}
-          >
-            <Users size={14} />
-            Workforce Directory ({employees.length})
-          </button>
-          <button
-            className={`workspace-pill ${activeTab === 'tree' ? 'active' : ''}`}
-            onClick={() => setActiveTab('tree')}
-          >
-            <Network size={14} />
-            Interactive Org Canvas
-          </button>
+        <div
+          className="workspace-pill active"
+          style={{ cursor: 'default', userSelect: 'none' }}
+        >
+          <Users size={14} />
+          Workforce Directory ({employees.length})
         </div>
       </div>
 
-      {activeTab === 'grid' ? (
-        /* Rich Employee Grid */
+      {/* Rich Employee Grid */}
         <div
           style={{
             display: 'grid',
@@ -282,38 +288,6 @@ export const EmployeeDirectory: React.FC = () => {
             );
           })}
         </div>
-      ) : (
-        /* Interactive Hierarchical Org Chart Canvas */
-        <div
-          className="glass-panel"
-          style={{
-            padding: '36px',
-            overflowX: 'auto',
-            minHeight: '600px',
-            background: 'radial-gradient(ellipse at top, rgba(99, 102, 241, 0.08) 0%, rgba(17, 20, 32, 0.95) 100%)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-            <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 700 }}>
-                Enterprise Reporting Hierarchy
-              </h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                Multi-level management tree with direct report counters.
-              </p>
-            </div>
-            <span className="badge badge-done">Live Hierarchy Synchronized</span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {(orgTree || [])
-              .filter((node) => Boolean(node && node.employee))
-              .map((node) => (
-                <OrgNodeCanvas key={node.employee.id} node={node} level={0} />
-              ))}
-          </div>
-        </div>
-      )}
 
       {/* Biometric Face Enrollment Modal */}
       {enrollingEmp && (
@@ -599,86 +573,6 @@ export const EmployeeDirectory: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const OrgNodeCanvas: React.FC<{ node: OrgNode; level: number }> = ({ node, level }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
-  if (!node || !node.employee) return null;
-  const hasReports = node.subordinates && node.subordinates.length > 0;
-
-  return (
-    <div style={{ marginLeft: `${level * 40}px`, position: 'relative' }}>
-      {/* Node Card */}
-      <div
-        className="glass-panel glass-panel-interactive"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '14px',
-          padding: '14px 20px',
-          background: 'var(--surface-2)',
-          borderLeft: level === 0 ? '3px solid var(--accent-primary)' : '2px solid var(--border-subtle)',
-          boxShadow: 'var(--shadow-sm)',
-          cursor: hasReports ? 'pointer' : 'default',
-        }}
-        onClick={() => hasReports && setIsExpanded(!isExpanded)}
-      >
-        <div
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'var(--surface-4)',
-            border: '1px solid var(--border-subtle)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-primary)',
-            fontWeight: 600,
-            fontSize: '13px',
-          }}
-        >
-          {node.employee.first_name.charAt(0)}
-        </div>
-
-        <div>
-          <div style={{ fontWeight: 600, fontSize: '14px' }}>
-            {node.employee.first_name} {node.employee.last_name}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-            {node.employee.designation_title || 'Employee'} &bull; {node.employee.work_email}
-          </div>
-        </div>
-
-        {hasReports && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
-            <span className="badge badge-in-progress">
-              {node.subordinates.length} Direct Reports
-            </span>
-            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </div>
-        )}
-      </div>
-
-      {/* Child Nodes */}
-      {hasReports && isExpanded && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            marginTop: '12px',
-            paddingLeft: '16px',
-            borderLeft: '1px dashed rgba(255, 255, 255, 0.15)',
-          }}
-        >
-          {node.subordinates.map((child) => (
-            <OrgNodeCanvas key={child.employee.id} node={child} level={level + 1} />
-          ))}
         </div>
       )}
     </div>

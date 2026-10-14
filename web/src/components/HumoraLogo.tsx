@@ -1,6 +1,6 @@
 import React, { useId } from 'react';
 
-export interface PeopleOSLogoProps {
+export interface HumoraLogoProps {
   size?: number;
   showBrandName?: boolean;
   className?: string;
@@ -10,7 +10,7 @@ export interface PeopleOSLogoProps {
   subText?: string;
 }
 
-export const PeopleOSLogo: React.FC<PeopleOSLogoProps> = ({
+export const HumoraLogo: React.FC<HumoraLogoProps> = ({
   size = 28,
   showBrandName = false,
   className = '',
@@ -20,8 +20,8 @@ export const PeopleOSLogo: React.FC<PeopleOSLogoProps> = ({
   subText,
 }) => {
   const uniqueId = useId().replace(/:/g, '_');
-  const gradientId = `peopleos-gold-grad-${uniqueId}`;
-  const maskId = `peopleos-logo-mask-${uniqueId}`;
+  const gradientId = `humora-gold-grad-${uniqueId}`;
+  const maskId = `humora-logo-mask-${uniqueId}`;
 
   // Maintain aspect ratio: width: 60, height: 68 -> approx 0.882 ratio
   const height = size;
@@ -29,7 +29,7 @@ export const PeopleOSLogo: React.FC<PeopleOSLogoProps> = ({
 
   return (
     <div
-      className={`peopleos-brand-mark ${className}`}
+      className={`humora-brand-mark ${className}`}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -138,3 +138,4 @@ export const PeopleOSLogo: React.FC<PeopleOSLogoProps> = ({
     </div>
   );
 };
+

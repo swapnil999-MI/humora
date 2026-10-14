@@ -68,8 +68,8 @@ export const KeyboardShortcutsModal: React.FC<{ isOpen: boolean; onClose: () => 
         style={{
           width: '560px',
           maxWidth: '94vw',
-          maxHeight: '85vh',
-          backgroundColor: 'var(--surface-1)',
+          background: 'var(--surface-1)',
+          backgroundColor: '#161412',
           border: '1px solid var(--border-subtle)',
           borderRadius: 'var(--radius-xl)',
           boxShadow: 'var(--shadow-popover)',

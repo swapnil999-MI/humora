@@ -15,6 +15,7 @@ import {
   Layers,
   ChevronDown,
   Sparkles,
+  X,
 } from 'lucide-react';
 
 export const ListView: React.FC = () => {
@@ -111,90 +112,93 @@ export const ListView: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '20px 28px', gap: '16px' }}>
+    <div className="list-view-container">
       {/* Top Filter & Action Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '320px' }}>
+      <div className="list-toolbar">
+        {/* Left: Search and Filter Dropdowns */}
+        <div className="list-toolbar-filters">
           {/* Quick Search */}
-          <div style={{ position: 'relative', flex: 1, maxWidth: '340px' }}>
+          <div className="list-search-wrapper">
             <Search
               size={14}
-              style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}
+              className="list-search-icon"
             />
             <input
               type="text"
-              className="input-field"
-              style={{ paddingLeft: '32px', height: '34px', fontSize: '12px' }}
+              className="input-field list-search-input"
               placeholder="Filter by key or title... (Cmd+K)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                className="list-search-clear"
+                onClick={() => setSearchQuery('')}
+                title="Clear filter"
+                aria-label="Clear filter"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
 
-          {/* Status Filter */}
-          <select
-            className="select-field"
-            style={{ width: 'auto', height: '34px', fontSize: '12px', padding: '0 28px 0 10px' }}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">All Statuses</option>
-            {kanbanBoard?.columns.map((c) => (
-              <option key={c.status_id} value={c.status_id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          {/* Filter Dropdowns */}
+          <div className="list-filters-group">
+            <select
+              className="select-field list-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter by status"
+            >
+              <option value="all">All Statuses</option>
+              {kanbanBoard?.columns.map((c) => (
+                <option key={c.status_id} value={c.status_id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
 
-          {/* Priority Filter */}
-          <select
-            className="select-field"
-            style={{ width: 'auto', height: '34px', fontSize: '12px', padding: '0 28px 0 10px' }}
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-          >
-            <option value="all">All Priorities</option>
-            <option value="highest">Highest</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-            <option value="lowest">Lowest</option>
-          </select>
+            <select
+              className="select-field list-select"
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              aria-label="Filter by priority"
+            >
+              <option value="all">All Priorities</option>
+              <option value="highest">Highest</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+              <option value="lowest">Lowest</option>
+            </select>
 
-          {/* Type Filter */}
-          <select
-            className="select-field"
-            style={{ width: 'auto', height: '34px', fontSize: '12px', padding: '0 28px 0 10px' }}
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
-            <option value="all">All Types</option>
-            <option value="task">Task</option>
-            <option value="story">Story</option>
-            <option value="bug">Bug</option>
-            <option value="epic">Epic</option>
-          </select>
+            <select
+              className="select-field list-select"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              aria-label="Filter by type"
+            >
+              <option value="all">All Types</option>
+              <option value="task">Task</option>
+              <option value="story">Story</option>
+              <option value="bug">Bug</option>
+              <option value="epic">Epic</option>
+            </select>
+          </div>
         </div>
 
-        {/* Right Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+        {/* Right Actions: Counter & Create Issue Button */}
+        <div className="list-actions-group">
+          <span className="list-count-badge">
             Showing <strong>{filteredIssues.length}</strong> of <strong>{allIssues.length}</strong> issues
           </span>
           <button
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary btn-sm list-create-btn"
             onClick={() => dispatch(setCreateIssueOpen(true))}
           >
             <Plus size={14} />
-            Create Issue
+            <span>Create Issue</span>
           </button>
         </div>
       </div>

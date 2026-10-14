@@ -59,7 +59,7 @@ export const SubNavPane: React.FC = () => {
     setCreateChannelModalOpen,
   } = usePulseStore();
 
-  if (isSidebarCollapsed) return null;
+  if (isSidebarCollapsed || workspace === 'pulse' || activePage === 'pulse') return null;
 
   const totalIssuesCount =
     kanbanBoard?.columns.reduce((sum, col) => sum + col.issues.length, 0) || 0;
@@ -324,131 +324,6 @@ export const SubNavPane: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* ========================================================================= */}
-        {/* DOMAIN 4: TEAM PULSE (CHAT & COLLABORATION)                              */}
-        {/* ========================================================================= */}
-        {workspace === 'pulse' && (
-          <div>
-            <div
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: 'var(--text-muted)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                marginBottom: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <span>Team Pulse</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ padding: '2px 6px', height: 'auto' }}
-                onClick={() => setCreateChannelModalOpen(true)}
-                title="Create Group"
-              >
-                <Plus size={13} strokeWidth={2} />
-              </button>
-            </div>
-
-            {/* Groups List */}
-            <div style={{ marginBottom: '14px' }}>
-              <div
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  color: 'var(--text-secondary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  padding: '4px 8px',
-                }}
-              >
-                Groups
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {channels.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className={`sub-nav-item ${activeId === c.id ? 'active' : ''}`}
-                    style={{ justifyContent: 'space-between' }}
-                    onClick={() => {
-                      setActiveConversation(c.id, 'channel');
-                      dispatch(navigateToPage('pulse'));
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                      {c.isPrivate ? <Lock size={13} strokeWidth={1.8} /> : <Hash size={13} strokeWidth={1.8} />}
-                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        {c.name}
-                      </span>
-                    </div>
-                    {c.unreadCount > 0 && (
-                      <span className="nav-badge">{c.unreadCount}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Direct Messages List */}
-            <div>
-              <div
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  color: 'var(--text-secondary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  padding: '4px 8px',
-                }}
-              >
-                Direct Messages
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {directMessages.map((dm) => (
-                  <button
-                    key={dm.id}
-                    type="button"
-                    className={`sub-nav-item ${activeId === dm.id ? 'active' : ''}`}
-                    style={{ justifyContent: 'space-between' }}
-                    onClick={() => {
-                      setActiveConversation(dm.id, 'dm');
-                      dispatch(navigateToPage('pulse'));
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                      <span
-                        style={{
-                          width: '7px',
-                          height: '7px',
-                          borderRadius: '50%',
-                          background:
-                            dm.status === 'online'
-                              ? 'var(--accent-primary)'
-                              : dm.status === 'away'
-                              ? 'var(--accent-warning, #f59e0b)'
-                              : 'var(--text-muted)',
-                          flexShrink: 0,
-                        }}
-                      />
-                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        {dm.name}
-                      </span>
-                    </div>
-                    {dm.unreadCount > 0 && (
-                      <span className="nav-badge">{dm.unreadCount}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Bottom Quick Action */}
@@ -472,16 +347,6 @@ export const SubNavPane: React.FC = () => {
           >
             <ShieldCheck size={13} strokeWidth={1.8} />
             <span>Review Approvals ({pendingApprovalsCount})</span>
-          </button>
-        ) : workspace === 'pulse' ? (
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            style={{ width: '100%', gap: '6px' }}
-            onClick={() => setCreateChannelModalOpen(true)}
-          >
-            <Plus size={13} strokeWidth={2} />
-            <span>New Group</span>
           </button>
         ) : (
           <button

@@ -263,9 +263,11 @@ export const App: React.FC = () => {
     );
   }
 
+  const isPulsePage = activePage === 'pulse';
+
   return (
     <div
-      className="app-shell"
+      className={`app-shell ${isPulsePage ? 'is-pulse-active' : ''}`}
       style={{
         display: 'flex',
         height: '100vh',
@@ -298,8 +300,8 @@ export const App: React.FC = () => {
           overflow: 'hidden',
         }}
       >
-        {/* Top Header & Breadcrumbs */}
-        <Header />
+        {/* Top Header & Breadcrumbs (on mobile, Pulse provides its own full WhatsApp header) */}
+        {(!isMobile || !isPulsePage) && <Header />}
 
         {/* Dynamic Redux-Driven Page Canvas */}
         <main

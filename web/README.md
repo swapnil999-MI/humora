@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="./public/logo.svg" alt="PeopleOS Brand Emblem" width="96" height="96" style="margin-bottom: 16px;" />
-  <h1>PeopleOS &bull; Enterprise Frontend Application</h1>
+  <img src="./public/logo.svg" alt="Humora Brand Emblem" width="96" height="96" style="margin-bottom: 16px;" />
+  <h1>Humora &bull; Enterprise Frontend Application</h1>
   <p><strong>The High-Performance, Unified Workday, Agile & HRMS Operating System</strong></p>
   <p>
     <code>React 19</code> &bull;
@@ -35,7 +35,7 @@
 
 ## 🏛 System Overview & Architecture
 
-**PeopleOS Frontend** is a modern Single Page Application (SPA) engineered to replace disjointed HR portals, time trackers, sprint management software, and payroll spreadsheets with a cohesive, fluid enterprise experience.
+**Humora Frontend** is a modern Single Page Application (SPA) engineered to replace disjointed HR portals, time trackers, sprint management software, and payroll spreadsheets with a cohesive, fluid enterprise experience.
 
 - **Zero Vendor Lock-In**: Complete control over client-side business logic and rendering.
 - **Microsecond Responsiveness**: Built with pure React 19, Vite 8 bundling, and lightweight Zustand stores.
@@ -68,7 +68,7 @@ All interactive buttons adhere to consistent soft-theme rules:
 
 ## 💎 Brand Identity & Visual Assets
 
-- **Vector Mark (`PeopleOSLogo.tsx`)**: Stylized human profile with an internal cerebral spiral brain labyrinth and integrated `P` monogram. Rendered with transparent negative space and a radiant champagne gold gradient.
+- **Vector Mark (`HumoraLogo.tsx`)**: Stylized human profile with an internal cerebral spiral brain labyrinth and integrated `P` monogram. Rendered with transparent negative space and a radiant champagne gold gradient.
 - **Brand Placements**:
   - **Header Anchor**: Prominently displayed next to interactive breadcrumbs with a 1-click return to the home hub.
   - **App Rail**: Persistent top brand emblem in the leftmost navigation rail.
@@ -125,7 +125,7 @@ High-precision compensation and statutory benefits hub:
 - **Monthly Payslips History (Tab 1)**:
   - Itemized history of all released salary slips with Net Pay, Gross Earnings, Payable Days, and Biometric LOP attendance deductions.
   - Direct PDF download and interactive document viewer.
-  - **PeopleOS Salary Calculation Engine Explainer**: Educational cards breaking down Gross Earnings, Biometric LOP deductions, and Retiral Contributions.
+  - **Humora Salary Calculation Engine Explainer**: Educational cards breaking down Gross Earnings, Biometric LOP deductions, and Retiral Contributions.
 - **Cost to Company (CTC) Schedule (Tab 2)**:
   - Annual and monthly compensation schedule effective dates.
   - **Part A (Fixed Monthly Earnings)**: Basic Salary (50%), HRA (20%), Conveyance Allowance, Medical Allowance, and Special Allowance.
@@ -240,7 +240,7 @@ Press `?` anywhere in the application to summon the cheat sheet modal:
 ```
 frontend/
 ├── public/
-│   ├── favicon.svg             # PeopleOS browser tab favicon
+│   ├── favicon.svg             # Humora browser tab favicon
 │   └── logo.svg                # High-res Champagne Amber Gold vector emblem
 ├── src/
 │   ├── api/
@@ -251,7 +251,7 @@ frontend/
 │   │   ├── GoogleSearchBar.tsx # Substring highlighter, recent pills, keyboard scroller
 │   │   ├── KeyboardShortcutsModal.tsx # Shortcut cheat sheet modal (?)
 │   │   ├── NotificationSidebar.tsx    # Slide-over notification tray
-│   │   └── PeopleOSLogo.tsx    # Pure SVG vectorized brand emblem
+│   │   └── HumoraLogo.tsx    # Pure SVG vectorized brand emblem
 │   ├── store/
 │   │   ├── store.ts            # Root store orchestrator
 │   │   ├── authStore.ts        # Active user session & profile state
@@ -285,7 +285,7 @@ frontend/
 │   ├── App.tsx                 # View router & global modal mounts
 │   ├── index.css               # Design system tokens, variables, & utility classes
 │   └── main.tsx                # Application bootstrap
-├── index.html                  # HTML5 entry with PeopleOS meta tags
+├── index.html                  # HTML5 entry with Humora meta tags
 ├── package.json                # Dependencies, build scripts & metadata
 ├── tsconfig.json               # TypeScript compiler options
 └── vite.config.ts              # Vite configuration & backend proxy rules
@@ -310,7 +310,7 @@ frontend/
 
 ### 1. Install Dependencies
 ```bash
-cd /Users/ritejmule/Desktop/Ritej/App/peopleos/frontend
+cd /Users/ritejmule/Desktop/Ritej/App/humora/frontend
 npm install
 ```
 
@@ -335,5 +335,5 @@ Executes fast Oxlint type and styling validation.
 ---
 
 <div align="center">
-  <p><em>Built with precision for PeopleOS Enterprise. Designed for clarity, speed, and elegance.</em></p>
+  <p><em>Built with precision for Humora Enterprise. Designed for clarity, speed, and elegance.</em></p>
 </div>

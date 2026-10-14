@@ -165,7 +165,7 @@ fun LoginScreen(
                 contentAlignment = Alignment.Center
             ) {
                 androidx.compose.foundation.Image(
-                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_peopleos_logo),
+                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_humora_logo),
                     contentDescription = "Humora Logo",
                     modifier = Modifier.size(52.dp)
                 )
@@ -184,22 +184,6 @@ fun LoginScreen(
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.sp
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFFF59E0B).copy(alpha = 0.18f))
-                        .border(1.dp, Color(0xFFF59E0B).copy(alpha = 0.35f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 7.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "PLATFORM",
-                        color = Color(0xFFFBBF24),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                }
             }
 
             Text(
@@ -532,7 +516,7 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Humora Enterprise Platform v1.0 · Protected by TLS & JWT",
+            text = "Humora Enterprise v1.0 · Protected by TLS & JWT",
             color = TextMutedDark,
             fontSize = 11.sp,
             textAlign = TextAlign.Center

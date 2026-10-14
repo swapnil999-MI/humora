@@ -4,7 +4,7 @@ import { setCreateIssueOpen, navigateToPage, toggleNotificationDrawer, toggleSid
 import { recordPunch } from '../store/hrmsSlice';
 import { GoogleSearchBar } from './GoogleSearchBar';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
-import { PeopleOSLogo } from './PeopleOSLogo';
+import { HumoraLogo } from './HumoraLogo';
 import { useNotificationPolling } from '../store/notifications';
 import {
   Kanban,
@@ -107,13 +107,14 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 20px',
-        zIndex: 40,
+        zIndex: 500,
+        overflow: 'visible',
         flexShrink: 0,
         userSelect: 'none',
         transition: 'background-color var(--transition-smooth), border-color var(--transition-smooth)',
       }}
     >
-      {/* Left: PeopleOS Brand Emblem + Contextual Breadcrumb */}
+      {/* Left: Humora Brand Emblem + Contextual Breadcrumb */}
       <div className="app-header-left" style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '13px' }}>
         {/* Phones: the section menu is a drawer, opened from here. */}
         <button
@@ -140,98 +141,107 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
             borderRadius: 'var(--radius-sm)',
             transition: 'opacity var(--transition-fast)',
           }}
-          title={isAdmin ? "Humora Management Console" : "Humora Platform Home (My Workday Hub)"}
+          title={isAdmin ? "Humora Management Console" : "Humora Home (My Workday Hub)"}
         >
-          <PeopleOSLogo size={26} showBrandName brandTextSize={15} subText={isAdmin ? "Management" : "Enterprise"} />
+          <HumoraLogo size={26} showBrandName brandTextSize={15} />
         </button>
 
-        <div className="hdr-sep" style={{ width: '1px', height: '18px', background: 'var(--border-subtle)' }} />
+        <div className="hdr-sep" style={{ width: '1px', height: '18px', background: 'var(--border-subtle)', flexShrink: 0 }} />
 
-        {workspace === 'employee' ? (
-          <>
-            <button
-              type="button"
-              className="breadcrumb-btn"
-              onClick={() => dispatch(navigateToPage('hub'))}
-              title="Jump to Employee Space Hub (Alt+0)"
-            >
-              <Compass size={14} strokeWidth={1.8} />
-              Employee Space
-            </button>
-            <ChevronRight size={12} color="var(--text-dim)" />
-            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-              {activePage === 'attendance'
-                ? 'My Attendance & Terminal'
-                : activePage === 'leaves'
-                ? 'My Leaves & Absence'
-                : activePage === 'payroll'
-                ? 'My Payroll & Payslips'
-                : activePage === 'profile'
-                ? 'My Employee Profile'
-                : 'My Workday Hub'}
-            </span>
-          </>
-        ) : workspace === 'management' ? (
-          <>
-            <button
-              type="button"
-              className="breadcrumb-btn"
-              onClick={() => dispatch(navigateToPage('directory'))}
-              title="Jump to Organization Directory (Alt+1)"
-            >
-              <ShieldCheck size={14} strokeWidth={1.8} color="var(--accent-primary)" />
-              Management Console
-            </button>
-            <ChevronRight size={12} color="var(--text-dim)" />
-            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-              {activePage === 'shifts'
-                ? 'Shift Catalog & Rostering'
-                : activePage === 'radar'
-                ? 'Live Team Presence Radar'
-                : activePage === 'approvals'
-                ? 'Approvals Desk'
-                : activePage === 'capacity'
-                ? 'Team Capacity & Workload'
-                : activePage === 'directory'
-                ? 'Organization & Employees'
-                : activePage === 'onboarding'
-                ? 'Onboarding Pipeline'
-                : activePage === 'company_settings'
-                ? 'Company Profile & Setup'
-                : 'Management Overview'}
-            </span>
-          </>
-        ) : workspace === 'pulse' ? (
-          <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Team Pulse</span>
-        ) : (
-          <>
-            <button
-              type="button"
-              className="breadcrumb-btn"
-              onClick={() => dispatch(navigateToPage('kanban'))}
-              title="Jump to Kanban Board (Alt+2)"
-            >
-              <Kanban size={14} strokeWidth={1.8} />
-              Agile Work
-            </button>
-            <ChevronRight size={12} color="var(--text-dim)" />
-            <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
-              {activeProject ? `[${activeProject.key}] ${activeProject.name}` : 'No project selected'}
-            </span>
-            <ChevronRight size={12} color="var(--text-dim)" />
-            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-              {activePage === 'backlog'
-                ? 'Sprints & Capacity'
-                : activePage === 'list'
-                ? 'High-Density List'
-                : 'Kanban Board'}
-            </span>
-          </>
-        )}
+        <div className="app-header-breadcrumbs">
+          {workspace === 'employee' ? (
+            <>
+              <button
+                type="button"
+                className="breadcrumb-btn"
+                onClick={() => dispatch(navigateToPage('hub'))}
+                title="Jump to Employee Space Hub (Alt+0)"
+              >
+                <Compass size={14} strokeWidth={1.8} />
+                <span>Employee Space</span>
+              </button>
+              <ChevronRight size={12} className="hdr-chevron" color="var(--text-dim)" />
+              <span className="hdr-current-page">
+                {activePage === 'attendance'
+                  ? 'My Attendance & Terminal'
+                  : activePage === 'leaves'
+                  ? 'My Leaves & Absence'
+                  : activePage === 'payroll'
+                  ? 'My Payroll & Payslips'
+                  : activePage === 'profile'
+                  ? 'My Employee Profile'
+                  : 'My Workday Hub'}
+              </span>
+            </>
+          ) : workspace === 'management' ? (
+            <>
+              <button
+                type="button"
+                className="breadcrumb-btn"
+                onClick={() => dispatch(navigateToPage('directory'))}
+                title="Jump to Organization Directory (Alt+1)"
+              >
+                <ShieldCheck size={14} strokeWidth={1.8} color="var(--accent-primary)" />
+                <span>Management Console</span>
+              </button>
+              <ChevronRight size={12} className="hdr-chevron" color="var(--text-dim)" />
+              <span className="hdr-current-page">
+                {activePage === 'shifts'
+                  ? 'Shift Catalog & Rostering'
+                  : activePage === 'radar'
+                  ? 'Live Team Presence Radar'
+                  : activePage === 'approvals'
+                  ? 'Approvals Desk'
+                  : activePage === 'capacity'
+                  ? 'Team Capacity & Workload'
+                  : activePage === 'directory'
+                  ? 'Organization & Employees'
+                  : activePage === 'onboarding'
+                  ? 'Onboarding Pipeline'
+                  : activePage === 'company_settings'
+                  ? 'Company Profile & Setup'
+                  : 'Management Overview'}
+              </span>
+            </>
+          ) : workspace === 'pulse' ? (
+            <span className="hdr-current-page">Team Pulse</span>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="breadcrumb-btn"
+                onClick={() => dispatch(navigateToPage('kanban'))}
+                title="Jump to Kanban Board (Alt+2)"
+              >
+                <Kanban size={14} strokeWidth={1.8} />
+                <span>Agile Work</span>
+              </button>
+              {activeProject && (
+                <>
+                  <ChevronRight size={12} className="hdr-chevron" color="var(--text-dim)" />
+                  <span
+                    className="hdr-project-crumb"
+                    title={`[${activeProject.key}] ${activeProject.name}`}
+                  >
+                    [{activeProject.key}] {activeProject.name}
+                  </span>
+                </>
+              )}
+              <ChevronRight size={12} className="hdr-chevron" color="var(--text-dim)" />
+              <span className="hdr-current-page">
+                {activePage === 'backlog'
+                  ? 'Sprints & Capacity'
+                  : activePage === 'list'
+                  ? 'High-Density List'
+                  : 'Kanban Board'}
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Center: High-Level Google-Style Search Bar with Attached Dropdown */}
-      <div className="app-header-search" style={{ display: 'contents' }}>
+      <div className="app-header-search">
         <GoogleSearchBar />
       </div>
 

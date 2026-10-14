@@ -32,6 +32,7 @@ import {
   Pencil,
   Trash2,
   Plus as PlusIcon,
+  Lock,
 } from 'lucide-react';
 import { EmojiPicker } from './EmojiPicker';
 import {
@@ -101,11 +102,12 @@ function replyPreviewOf(msg: PulseMessage): PulseReplyPreview {
         ? 'document'
         : 'text';
   const body = msg.content.replace(/\s+/g, ' ').trim();
+  const isMe = msg.senderId === 'user-current';
   return {
     messageId: msg.id,
     senderId: msg.senderId,
-    senderName: msg.senderName,
-    isMe: msg.senderId === 'user-current',
+    senderName: isMe ? 'You' : (msg.senderName || 'Colleague'),
+    isMe,
     text:
       body ||
       (kind === 'voice' ? `Voice message (${msg.voiceNote?.duration ?? '0:00'})` : kind === 'image' ? 'Photo' : att?.name || ''),
@@ -355,7 +357,15 @@ export const PulseDesk: React.FC = () => {
   const [editingMessage, setEditingMessage] = useState<PulseMessage | null>(null);
   const [confirmDeleteMsg, setConfirmDeleteMsg] = useState<PulseMessage | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
-  const swipeRef = useRef<{ id: string; x: number; y: number; dx: number; el: HTMLElement } | null>(null);
+  const swipeRef = useRef<{
+    id: string;
+    x: number;
+    y: number;
+    dx: number;
+    el: HTMLElement;
+    isMe: boolean;
+    timer?: ReturnType<typeof setTimeout>;
+  } | null>(null);
 
   // WhatsApp-Style Filter Pills (All, Unread, Groups, Direct)
   const [chatFilter, setChatFilter] = useState<'all' | 'unread' | 'groups' | 'dms'>('all');
@@ -438,6 +448,19 @@ export const PulseDesk: React.FC = () => {
   // Determine active conversation details
   const activeChannel = channels.find((c) => c.id === activeId);
   const activeDM = directMessages.find((dm) => dm.id === activeId);
+  const hasActiveChat = Boolean(activeChannel || activeDM);
+
+  // Sync mobile chat view class for full-screen phone UX
+  useEffect(() => {
+    if (mobilePane === 'chat') {
+      document.body.classList.add('mobile-chat-open');
+    } else {
+      document.body.classList.remove('mobile-chat-open');
+    }
+    return () => {
+      document.body.classList.remove('mobile-chat-open');
+    };
+  }, [mobilePane]);
 
   const currentGroupMembers: GroupMember[] = members[activeId] || [];
 
@@ -558,33 +581,61 @@ export const PulseDesk: React.FC = () => {
     window.setTimeout(() => setFlashMessageId((cur) => (cur === messageId ? null : cur)), 1500);
   };
 
-  // Touch screens: swipe a message to the right to reply.
+  // Touch screens: swipe a message to reply (swipe right for incoming, swipe left or right for own message),
+  // and long-press (500ms) to open the message menu with Reply.
   const onRowTouchStart = (msg: PulseMessage, e: React.TouchEvent<HTMLDivElement>) => {
     if (msg.isDeleted || msg.isUnavailable) return;
     const t = e.touches[0];
-    swipeRef.current = { id: msg.id, x: t.clientX, y: t.clientY, dx: 0, el: e.currentTarget };
+    const isMe = msg.senderId === 'user-current';
+    const targetEl = e.currentTarget;
+
+    const timer = setTimeout(() => {
+      if (navigator.vibrate) navigator.vibrate(20);
+      const r = targetEl.getBoundingClientRect();
+      openMessageMenu(msg, isMe ? Math.max(12, r.right - 200) : Math.max(12, r.left), r.bottom + 4);
+    }, 500);
+
+    swipeRef.current = { id: msg.id, x: t.clientX, y: t.clientY, dx: 0, el: targetEl, isMe, timer };
   };
   const onRowTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     const sw = swipeRef.current;
     if (!sw) return;
     const t = e.touches[0];
     const dx = t.clientX - sw.x;
-    if (Math.abs(t.clientY - sw.y) > 30 && sw.dx < 10) {
+    const dy = t.clientY - sw.y;
+
+    if (Math.abs(dy) > 10 || Math.abs(dx) > 10) {
+      if (sw.timer) {
+        clearTimeout(sw.timer);
+        sw.timer = undefined;
+      }
+    }
+
+    if (Math.abs(dy) > 30 && Math.abs(sw.dx) < 10) {
       swipeRef.current = null; // vertical scroll, not a swipe
       sw.el.style.transform = '';
       return;
     }
-    sw.dx = Math.max(0, Math.min(80, dx));
+
+    // Allow swipe left or right on own message; swipe right on incoming
+    if (sw.isMe) {
+      sw.dx = dx < 0 ? Math.max(-75, dx) : Math.min(75, dx);
+    } else {
+      sw.dx = Math.max(0, Math.min(75, dx));
+    }
     sw.el.style.transform = `translateX(${sw.dx}px)`;
     sw.el.style.transition = 'none';
   };
   const onRowTouchEnd = (msg: PulseMessage) => {
     const sw = swipeRef.current;
+    if (sw?.timer) {
+      clearTimeout(sw.timer);
+    }
     swipeRef.current = null;
     if (!sw) return;
     sw.el.style.transition = 'transform 0.2s ease-out';
     sw.el.style.transform = '';
-    if (sw.dx >= 56) {
+    if (Math.abs(sw.dx) >= 42) {
       if (navigator.vibrate) navigator.vibrate(15);
       startReply(msg);
     }
@@ -966,7 +1017,53 @@ export const PulseDesk: React.FC = () => {
 
         {/* WhatsApp Scrollable Conversations Roster */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {filteredConversations.map((item) => {
+          {filteredConversations.length === 0 ? (
+            <div
+              style={{
+                padding: '48px 24px',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
+              <div
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '50%',
+                  background: 'var(--surface-2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <Search size={22} />
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                {searchQuery ? 'No chats found' : 'No conversations yet'}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', maxWidth: '220px', lineHeight: 1.5 }}>
+                {searchQuery
+                  ? `No results match "${searchQuery}". Check spelling or start a new chat.`
+                  : 'Start chatting with your team or create a new group channel.'}
+              </div>
+              {!searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setCreateChannelModalOpen(true)}
+                  className="btn btn-primary btn-sm"
+                  style={{ marginTop: '8px', gap: '6px' }}
+                >
+                  <Plus size={14} />
+                  <span>Create Group</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredConversations.map((item) => {
             const isGroup = item.isGroup;
             const isActive = isGroup
               ? activeType === 'channel' && activeId === item.id
@@ -1095,7 +1192,7 @@ export const PulseDesk: React.FC = () => {
                 </div>
               </div>
             );
-          })}
+          }))}
         </div>
       </aside>
 
@@ -1113,6 +1210,94 @@ export const PulseDesk: React.FC = () => {
           zIndex: 1,
         }}
       >
+        {!hasActiveChat ? (
+          <div
+            className="whatsapp-welcome-view"
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'var(--surface-0)',
+              padding: '40px 24px',
+              textAlign: 'center',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                width: '420px',
+                height: '420px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(245, 158, 11, 0.07) 0%, transparent 70%)',
+                pointerEvents: 'none',
+              }}
+            />
+
+            <div
+              style={{
+                width: '84px',
+                height: '84px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.08) 100%)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--accent-primary)',
+                marginBottom: '22px',
+                boxShadow: '0 8px 32px rgba(245, 158, 11, 0.12)',
+              }}
+            >
+              <MessageSquare size={40} strokeWidth={1.75} />
+            </div>
+
+            <h2
+              style={{
+                fontSize: '22px',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                marginBottom: '10px',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Humora Pulse for Web
+            </h2>
+
+            <p
+              style={{
+                fontSize: '13px',
+                color: 'var(--text-secondary)',
+                maxWidth: '420px',
+                lineHeight: 1.6,
+                margin: '0 0 24px',
+              }}
+            >
+              Send and receive end-to-end encrypted messages, voice notes, and project task tags with your team seamlessly.
+            </p>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '12px',
+                color: 'var(--text-muted)',
+                background: 'var(--surface-2)',
+                padding: '6px 16px',
+                borderRadius: '20px',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <Lock size={12} color="var(--accent-primary)" />
+              <span>End-to-end encrypted</span>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* WhatsApp Chat Top Navigation Header */}
         <header
           className="pulse-chat-header"
@@ -1348,6 +1533,7 @@ export const PulseDesk: React.FC = () => {
                   e.preventDefault();
                   openMessageMenu(msg, e.clientX, e.clientY);
                 }}
+                onDoubleClick={() => startReply(msg)}
                 onTouchStart={(e) => onRowTouchStart(msg, e)}
                 onTouchMove={onRowTouchMove}
                 onTouchEnd={() => onRowTouchEnd(msg)}
@@ -1356,10 +1542,10 @@ export const PulseDesk: React.FC = () => {
                   display: 'flex',
                   flexDirection: 'column',
                   alignSelf: isMe ? 'flex-end' : 'flex-start',
-                  maxWidth: '68%',
+                  maxWidth: '70%',
                   margin: '4px 0',
-                  marginRight: isMe ? '8px' : '0',
-                  marginLeft: !isMe ? '8px' : '0',
+                  marginRight: isMe ? '10px' : '0',
+                  marginLeft: !isMe ? '10px' : '0',
                 }}
               >
                 {/* WhatsApp-style quick reply arrow beside the bubble */}
@@ -1367,9 +1553,12 @@ export const PulseDesk: React.FC = () => {
                   <button
                     type="button"
                     className="pulse-quick-reply"
-                    style={{ [isMe ? 'left' : 'right']: '-36px' }}
-                    onClick={() => startReply(msg)}
-                    title="Reply"
+                    style={{ [isMe ? 'left' : 'right']: '-32px' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startReply(msg);
+                    }}
+                    title="Reply (or double-click message)"
                     aria-label="Reply"
                   >
                     <Reply size={15} />
@@ -1426,24 +1615,31 @@ export const PulseDesk: React.FC = () => {
                 {/* Message Bubble Card */}
                 <div
                   className={isMe ? 'whatsapp-bubble-out' : 'whatsapp-bubble-in'}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    startReply(msg);
+                  }}
+                  title="Double-click to reply"
                   style={{
                     padding: '8px 12px',
                     position: 'relative',
+                    cursor: 'default',
                   }}
                 >
                   {/* WhatsApp Web chevron: opens the message menu */}
-                  {isHovered && !msg.isDeleted && !msg.isUnavailable && (
+                  {!msg.isDeleted && !msg.isUnavailable && (
                     <button
                       type="button"
-                      className="pulse-bubble-chevron"
+                      className={`pulse-bubble-chevron ${isHovered ? 'is-visible' : ''}`}
                       onClick={(e) => {
+                        e.stopPropagation();
                         const r = e.currentTarget.getBoundingClientRect();
-                        openMessageMenu(msg, isMe ? r.right - 200 : r.left, r.bottom + 4);
+                        openMessageMenu(msg, isMe ? Math.max(12, r.right - 200) : Math.max(12, r.left), r.bottom + 4);
                       }}
                       title="Message options"
                       aria-label="Message options"
                     >
-                      <ChevronDown size={16} />
+                      <ChevronDown size={15} />
                     </button>
                   )}
                   {/* WhatsApp Top Triangular Corner Notch / Tail with continuous border */}
@@ -1985,6 +2181,8 @@ export const PulseDesk: React.FC = () => {
             </button>
           )}
         </footer>
+          </>
+        )}
       </main>
 
       {/* ========================================================================= */}

@@ -22,8 +22,8 @@ import {
   PriorityGlyph,
 } from '../../components/StatusGlyph';
 import {
-  PeopleOSLogo,
-} from '../../components/PeopleOSLogo';
+  HumoraLogo,
+} from '../../components/HumoraLogo';
 import {
   Clock,
   Play,
@@ -196,7 +196,7 @@ export const MyWorkdayHub: React.FC = () => {
                 border: '1px solid rgba(245, 158, 11, 0.25)',
               }}
             >
-              <PeopleOSLogo size={14} />
+              <HumoraLogo size={14} />
               <span>Humora &bull; My Workday Hub</span>
             </div>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -528,7 +528,7 @@ export const MyWorkdayHub: React.FC = () => {
                     boxShadow: '0 2px 8px rgba(245, 158, 11, 0.12)',
                   }}
                 >
-                  <PeopleOSLogo size={24} />
+                  <HumoraLogo size={24} />
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

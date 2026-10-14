@@ -1,4 +1,4 @@
--- Seed Initial Enterprise Setup for Humora Platform
+-- Seed Initial Enterprise Setup for Humora
 
 -- 1. Default Organization / Tenant
 INSERT INTO tenants (id, slug, name, domain, subscription_tier)

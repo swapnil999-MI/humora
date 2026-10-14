@@ -9,7 +9,7 @@ object NetworkConfig {
     private const val KEY_BASE_URL = "backend_base_url"
 
     // Host machine private LAN IP for physical device testing
-    const val DEVICE_LAN_IP = "192.168.1.50"
+    const val DEVICE_LAN_IP = "192.168.1.5"
     const val DEFAULT_DEVICE_PORT = "8090"
     const val FALLBACK_DEVICE_PORT = "8000"
 

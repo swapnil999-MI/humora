@@ -538,7 +538,7 @@ export const GoogleSearchBar: React.FC = () => {
     <div
       ref={containerRef}
       className={`google-search-container ${isOpen ? 'is-active' : ''}`}
-      style={{ position: 'relative', width: '380px', maxWidth: '42vw' }}
+      style={{ position: 'relative', width: '100%', maxWidth: isOpen ? '480px' : '380px' }}
     >
       {/* The Google-Style Pill Search Input */}
       <div

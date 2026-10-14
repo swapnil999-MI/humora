@@ -615,7 +615,7 @@ fun UserProfileScreen(
                         ProfileDetailRow(
                             icon = Icons.Default.Smartphone,
                             label = "Client Version",
-                            value = "Humora PeopleOS Mobile v2.1"
+                            value = "Humora Mobile v2.1"
                         )
 
                         Spacer(modifier = Modifier.height(4.dp))

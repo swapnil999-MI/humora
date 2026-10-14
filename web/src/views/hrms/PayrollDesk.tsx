@@ -30,7 +30,7 @@ import { Payslip, ITDeclaration, ReimbursementClaim } from '../../types';
 import { formatINR } from '../../utils/numberToWords';
 import { PayslipDocumentModal } from './PayslipDocumentModal';
 import { PayrollRunModal } from './PayrollRunModal';
-import { PeopleOSLogo } from '../../components/PeopleOSLogo';
+import { HumoraLogo } from '../../components/HumoraLogo';
 
 export const PayrollDesk: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -243,7 +243,7 @@ export const PayrollDesk: React.FC = () => {
               textTransform: 'uppercase',
             }}
           >
-            <PeopleOSLogo size={14} />
+            <HumoraLogo size={14} />
             <span>Humora &bull; Payroll & Compensation Hub</span>
           </div>
           <h1
