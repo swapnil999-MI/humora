@@ -22,7 +22,7 @@ import {
   Menu,
 } from 'lucide-react';
 
-export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
+export const Header: React.FC = () => {
   const dispatch = useAppDispatch();
   const { workspace, activePage, isNotificationDrawerOpen, notifications } = useAppSelector((state) => state.ui);
   const { attendanceSummary, isPunching } = useAppSelector((state) => state.hrms);

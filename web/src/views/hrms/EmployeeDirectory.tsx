@@ -6,11 +6,9 @@ import { Employee } from '../../types';
 import {
   Search,
   Users,
+  User,
   Mail,
   Briefcase,
-  User,
-  Sparkles,
-  Kanban,
   ShieldCheck,
   Camera,
   Upload,

@@ -17,9 +17,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 
-export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
-  onOpenCommandPalette,
-}) => {
+export const AppRail: React.FC = () => {
   const dispatch = useAppDispatch();
   const { workspace, activePage, isSidebarCollapsed } = useAppSelector((state) => state.ui);
   const { user } = useAppSelector((state) => state.auth);
@@ -176,10 +174,7 @@ export const AppRail: React.FC<{ onOpenCommandPalette?: () => void }> = ({
         <button
           type="button"
           className="app-rail-btn"
-          onClick={() => {
-            if (onOpenCommandPalette) onOpenCommandPalette();
-            else window.dispatchEvent(new CustomEvent('focus-header-search'));
-          }}
+          onClick={() => window.dispatchEvent(new CustomEvent('focus-header-search'))}
           title="Universal Search (Cmd+K)"
         >
           <Search size={18} strokeWidth={1.8} />

@@ -121,13 +121,6 @@ func NewService(repo Repository) Service {
 	}
 }
 
-func NewServiceWithEmbedder(repo Repository, embedder biometrics.FaceEmbedder) Service {
-	return &service{
-		repo:     repo,
-		embedder: embedder,
-	}
-}
-
 func (s *service) CreateEmployee(ctx context.Context, tenantID uuid.UUID, req *CreateEmployeeRequest) (*Employee, error) {
 	if validationErr := req.Validate(); validationErr != "" {
 		return nil, errors.New(validationErr)

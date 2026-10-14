@@ -49,8 +49,6 @@ export const AttendanceDesk: React.FC = () => {
     attendanceSession,
     monthlyAttendance,
     myRegularizations: rawMyRegularizations,
-    isLoadingAttendance,
-    isPunching,
   } = useAppSelector((state) => state.hrms);
 
   const myRegularizations = rawMyRegularizations || [];
@@ -452,7 +450,6 @@ export const AttendanceDesk: React.FC = () => {
   }, [selectedMonthDate, monthlyAttendance, elapsedWorkTime]);
 
   // Time Axis markers: 10AM to 07PM
-  const timeHours = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
   const timeLabels = ['10AM', '11AM', '12PM', '01PM', '02PM', '03PM', '04PM', '05PM', '06PM', '07PM'];
 
   // Current time position percentage along the 10AM - 7PM time axis

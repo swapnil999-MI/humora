@@ -15,9 +15,7 @@ import {
   Trash2,
   Mail,
   Send,
-  Lock,
   ShieldCheck,
-  AlertCircle,
   Server,
   KeyRound,
   ExternalLink,
@@ -491,16 +489,6 @@ export const CompanySettingsDesk: React.FC = () => {
     fontWeight: 500,
     color: 'var(--text-secondary)',
     marginBottom: '6px',
-  };
-
-  const cardStyle: React.CSSProperties = {
-    background: 'var(--surface-1)',
-    border: '1px solid var(--border-hairline)',
-    borderRadius: '14px',
-    padding: '24px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '18px',
   };
 
   const cardHeaderStyle: React.CSSProperties = {

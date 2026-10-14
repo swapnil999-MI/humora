@@ -184,15 +184,15 @@ func TestPackageLevelStorageHelpers(t *testing.T) {
 	SetDefaultStorage(nil)
 
 	// Calls should fail when uninitialized
-	_, err := UploadFile(nil, "bucket", "obj", nil, 0, "")
+	err := DeleteFile(nil, "bucket", "obj")
 	if err == nil {
 		t.Errorf("expected error when storage uninitialized, got nil")
 	}
 
 	storage, _ := NewMinioStorageFromConfig(&configs.MinioConfig{
-		Endpoint:      "192.168.1.50:9000",
+		Endpoint:      "192.168.1.5:9000",
 		DefaultBucket: "my-bucket",
-		PublicURL:     "http://192.168.1.50:9000",
+		PublicURL:     "http://192.168.1.5:9000",
 	})
 	SetDefaultStorage(storage)
 
@@ -200,8 +200,8 @@ func TestPackageLevelStorageHelpers(t *testing.T) {
 		t.Errorf("expected default storage to match set storage")
 	}
 
-	if got := FormatURL("paylogic-media/test.png"); got != "http://192.168.1.50:9000/paylogic-media/test.png" {
-		t.Errorf("expected FormatURL http://192.168.1.50:9000/paylogic-media/test.png, got %s", got)
+	if got := storage.FormatURL("paylogic-media/test.png"); got != "http://192.168.1.5:9000/paylogic-media/test.png" {
+		t.Errorf("expected FormatURL http://192.168.1.5:9000/paylogic-media/test.png, got %s", got)
 	}
 }
 
