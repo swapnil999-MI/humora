@@ -10,6 +10,8 @@ import (
 const (
 	PortEnv                      = "PORT"
 	EnvEnv                       = "ENV"
+	AppHostEnv                   = "APP_HOST"
+	HostEnv                      = "HOST"
 	FrontendBaseURLEnv           = "FRONTEND_BASE_URL"
 	AllowedOriginsEnv            = "ALLOWED_ORIGINS"
 	CookieDomainEnv              = "COOKIE_DOMAIN"

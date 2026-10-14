@@ -16,6 +16,8 @@ services:
     environment:
       - ENV_FILE_PATH=infra/local/.env.local
       - PORT=8090
+      - APP_HOST=${APP_HOST:-}
+      - HOST=${HOST:-}
     command: [ "sh", "/app/infra/local/start.sh" ]
     networks:
       - paylogic-infra_default

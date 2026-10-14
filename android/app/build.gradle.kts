@@ -77,8 +77,9 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
-            // Local backend on the developer LAN over plain HTTP; override with -Phumora.debugApiBaseUrl=...
-            val debugApi = providers.gradleProperty("humora.debugApiBaseUrl").orNull ?: "http://192.168.1.5:8090/api/v1"
+            // Local backend on the developer LAN over plain HTTP; override with -Phumora.debugApiBaseUrl=... or APP_HOST / HOST
+            val masterHost = System.getenv("APP_HOST") ?: System.getenv("HOST") ?: "192.168.1.5"
+            val debugApi = providers.gradleProperty("humora.debugApiBaseUrl").orNull ?: "http://$masterHost:8090/api/v1"
             buildConfigField("String", "API_BASE_URL", "\"$debugApi\"")
             manifestPlaceholders["usesCleartextTraffic"] = "true"
         }

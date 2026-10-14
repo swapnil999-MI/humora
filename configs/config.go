@@ -149,14 +149,56 @@ func LoadConfig() {
 		passwordSecret = DevPasswordSecret
 	}
 
+	// Master Host Resolution (APP_HOST / HOST)
+	// Setting APP_HOST or HOST automatically coordinates Frontend, Backend CORS, MinIO Public URL, and OAuth.
+	masterHost := strings.TrimSpace(GetEnv(AppHostEnv))
+	if masterHost == "" {
+		masterHost = strings.TrimSpace(GetEnv(HostEnv))
+	}
+	masterScheme := "http"
+	masterHostOnly := masterHost
+	if strings.HasPrefix(masterHostOnly, "https://") {
+		masterScheme = "https"
+		masterHostOnly = strings.TrimPrefix(masterHostOnly, "https://")
+	} else if strings.HasPrefix(masterHostOnly, "http://") {
+		masterHostOnly = strings.TrimPrefix(masterHostOnly, "http://")
+	}
+	masterHostOnly = strings.TrimRight(masterHostOnly, "/")
+	if idx := strings.Index(masterHostOnly, ":"); idx != -1 {
+		masterHostOnly = masterHostOnly[:idx]
+	}
+
 	frontendURL := GetEnv(FrontendBaseURLEnv)
-	if frontendURL == "" && local {
-		frontendURL = "http://192.168.1.50:3000"
+	if frontendURL == "" {
+		if masterHostOnly != "" {
+			frontendURL = fmt.Sprintf("%s://%s:3000", masterScheme, masterHostOnly)
+		} else if local {
+			frontendURL = "http://192.168.1.5:3000"
+		}
 	}
 
 	allowedOrigins := GetEnv(AllowedOriginsEnv)
 	if allowedOrigins == "" && local {
-		allowedOrigins = "http://192.168.1.50:3000,http://192.168.1.50:5173,http://192.168.1.50:8090,http://192.168.1.50:8000,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
+		allowedOrigins = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
+	}
+	if masterHostOnly != "" {
+		hostOrigins := []string{
+			fmt.Sprintf("%s://%s:3000", masterScheme, masterHostOnly),
+			fmt.Sprintf("%s://%s:5173", masterScheme, masterHostOnly),
+			fmt.Sprintf("%s://%s:8090", masterScheme, masterHostOnly),
+			fmt.Sprintf("%s://%s:8080", masterScheme, masterHostOnly),
+			fmt.Sprintf("%s://%s:8000", masterScheme, masterHostOnly),
+			fmt.Sprintf("%s://%s", masterScheme, masterHostOnly),
+		}
+		for _, ho := range hostOrigins {
+			if !strings.Contains(allowedOrigins, ho) {
+				if allowedOrigins != "" {
+					allowedOrigins += "," + ho
+				} else {
+					allowedOrigins = ho
+				}
+			}
+		}
 	}
 
 	cookieDomain := GetEnv(CookieDomainEnv)
@@ -227,8 +269,12 @@ func LoadConfig() {
 		minioRegion = "us-east-1"
 	}
 	minioPublicURL := GetEnv(MinioPublicURLEnv)
-	if minioPublicURL == "" && local {
-		minioPublicURL = "http://192.168.1.50:9000"
+	if minioPublicURL == "" {
+		if masterHostOnly != "" {
+			minioPublicURL = fmt.Sprintf("%s://%s:9000", masterScheme, masterHostOnly)
+		} else if local {
+			minioPublicURL = "http://192.168.1.5:9000"
+		}
 	}
 
 	storageDriver := GetEnv(StorageDriverEnv)
@@ -304,7 +350,15 @@ func LoadConfig() {
 			GithubClientSecret:    GetEnv(GithubClientSecretEnv),
 			MicrosoftClientID:     GetEnv(MicrosoftClientIDEnv),
 			MicrosoftClientSecret: GetEnv(MicrosoftClientSecretEnv),
-			RedirectBaseURL:       GetEnv(OAuthRedirectBaseURLEnv),
+			RedirectBaseURL: func() string {
+				if r := GetEnv(OAuthRedirectBaseURLEnv); r != "" {
+					return r
+				}
+				if masterHostOnly != "" {
+					return fmt.Sprintf("%s://%s:%s", masterScheme, masterHostOnly, port)
+				}
+				return "http://localhost:8090"
+			}(),
 		},
 	}
 
@@ -314,6 +368,9 @@ func LoadConfig() {
 		}
 	}
 
+	if masterHostOnly != "" {
+		log.Printf("[Config] Master Host active: %s://%s (frontend: %s, minio: %s)", masterScheme, masterHostOnly, frontendURL, minioPublicURL)
+	}
 	log.Printf("[Config] Loaded configuration for env: %s, port: %s, db: %s", env, port, dbName)
 }
 
