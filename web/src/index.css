@@ -3301,3 +3301,276 @@ div[style*="position: fixed"] > div[style*="background: var(--surface-3)"],
     padding: 8px 10px !important;
   }
 }
+
+/* ── Pulse: WhatsApp-style quoted replies ─────────────────────────────── */
+.pulse-quote {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 180px;
+  margin: 2px 0 6px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pulse-quote:hover { background: rgba(0, 0, 0, 0.3); }
+.pulse-quote.is-static { cursor: default; }
+.pulse-quote.is-static:hover { background: rgba(0, 0, 0, 0.22); }
+[data-theme="light"] .pulse-quote,
+.light .pulse-quote,
+[data-theme="light"] .pulse-quote.is-static:hover,
+.light .pulse-quote.is-static:hover { background: rgba(0, 0, 0, 0.055); }
+[data-theme="light"] .pulse-quote:hover,
+.light .pulse-quote:hover { background: rgba(0, 0, 0, 0.09); }
+.pulse-quote-bar { width: 4px; flex-shrink: 0; }
+.pulse-quote-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 10px 6px 9px;
+}
+.pulse-quote-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pulse-quote-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+.pulse-quote-text > svg { flex-shrink: 0; color: var(--text-muted); }
+.pulse-quote-text > span {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+.pulse-quote-thumb { width: 52px; min-height: 52px; object-fit: cover; flex-shrink: 0; }
+
+/* Composer: the quote sits above the input, like WhatsApp Web */
+.pulse-reply-composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 0 60px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border-hairline);
+  animation: pulse-reply-in 0.16s ease-out;
+}
+.pulse-reply-composer .pulse-quote { margin: 0; }
+.pulse-reply-composer .pulse-quote-text > span { -webkit-line-clamp: 1; }
+@keyframes pulse-reply-in {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@media (max-width: 640px) {
+  .pulse-reply-composer { padding-left: 12px; }
+}
+
+/* Hover reply arrow beside the bubble */
+.pulse-quick-reply {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  z-index: 15;
+}
+.pulse-quick-reply:hover { color: var(--text-primary); }
+
+/* After jumping to a quoted message it flashes once */
+.pulse-msg-flash > .whatsapp-bubble-out,
+.pulse-msg-flash > .whatsapp-bubble-in { animation: pulse-msg-flash 1.4s ease-out; }
+@keyframes pulse-msg-flash {
+  0%, 35% { box-shadow: 0 0 0 3px rgba(83, 189, 235, 0.6); }
+  100% { box-shadow: 0 0 0 3px rgba(83, 189, 235, 0); }
+}
+
+/* ── Pulse: WhatsApp Web message menu (right-click or bubble chevron) ── */
+.pulse-msg-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 200px;
+  padding: 6px 0;
+  border-radius: 12px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-popover, 0 12px 32px rgba(0, 0, 0, 0.35));
+  animation: pulse-menu-in 0.12s ease-out;
+}
+@keyframes pulse-menu-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.pulse-menu-reactions {
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 2px 8px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-hairline);
+}
+.pulse-menu-reactions button {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.pulse-menu-reactions button:hover { transform: scale(1.18); background: var(--surface-hover); }
+.pulse-menu-reactions button.is-mine { background: var(--surface-hover); }
+.pulse-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.pulse-menu-item svg { color: var(--text-secondary); flex-shrink: 0; }
+.pulse-menu-item:hover { background: var(--surface-hover); }
+.pulse-menu-item.is-danger,
+.pulse-menu-item.is-danger svg { color: #ef4444; }
+
+/* Chevron in the bubble's top corner on hover */
+.pulse-bubble-chevron {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  z-index: 6;
+  width: 24px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: radial-gradient(circle at 70% 30%, rgba(0, 0, 0, 0.35), transparent 75%);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+[data-theme="light"] .pulse-bubble-chevron,
+.light .pulse-bubble-chevron { background: radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.9), transparent 75%); }
+.pulse-bubble-chevron:hover { color: var(--text-primary); }
+
+/* ── Pulse: full emoji picker (message box and reactions) ── */
+.pulse-emoji-picker {
+  position: fixed;
+  z-index: 1001;
+  width: 352px;
+  max-width: calc(100vw - 16px);
+  height: 420px;
+  max-height: calc(100vh - 16px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-popover, 0 12px 32px rgba(0, 0, 0, 0.35));
+  overflow: hidden;
+  animation: pulse-menu-in 0.12s ease-out;
+}
+.pulse-emoji-tabs {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--border-hairline);
+}
+.pulse-emoji-tabs button {
+  flex: 1;
+  height: 32px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pulse-emoji-tabs button:hover { color: var(--text-primary); border-bottom-color: var(--accent-primary); }
+.pulse-emoji-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 10px 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+.pulse-emoji-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+.pulse-emoji-grid { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+.pulse-emoji-grid h4 {
+  position: sticky;
+  top: 0;
+  margin: 0;
+  padding: 8px 4px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--surface-3);
+}
+.pulse-emoji-cells { display: grid; grid-template-columns: repeat(8, 1fr); }
+.pulse-emoji-cells button {
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+}
+.pulse-emoji-cells button:hover { background: var(--surface-hover); }
+.pulse-emoji-empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.pulse-more-reactions {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}

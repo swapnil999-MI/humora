@@ -289,6 +289,11 @@ export class PulseClient {
     return this.storage.listMessages(conversationId, opts);
   }
 
+  /** One message from the local store, e.g. the original a reply quotes. */
+  message(conversationId: string, id: string): Promise<LocalMessage | undefined> {
+    return this.storage.getMessage(conversationId, id);
+  }
+
   /**
    * Messages from other people after this user's read position. Counted from
    * the local store because the log also holds entries that are not messages

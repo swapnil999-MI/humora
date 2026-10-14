@@ -38,6 +38,7 @@ import {
   Info,
 } from 'lucide-react';
 import { MonthlyAttendanceDay } from '../../types';
+import { formatClock } from '../../utils/time';
 
 type SubNavTab = 'summary' | 'regularization' | 'onduty';
 type ViewMode = 'list' | 'matrix' | 'calendar';
@@ -315,10 +316,10 @@ export const AttendanceDesk: React.FC = () => {
       let hoursWorked = '00:00';
 
       if (match?.first_punch_in) {
-        inTime = new Date(match.first_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        inTime = formatClock(match.first_punch_in);
       }
       if (match?.last_punch_out) {
-        outTime = new Date(match.last_punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        outTime = formatClock(match.last_punch_out);
       }
       if (match?.work_hours) {
         hoursWorked = `${match.work_hours.toFixed(1)}h`;
@@ -326,10 +327,10 @@ export const AttendanceDesk: React.FC = () => {
 
       if (isToday) {
         if (attendanceSession?.first_punch_in) {
-          inTime = new Date(attendanceSession.first_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          inTime = formatClock(attendanceSession.first_punch_in);
           hoursWorked = elapsedWorkTime;
           if (attendanceSession.last_punch_type === 'out' && attendanceSession.last_punch_time) {
-            outTime = new Date(attendanceSession.last_punch_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            outTime = formatClock(attendanceSession.last_punch_time);
           }
         } else {
           inTime = '-';
@@ -401,14 +402,14 @@ export const AttendanceDesk: React.FC = () => {
         : match?.status || (isPast ? 'absent' : 'scheduled');
 
       let inTime = match?.first_punch_in
-        ? new Date(match.first_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        ? formatClock(match.first_punch_in)
         : (isToday && attendanceSession?.first_punch_in
-            ? new Date(attendanceSession.first_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            ? formatClock(attendanceSession.first_punch_in)
             : '');
       let outTime = match?.last_punch_out
-        ? new Date(match.last_punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        ? formatClock(match.last_punch_out)
         : (isToday && attendanceSession?.last_punch_type === 'out' && attendanceSession?.last_punch_time
-            ? new Date(attendanceSession.last_punch_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            ? formatClock(attendanceSession.last_punch_time)
             : '');
       let hoursWorked = match?.work_hours
         ? `${match.work_hours.toFixed(1)}h`
@@ -477,17 +478,11 @@ export const AttendanceDesk: React.FC = () => {
         })
       ).unwrap();
 
-      dispatch(
-        addToast({
-          type: 'success',
-          message: `Biometric action [${type === 'punch_in' ? 'Check-in' : 'Check-out'}] recorded with notes.`,
-        })
-      );
       setPunchNotes('');
       dispatch(fetchMonthlyAttendance({ year, month }));
       dispatch(fetchAttendanceSession());
-    } catch (err: any) {
-      dispatch(addToast({ type: 'error', message: err || 'Punch failed' }));
+    } catch {
+      // The face-check dialog shows its own errors; a rejection here only means it was cancelled.
     }
   };
 
@@ -1788,8 +1783,8 @@ export const AttendanceDesk: React.FC = () => {
                           {r.request_type.replace('_', ' ')}
                         </td>
                         <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
-                          {r.requested_punch_in ? new Date(r.requested_punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00'} -{' '}
-                          {r.requested_punch_out ? new Date(r.requested_punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '18:00'}
+                          {r.requested_punch_in ? formatClock(r.requested_punch_in) : '9:00 AM'} -{' '}
+                          {r.requested_punch_out ? formatClock(r.requested_punch_out) : '6:00 PM'}
                         </td>
                         <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', maxWidth: '300px' }}>
                           {r.reason}

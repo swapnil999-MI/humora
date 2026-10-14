@@ -296,11 +296,11 @@ export const PayslipDocumentModal: React.FC<PayslipDocumentModalProps> = ({
               </div>
               <div>
                 <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>Bank Name & Account</span>
-                <span style={{ color: '#1e293b', fontWeight: 500 }}>{payslip.bank_name} ({payslip.bank_account_masked})</span>
+                <span style={{ color: '#1e293b', fontWeight: 500 }}>{payslip.bank_name ? `${payslip.bank_name}${payslip.bank_account_masked ? ` (${payslip.bank_account_masked})` : ''}` : 'Not on file'}</span>
               </div>
               <div>
                 <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>Bank IFSC</span>
-                <span style={{ color: '#1e293b' }}>{payslip.bank_ifsc}</span>
+                <span style={{ color: '#1e293b' }}>{payslip.bank_ifsc || 'Not on file'}</span>
               </div>
               <div>
                 <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>Payment Date</span>
@@ -309,11 +309,11 @@ export const PayslipDocumentModal: React.FC<PayslipDocumentModalProps> = ({
 
               <div>
                 <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>PAN</span>
-                <span style={{ color: '#1e293b', fontWeight: 500 }}>{payslip.pan}</span>
+                <span style={{ color: '#1e293b', fontWeight: 500 }}>{payslip.pan || 'Not on file'}</span>
               </div>
               <div>
                 <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>Universal Account No (UAN)</span>
-                <span style={{ color: '#1e293b', fontWeight: 500 }}>{payslip.uan}</span>
+                <span style={{ color: '#1e293b', fontWeight: 500 }}>{payslip.uan || 'Not on file'}</span>
               </div>
               <div>
                 <span style={{ color: '#64748b', display: 'block', fontSize: '10px' }}>Total / Payable Days</span>
@@ -468,7 +468,7 @@ export const PayslipDocumentModal: React.FC<PayslipDocumentModalProps> = ({
                 {formatINR(payslip.net_pay)}
               </div>
               <div style={{ fontSize: '10px', color: '#047857', fontWeight: 600 }}>
-                • Transferred directly to {payslip.bank_name}
+                • {payslip.bank_name ? `Transferred directly to ${payslip.bank_name}` : 'Bank transfer'}
               </div>
             </div>
           </div>

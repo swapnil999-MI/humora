@@ -50,36 +50,6 @@ type OrgNode struct {
 	Children         []OrgNode `json:"children"`
 }
 
-// PunchRequest holds geolocation and biometric telemetry for attendance punches.
-type PunchRequest struct {
-	PunchType        string   `json:"punch_type"` // 'in', 'out', 'break_start', 'break_end'
-	Latitude         *float64 `json:"latitude,omitempty"`
-	Longitude        *float64 `json:"longitude,omitempty"`
-	AccuracyMeters   *float64 `json:"accuracy_meters,omitempty"`
-	LocationID       *string  `json:"location_id,omitempty"`
-	WiFiBSSID        string   `json:"wifi_bssid,omitempty"`
-	OfflineSignature string   `json:"offline_signature,omitempty"`
-	PunchedAt        *string  `json:"punched_at,omitempty"` // RFC3339 for offline queued punches
-	Source           string   `json:"source"`               // 'web', 'android', 'ios'
-}
-
-func (r *PunchRequest) Validate() string {
-	if r.PunchType != "in" && r.PunchType != "out" && r.PunchType != "break_start" && r.PunchType != "break_end" {
-		return "invalid punch_type: must be 'in', 'out', 'break_start', or 'break_end'"
-	}
-	return ""
-}
-
-// PunchResponse describes the verification outcome of a punch event.
-type PunchResponse struct {
-	ID                 string    `json:"id"`
-	PunchType          string    `json:"punch_type"`
-	PunchedAt          time.Time `json:"punched_at"`
-	IsGeofenceVerified bool      `json:"is_geofence_verified"`
-	IsOfflineSigned    bool      `json:"is_offline_signed"`
-	Message            string    `json:"message"`
-}
-
 // EnrollBiometricFaceRequest holds 1 to 5 images for employee master face enrollment.
 type EnrollBiometricFaceRequest struct {
 	Images []string `json:"images"` // 1 to 5 Base64 data URLs or raw base64 images
@@ -135,6 +105,58 @@ type PunchWithFaceResponse struct {
 	FaceConfidence     float64   `json:"face_confidence"`
 	FaceDistance       float32   `json:"face_distance"`
 	SelfieURL          string    `json:"selfie_url,omitempty"`
+	IsGeofenceVerified bool      `json:"is_geofence_verified"`
+	Message            string    `json:"message"`
+}
+
+// PunchDeviceStatus reports whether the employee has a phone set up for fingerprint punches.
+type PunchDeviceStatus struct {
+	Allowed      bool       `json:"allowed"` // HR/admin enabled fingerprint punching for this employee
+	Registered   bool       `json:"registered"`
+	PublicKey    string     `json:"public_key,omitempty"`
+	DeviceLabel  string     `json:"device_label,omitempty"`
+	RegisteredAt *time.Time `json:"registered_at,omitempty"`
+}
+
+// RegisterPunchDeviceRequest registers a fingerprint-bound key; the selfie must match the enrolled face.
+type RegisterPunchDeviceRequest struct {
+	PublicKey   string `json:"public_key"` // base64 DER SubjectPublicKeyInfo, ECDSA P-256
+	SelfieImage string `json:"selfie_image"`
+	DeviceLabel string `json:"device_label"`
+	// Challenge is the server's registration challenge; the key was created with
+	// setAttestationChallenge(SHA-256(Challenge)).
+	Challenge string `json:"challenge"`
+	// AttestationChain is the key's Android attestation certificate chain, base64 DER, leaf first.
+	AttestationChain []string `json:"attestation_chain"`
+}
+
+// PunchChallengeRequest asks for a one-time challenge to sign with the fingerprint key.
+type PunchChallengeRequest struct {
+	PunchType string `json:"punch_type"`
+}
+
+type PunchChallengeResponse struct {
+	Challenge string `json:"challenge"`
+	ExpiresIn int    `json:"expires_in"`
+}
+
+// PunchWithFingerprintRequest carries the challenge signed (SHA256withECDSA, base64 DER) after a fingerprint scan.
+type PunchWithFingerprintRequest struct {
+	PunchType      string   `json:"punch_type"`
+	Challenge      string   `json:"challenge"`
+	Signature      string   `json:"signature"`
+	Latitude       *float64 `json:"latitude,omitempty"`
+	Longitude      *float64 `json:"longitude,omitempty"`
+	AccuracyMeters *float64 `json:"accuracy_meters,omitempty"`
+	LocationID     *string  `json:"location_id,omitempty"`
+	Source         string   `json:"source"`
+}
+
+type PunchWithFingerprintResponse struct {
+	ID                 string    `json:"id"`
+	PunchType          string    `json:"punch_type"`
+	PunchedAt          time.Time `json:"punched_at"`
+	IsDeviceVerified   bool      `json:"is_device_verified"`
 	IsGeofenceVerified bool      `json:"is_geofence_verified"`
 	Message            string    `json:"message"`
 }
@@ -252,12 +274,16 @@ type CreateShiftRequest struct {
 	FullDayHours        float64 `json:"full_day_hours"`
 	IsNightShift        bool    `json:"is_night_shift"`
 	NightShiftAllowance float64 `json:"night_shift_allowance"`
+	// TimeZone is the admin dashboard's IANA zone (e.g. "Asia/Kolkata"), captured when the
+	// shift is created. It cannot be changed afterwards.
+	TimeZone string `json:"time_zone"`
 }
 
 func (r *CreateShiftRequest) Validate() string {
 	if strings.TrimSpace(r.Name) == "" {
 		return "shift name is required"
 	}
+	r.TimeZone = strings.TrimSpace(r.TimeZone)
 	if strings.TrimSpace(r.StartTime) == "" || strings.TrimSpace(r.EndTime) == "" {
 		return "start_time and end_time are required"
 	}

@@ -16,6 +16,7 @@ const (
 	LogLevelEnv                  = "LOG_LEVEL"
 	ProxyHeaderEnv               = "PROXY_HEADER"
 	TrustedProxiesEnv            = "TRUSTED_PROXIES"
+	PublicSignupEnv              = "PUBLIC_SIGNUP"
 
 	// Database keys
 	DbHostEnv                    = "DB_HOST"

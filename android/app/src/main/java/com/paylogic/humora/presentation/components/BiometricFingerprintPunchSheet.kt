@@ -38,10 +38,12 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.paylogic.humora.HumoraApp
+import androidx.biometric.BiometricPrompt
 import com.paylogic.humora.core.security.BiometricPromptManager
+import com.paylogic.humora.core.security.PunchKey
+import com.paylogic.humora.data.remote.NetworkResult
 import com.paylogic.humora.core.theme.*
 import com.paylogic.humora.data.repository.AttendanceRepository
-import com.paylogic.humora.data.repository.BiometricPunchResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
@@ -85,8 +87,11 @@ fun BiometricFingerprintPunchSheet(
     var isFingerprintVerified by remember { mutableStateOf(false) }
     var isPunching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var statusText by remember { mutableStateOf("Touch the fingerprint sensor to verify") }
-    var capturedSelfieBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var statusText by remember { mutableStateOf("Checking fingerprint punch on this phone...") }
+    // null = still checking or not allowed; false = this phone must be set up with a face check first.
+    var isDeviceReady by remember { mutableStateOf<Boolean?>(null) }
+    var isNotAllowed by remember { mutableStateOf(false) }
+    val userId = remember { HumoraApp.instance.sessionManager.userId }
 
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
@@ -115,76 +120,118 @@ fun BiometricFingerprintPunchSheet(
         return "data:image/jpeg;base64,$base64"
     }
 
-    // Helper to generate simulated synthetic face portrait if camera is unaccessible
-    fun generateSimulatedFaceDataUrl(): String {
-        val bmp = Bitmap.createBitmap(150, 150, Bitmap.Config.ARGB_8888)
-        for (y in 0 until 150) {
-            for (x in 0 until 150) {
-                val tex = (x * y) % 255
-                val r = 210
-                val g = 160
-                val b = 120 + (tex % 60)
-                bmp.setPixel(x, y, android.graphics.Color.argb(255, r, g, b))
-            }
-        }
-        return bitmapToBase64DataUrl(bmp)
+    fun networkMessage(res: NetworkResult<*>): String = when (res) {
+        is NetworkResult.Error -> res.message
+        is NetworkResult.Exception -> "You're offline. Connect to the internet to punch."
+        is NetworkResult.Success -> ""
     }
 
-    fun executePunch(selfieBase64: String) {
+    // Signs a fresh server challenge with the fingerprint-bound key and records the punch.
+    fun promptFingerprint() {
+        if (activity == null) {
+            errorMessage = "Biometric prompt requires an active activity."
+            return
+        }
+        errorMessage = null
         scope.launch {
-            isPunching = true
-            statusText = "Archiving punch with photo audit..."
-
             val location = com.paylogic.humora.core.location.LocationProvider.getCurrentLocation(context)
-            if (location == null) {
-                isPunching = false
-                errorMessage = "Location unavailable: Please enable GPS and grant location permission to punch."
+            attendanceRepo.precheckLocation(location)?.let {
+                errorMessage = it
                 return@launch
             }
 
-            val result = attendanceRepo.recordPunchWithFace(
-                punchType = punchType,
-                base64Image = selfieBase64,
-                location = location,
-                source = "android_fingerprint"
-            )
+            val signature = PunchKey.signatureForPrompt(userId)
+            if (signature == null) {
+                isDeviceReady = false
+                statusText = "Fingerprints on this phone changed. Verify your face to set up fingerprint punch again."
+                return@launch
+            }
+            val challengeRes = attendanceRepo.getPunchChallenge(punchType)
+            if (challengeRes !is NetworkResult.Success) {
+                errorMessage = networkMessage(challengeRes)
+                return@launch
+            }
+            val challenge = challengeRes.data.challenge
 
-            isPunching = false
-            when (result) {
-                is BiometricPunchResult.Success -> {
-                    val action = if (punchType.equals("in", ignoreCase = true)) "CHECK-IN" else "CHECK-OUT"
-                    statusText = "$action recorded with fingerprint & front camera photo!"
-                    delay(1200)
-                    onPunchSuccess("$action Verified via Fingerprint (Audit Snapshot Archived)")
-                    onDismiss()
-                }
-                is BiometricPunchResult.GeofenceRejection -> {
-                    errorMessage = "Geofence Violation: You are ${result.distanceMeters.toInt()}m from corporate office."
-                }
-                is BiometricPunchResult.SecurityRejection -> {
-                    errorMessage = "Security Alert: ${result.reason}"
-                }
-                is BiometricPunchResult.Error -> {
-                    errorMessage = result.message
-                }
-                is BiometricPunchResult.NotEnrolled -> {
-                    errorMessage = result.message
-                }
-                is BiometricPunchResult.IdentityMismatch -> {
-                    errorMessage = result.message
+            statusText = "Touch the fingerprint sensor to verify..."
+            BiometricPromptManager(activity).showBiometricPrompt(
+                title = if (punchType.equals("in", ignoreCase = true)) "Fingerprint Check-In" else "Fingerprint Check-Out",
+                subtitle = "Verify your fingerprint to record this punch",
+                description = "Place your registered finger on the sensor.",
+                cryptoObject = BiometricPrompt.CryptoObject(signature)
+            ) { result ->
+                when (result) {
+                    is BiometricPromptManager.BiometricResult.AuthenticationSuccess -> {
+                        val unlocked = result.cryptoObject?.signature
+                        if (unlocked == null) {
+                            errorMessage = "Fingerprint verification did not unlock the punch key. Please try again."
+                            return@showBiometricPrompt
+                        }
+                        isFingerprintVerified = true
+                        scope.launch {
+                            isPunching = true
+                            statusText = "Fingerprint verified. Recording punch..."
+                            val signed = PunchKey.sign(unlocked, challenge)
+                            val res = attendanceRepo.submitFingerprintPunch(punchType, challenge, signed, location!!)
+                            isPunching = false
+                            if (res is NetworkResult.Success) {
+                                val action = if (punchType.equals("in", ignoreCase = true)) "CHECK-IN" else "CHECK-OUT"
+                                statusText = "$action recorded with fingerprint!"
+                                delay(1200)
+                                onPunchSuccess("$action Verified via Fingerprint")
+                                onDismiss()
+                            } else {
+                                isFingerprintVerified = false
+                                errorMessage = networkMessage(res)
+                            }
+                        }
+                    }
+                    is BiometricPromptManager.BiometricResult.AuthenticationFailed -> {
+                        errorMessage = "Fingerprint did not match. Please try again."
+                    }
+                    is BiometricPromptManager.BiometricResult.AuthenticationError -> {
+                        errorMessage = result.errString
+                    }
+                    is BiometricPromptManager.BiometricResult.NoneEnrolled -> {
+                        errorMessage = "No fingerprints enrolled on this device. Please enroll in Android Settings."
+                    }
+                    is BiometricPromptManager.BiometricResult.HardwareUnavailable -> {
+                        errorMessage = "Biometric hardware is currently unavailable."
+                    }
+                    is BiometricPromptManager.BiometricResult.FeatureUnavailable -> {
+                        errorMessage = "This phone has no strong fingerprint sensor. Use face punch instead."
+                    }
                 }
             }
         }
     }
 
-    fun capturePhotoAndSubmit() {
+    // One-time setup: a selfie that matches the enrolled face registers this phone's key.
+    fun setUpWithSelfie(selfieBase64: String) {
+        scope.launch {
+            isPunching = true
+            statusText = "Checking your face to set up fingerprint punch..."
+            val res = attendanceRepo.setUpFingerprint(userId, selfieBase64)
+            isPunching = false
+            if (res is NetworkResult.Success) {
+                isDeviceReady = true
+                statusText = "Fingerprint punch is set up on this phone."
+                promptFingerprint()
+            } else {
+                errorMessage = networkMessage(res)
+                statusText = "Look at the camera and tap Verify Face to set up fingerprint punch."
+            }
+        }
+    }
+
+    fun captureSetupSelfie() {
+        errorMessage = null
         val capture = imageCapture
         if (capture == null || !hasCameraPermission) {
-            val fallbackBase64 = generateSimulatedFaceDataUrl()
-            executePunch(fallbackBase64)
+            errorMessage = "Camera access is needed once to verify your face for fingerprint punch."
             return
         }
-
+        statusText = "Capturing selfie..."
         val executor = Executors.newSingleThreadExecutor()
         capture.takePicture(executor, object : ImageCapture.OnImageCapturedCallback() {
             override fun onCaptureSuccess(image: ImageProxy) {
@@ -203,66 +250,40 @@ fun BiometricFingerprintPunchSheet(
                 val correctedBitmap = Bitmap.createBitmap(
                     originalBitmap, 0, 0, originalBitmap.width, originalBitmap.height, matrix, true
                 )
-                capturedSelfieBitmap = correctedBitmap
-                val base64DataUrl = bitmapToBase64DataUrl(correctedBitmap)
-                executePunch(base64DataUrl)
+                setUpWithSelfie(bitmapToBase64DataUrl(correctedBitmap))
             }
 
             override fun onError(exception: ImageCaptureException) {
-                val fallbackBase64 = generateSimulatedFaceDataUrl()
-                executePunch(fallbackBase64)
+                scope.launch {
+                    errorMessage = "Could not take the selfie: ${exception.message}"
+                }
             }
         })
     }
 
-    fun promptFingerprint() {
-        if (activity == null) {
-            errorMessage = "Biometric prompt requires an active activity."
-            return
-        }
-
-        errorMessage = null
-        statusText = "Touch fingerprint sensor to authenticate..."
-
-        val manager = BiometricPromptManager(activity)
-        if (!manager.canAuthenticate()) {
-            errorMessage = "Fingerprint sensor is not available or no fingerprint is enrolled on device."
-            return
-        }
-
-        manager.showBiometricPrompt(
-            title = if (punchType.equals("in", ignoreCase = true)) "Fingerprint Check-In" else "Fingerprint Check-Out",
-            subtitle = "Verify fingerprint & capture front-camera photo audit",
-            description = "Place your registered finger on the sensor to record punch."
-        ) { result ->
-            when (result) {
-                is BiometricPromptManager.BiometricResult.AuthenticationSuccess -> {
-                    isFingerprintVerified = true
-                    statusText = "Fingerprint authenticated! Capturing selfie snapshot..."
-                    capturePhotoAndSubmit()
-                }
-                is BiometricPromptManager.BiometricResult.AuthenticationFailed -> {
-                    errorMessage = "Fingerprint did not match. Please try again."
-                }
-                is BiometricPromptManager.BiometricResult.AuthenticationError -> {
-                    errorMessage = result.errString
-                }
-                is BiometricPromptManager.BiometricResult.NoneEnrolled -> {
-                    errorMessage = "No fingerprints enrolled on this device. Please enroll in Android Settings."
-                }
-                is BiometricPromptManager.BiometricResult.HardwareUnavailable -> {
-                    errorMessage = "Biometric hardware is currently unavailable."
-                }
-                is BiometricPromptManager.BiometricResult.FeatureUnavailable -> {
-                    errorMessage = "Biometric authentication is not supported on this device."
-                }
-            }
-        }
-    }
-
     LaunchedEffect(Unit) {
         delay(300)
-        promptFingerprint()
+        when (val ready = attendanceRepo.fingerprintReadiness(userId)) {
+            is NetworkResult.Success -> when (ready.data) {
+                AttendanceRepository.FingerprintReadiness.READY -> {
+                    isDeviceReady = true
+                    statusText = "Touch the fingerprint sensor to verify"
+                    promptFingerprint()
+                }
+                AttendanceRepository.FingerprintReadiness.NEEDS_SETUP -> {
+                    isDeviceReady = false
+                    statusText = "Fingerprint punch isn't set up on this phone yet. Look at the camera and tap Verify Face (one time)."
+                }
+                AttendanceRepository.FingerprintReadiness.NOT_ALLOWED -> {
+                    isNotAllowed = true
+                    statusText = "Fingerprint punch is not enabled for you. Ask HR or an admin to allow it, or punch with your face."
+                }
+            }
+            else -> {
+                errorMessage = networkMessage(ready)
+                statusText = "Could not check fingerprint punch."
+            }
+        }
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -310,7 +331,7 @@ fun BiometricFingerprintPunchSheet(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Auto front-camera snapshot recorded",
+                                text = if (isDeviceReady == false) "One-time setup with a face check" else "Signed with this phone's fingerprint key",
                                 color = TextMutedDark,
                                 fontSize = 11.sp
                             )
@@ -324,8 +345,8 @@ fun BiometricFingerprintPunchSheet(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Front Camera Viewport (Live selfie feed)
-                Box(
+                // Front Camera Viewport (only for the one-time face check during setup)
+                if (isDeviceReady == false) Box(
                     modifier = Modifier
                         .size(190.dp)
                         .clip(RoundedCornerShape(95.dp))
@@ -408,7 +429,7 @@ fun BiometricFingerprintPunchSheet(
                                 modifier = Modifier.size(12.dp)
                             )
                             Text(
-                                text = "Front Camera Audit",
+                                text = "Face check",
                                 fontSize = 10.sp,
                                 color = Color.White,
                                 fontWeight = FontWeight.Medium
@@ -512,15 +533,15 @@ fun BiometricFingerprintPunchSheet(
                     }
 
                     Button(
-                        onClick = { promptFingerprint() },
-                        enabled = !isPunching,
+                        onClick = { if (isDeviceReady == false) captureSetupSelfie() else promptFingerprint() },
+                        enabled = !isPunching && isDeviceReady != null && !isNotAllowed,
                         modifier = Modifier.weight(1.3f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = BrandSecondary)
                     ) {
-                        Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(if (isDeviceReady == false) Icons.Default.Face else Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Scan Finger", fontWeight = FontWeight.SemiBold)
+                        Text(if (isDeviceReady == false) "Verify Face" else "Scan Finger", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

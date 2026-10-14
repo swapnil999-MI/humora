@@ -1,6 +1,6 @@
 module humora-backend
 
-go 1.27.2
+go 1.27.1
 
 require (
 	github.com/fasthttp/websocket v1.5.8

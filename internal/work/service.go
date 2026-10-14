@@ -136,11 +136,11 @@ func (s *service) CreateSprint(ctx context.Context, tenantID uuid.UUID, req *Cre
 }
 
 func (s *service) ListSprints(ctx context.Context, tenantID, projectID uuid.UUID) ([]Sprint, error) {
-	return s.repo.ListSprintsByProject(ctx, projectID)
+	return s.repo.ListSprintsByProject(ctx, tenantID, projectID)
 }
 
 func (s *service) UpdateSprintStatus(ctx context.Context, tenantID, sprintID uuid.UUID, status string) (*Sprint, error) {
-	sprint, err := s.repo.GetSprintByID(ctx, sprintID)
+	sprint, err := s.repo.GetSprintByID(ctx, tenantID, sprintID)
 	if err != nil || sprint == nil {
 		return nil, errors.New("sprint not found")
 	}
@@ -153,7 +153,7 @@ func (s *service) UpdateSprintStatus(ctx context.Context, tenantID, sprintID uui
 		}
 	}
 
-	if err := s.repo.UpdateSprintStatus(ctx, sprintID, status); err != nil {
+	if err := s.repo.UpdateSprintStatus(ctx, tenantID, sprintID, status); err != nil {
 		return nil, fmt.Errorf("failed to update sprint status: %w", err)
 	}
 
@@ -207,6 +207,10 @@ func (s *service) CreateIssue(ctx context.Context, tenantID, reporterUserID uuid
 		}
 	}
 
+	if err := s.checkIssueLinks(ctx, tenantID, projectUUID, assigneeUUID, sprintUUID, parentUUID); err != nil {
+		return nil, err
+	}
+
 	issue := &Issue{
 		ID:                       uuid.New(),
 		TenantID:                 tenantID,
@@ -238,6 +242,29 @@ func (s *service) CreateIssue(ctx context.Context, tenantID, reporterUserID uuid
 	return s.repo.GetIssueByID(ctx, tenantID, issue.ID)
 }
 
+// checkIssueLinks makes sure an issue only points at things in its own organisation and
+// project: an assignee in the tenant, a sprint of the same project, a parent in the project.
+func (s *service) checkIssueLinks(ctx context.Context, tenantID, projectID uuid.UUID, assignee, sprint, parent *uuid.UUID) error {
+	if assignee != nil {
+		if ok, err := s.repo.EmployeeInTenant(ctx, tenantID, *assignee); err != nil || !ok {
+			return errors.New("assignee not found")
+		}
+	}
+	if sprint != nil {
+		sp, err := s.repo.GetSprintByID(ctx, tenantID, *sprint)
+		if err != nil || sp == nil || sp.ProjectID != projectID {
+			return errors.New("sprint not found in this project")
+		}
+	}
+	if parent != nil {
+		p, err := s.repo.GetIssueByID(ctx, tenantID, *parent)
+		if err != nil || p == nil || p.ProjectID != projectID {
+			return errors.New("parent issue not found in this project")
+		}
+	}
+	return nil
+}
+
 func (s *service) GetIssue(ctx context.Context, tenantID, id uuid.UUID) (*Issue, error) {
 	return s.repo.GetIssueByID(ctx, tenantID, id)
 }
@@ -256,9 +283,14 @@ func (s *service) TransitionIssue(ctx context.Context, tenantID, issueID, target
 		return nil, errors.New("issue not found")
 	}
 
-	// Verify target status exists
+	// The status must belong to this issue's project workflow (statuses are looked up by id
+	// alone, so without this check any workflow's status, even another tenant's, was accepted).
 	targetStatus, err := s.repo.GetWorkflowStatus(ctx, targetStatusID)
 	if err != nil || targetStatus == nil {
+		return nil, errors.New("target workflow status not found")
+	}
+	project, err := s.repo.GetProjectByID(ctx, tenantID, issue.ProjectID)
+	if err != nil || project == nil || targetStatus.WorkflowID != project.WorkflowID {
 		return nil, errors.New("target workflow status not found")
 	}
 
@@ -301,6 +333,16 @@ func (s *service) UpdateIssue(ctx context.Context, tenantID, issueID uuid.UUID, 
 	}
 	if req.StoryPoints != nil {
 		issue.StoryPoints = req.StoryPoints
+	}
+	var newAssignee, newSprint *uuid.UUID
+	if req.AssigneeID != nil {
+		newAssignee = issue.AssigneeID
+	}
+	if req.SprintID != nil {
+		newSprint = issue.SprintID
+	}
+	if err := s.checkIssueLinks(ctx, tenantID, issue.ProjectID, newAssignee, newSprint, nil); err != nil {
+		return nil, err
 	}
 	if req.RemainingEstimateSeconds != nil {
 		issue.RemainingEstimateSeconds = *req.RemainingEstimateSeconds
@@ -371,7 +413,7 @@ func (s *service) GetBacklog(ctx context.Context, tenantID, projectID uuid.UUID)
 		return nil, errors.New("project not found")
 	}
 
-	sprints, err := s.repo.ListSprintsByProject(ctx, projectID)
+	sprints, err := s.repo.ListSprintsByProject(ctx, tenantID, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch sprints: %w", err)
 	}

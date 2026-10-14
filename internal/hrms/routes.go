@@ -28,7 +28,6 @@ func RegisterRoutes(router fiber.Router, handler *Handler, onboardingHandler *On
 		companyGroup.Get("/smtp", companyHandler.GetSMTPConfig)
 		companyGroup.Put("/smtp", companyHandler.SaveSMTPConfig)
 		companyGroup.Post("/smtp/test", companyHandler.TestSMTPConfig)
-		companyGroup.Get("/smtp/test", companyHandler.TestSMTPConfig)
 	}
 
 	// Employee Self-Service (ESS) Profile Management
@@ -57,6 +56,9 @@ func RegisterRoutes(router fiber.Router, handler *Handler, onboardingHandler *On
 	empGroup.Get("/org-tree", handler.GetOrgTree)
 	empGroup.Get("/:id", handler.GetEmployee)
 	empGroup.Post("/:id/biometric-face", managementOnly, handler.UpdateEmployeeBiometricFace)
+	empGroup.Delete("/:id/biometric-face", managementOnly, handler.DeleteEmployeeBiometricFace)
+	empGroup.Post("/:id/fingerprint", managementOnly, handler.AllowEmployeeFingerprint)
+	empGroup.Delete("/:id/fingerprint", managementOnly, handler.RemoveEmployeeFingerprint)
 
 	// Office Geofenced Locations Desk
 	locGroup := hrmsGroup.Group("/locations")
@@ -68,8 +70,14 @@ func RegisterRoutes(router fiber.Router, handler *Handler, onboardingHandler *On
 
 	// Attendance & Geofenced Punch Desk
 	attGroup := hrmsGroup.Group("/attendance")
-	attGroup.Post("/punch", handler.Punch)
+	// Every punch is verified by face or by fingerprint; there is no location-only punch.
 	attGroup.Post("/punch-with-face", handler.PunchWithFace)
+	attGroup.Get("/fingerprint/device", handler.GetPunchDevice)
+	attGroup.Get("/fingerprint/devices", managementOnly, handler.ListFingerprintAccess)
+	attGroup.Post("/fingerprint/device/challenge", handler.IssueDeviceRegistrationChallenge)
+	attGroup.Post("/fingerprint/device", middleware.RateLimiter(10, time.Minute), handler.RegisterPunchDevice)
+	attGroup.Post("/fingerprint/challenge", handler.IssuePunchChallenge)
+	attGroup.Post("/punch-with-fingerprint", handler.PunchWithFingerprint)
 	attGroup.Get("/summary", handler.GetAttendanceSummary)
 	attGroup.Get("/session", handler.GetAttendanceSession)
 	attGroup.Get("/calendar", handler.GetMonthlyAttendance)

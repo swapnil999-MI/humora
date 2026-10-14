@@ -558,7 +558,7 @@ fun AdminCapacityScreen(
                                                 color = TextPrimaryDark
                                             )
                                             Text(
-                                                text = "Enroll Face & Fingerprint for kiosk attendance",
+                                                text = "Enroll faces, allow or delete face & fingerprint punching",
                                                 fontSize = 11.sp,
                                                 color = TextMutedDark
                                             )
@@ -574,7 +574,7 @@ fun AdminCapacityScreen(
                         EmployeeBiometricRow(
                             empState = empState,
                             onEnrollFace = { adminViewModel.openFaceEnrollment(empState.employee) },
-                            onEnrollFingerprint = { adminViewModel.openFingerprintEnrollment(empState.employee) }
+                            onEnrollFingerprint = { adminViewModel.openBiometricAccess(empState.employee) }
                         )
                     }
                 }
@@ -601,12 +601,8 @@ fun AdminCapacityScreen(
             )
         }
 
-        uiState.activeFingerprintEnrollEmployee?.let { emp ->
-            AdminFingerprintEnrollmentSheet(
-                employee = emp,
-                adminViewModel = adminViewModel,
-                onDismiss = { adminViewModel.closeFingerprintEnrollment() }
-            )
+        if (uiState.activeBiometricEmployeeId != null) {
+            AdminBiometricAccessSheet(uiState = uiState, adminViewModel = adminViewModel)
         }
     }
 }
@@ -1192,7 +1188,7 @@ private fun EmployeeBiometricRow(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Fingerprint,
-                        contentDescription = "Fingerprint",
+                        contentDescription = "Manage face and fingerprint access",
                         tint = if (empState.isFingerprintRegistered) EmeraldSuccess else BrandPrimary,
                         modifier = Modifier.size(18.dp)
                     )

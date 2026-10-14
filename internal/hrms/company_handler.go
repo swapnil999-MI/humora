@@ -106,9 +106,6 @@ func (h *CompanyHandler) TestSMTPConfig(c *fiber.Ctx) error {
 			req.RecipientEmail = emailVal
 		}
 	}
-	if strings.TrimSpace(req.Host) == "" {
-		req.Host = strings.TrimSpace(c.Query("host"))
-	}
 
 	if err := h.service.TestSMTPConfig(c.UserContext(), tenantID, &req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, err.Error())

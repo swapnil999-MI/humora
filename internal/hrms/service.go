@@ -5,8 +5,6 @@ import (
 	"humora-backend/internal/notify"
 	"bytes"
 	"context"
-	"crypto/ed25519"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,12 +29,12 @@ func saveBiometricDebugImage(prefix, empID string, img image.Image) string {
 		return ""
 	}
 	debugDir := "storage/debug_biometrics"
-	if err := os.MkdirAll(debugDir, 0755); err != nil {
+	if err := os.MkdirAll(debugDir, 0700); err != nil {
 		return ""
 	}
 	filename := fmt.Sprintf("%s_%s_%d.jpg", prefix, empID, time.Now().UnixNano()/1000000)
 	filePath := filepath.Join(debugDir, filename)
-	f, err := os.Create(filePath)
+	f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return ""
 	}
@@ -54,12 +52,20 @@ type Service interface {
 	ListEmployees(ctx context.Context, tenantID uuid.UUID, search, deptID string, limit, offset int) ([]Employee, int64, error)
 	GetOrgTree(ctx context.Context, tenantID uuid.UUID) ([]OrgNode, error)
 
-	RecordPunch(ctx context.Context, tenantID, userID uuid.UUID, req *PunchRequest) (*PunchResponse, error)
 	GetAttendanceSummary(ctx context.Context, tenantID, userID uuid.UUID) (*AttendanceSummaryResponse, error)
 
 	// Biometric Face Verification & Punching
 	UpdateEmployeeBiometricFace(ctx context.Context, tenantID, employeeID uuid.UUID, req *EnrollBiometricFaceRequest) (*EnrollBiometricFaceResponse, error)
 	PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID, req *PunchWithFaceRequest) (*PunchWithFaceResponse, error)
+	GetPunchDevice(ctx context.Context, tenantID, userID uuid.UUID) (*PunchDeviceStatus, error)
+	RegisterPunchDevice(ctx context.Context, tenantID, userID uuid.UUID, req *RegisterPunchDeviceRequest) (*PunchDeviceStatus, error)
+	IssuePunchChallenge(ctx context.Context, tenantID, userID uuid.UUID, punchType string) (*PunchChallengeResponse, error)
+	IssueDeviceRegistrationChallenge(ctx context.Context, tenantID, userID uuid.UUID) (*PunchChallengeResponse, error)
+	PunchWithFingerprint(ctx context.Context, tenantID, userID uuid.UUID, req *PunchWithFingerprintRequest) (*PunchWithFingerprintResponse, error)
+	ListFingerprintAccess(ctx context.Context, tenantID uuid.UUID) ([]PunchDevice, error)
+	AllowFingerprint(ctx context.Context, tenantID, employeeID, adminUserID uuid.UUID) error
+	RemoveFingerprint(ctx context.Context, tenantID, employeeID uuid.UUID) error
+	DeleteEmployeeFace(ctx context.Context, tenantID, employeeID uuid.UUID) error
 
 	PreviewLeave(ctx context.Context, tenantID, userID uuid.UUID, req *ApplyLeaveRequest) (*LeavePreviewResponse, error)
 	ApplyLeave(ctx context.Context, tenantID, userID uuid.UUID, req *ApplyLeaveRequest) (*LeaveRequest, error)
@@ -241,127 +247,15 @@ func (s *service) GetOrgTree(ctx context.Context, tenantID uuid.UUID) ([]OrgNode
 	return rootNodes, nil
 }
 
-func (s *service) RecordPunch(ctx context.Context, tenantID, userID uuid.UUID, req *PunchRequest) (*PunchResponse, error) {
-	if validationErr := req.Validate(); validationErr != "" {
-		return nil, errors.New(validationErr)
-	}
-
-	emp, err := s.repo.GetEmployeeByUserID(ctx, tenantID, userID)
-	if err != nil || emp == nil {
-		return nil, errors.New("employee profile not found for user")
-	}
-
-	punchedAt := time.Now().UTC()
-	if req.PunchedAt != nil && *req.PunchedAt != "" {
-		if parsed, err := time.Parse(time.RFC3339, *req.PunchedAt); err == nil {
-			punchedAt = parsed
-		}
-	}
-
-	isGeofenceVerified := false
-	verificationMsg := "punch recorded"
-
-	// 1. Geofence & Wi-Fi Check
-	offices, _ := s.repo.ListOfficeLocations(ctx, tenantID)
-	if len(offices) > 0 {
-		if req.Latitude == nil || req.Longitude == nil {
-			// Check if verified by corporate WiFi
-			wifiVerified := false
-			if req.WiFiBSSID != "" {
-				for _, off := range offices {
-					v, msg := VerifyGeofence(&off, 0, 0, req.WiFiBSSID)
-					if v {
-						wifiVerified = true
-						isGeofenceVerified = true
-						verificationMsg = msg
-						break
-					}
-				}
-			}
-			if !wifiVerified && req.OfflineSignature == "" {
-				return nil, errors.New("location check failed: GPS coordinates are required for attendance check-in/check-out")
-			}
-		} else {
-			var nearestOffice *OfficeLocation
-			minDist := math.MaxFloat64
-
-			for i := range offices {
-				off := &offices[i]
-				dist := HaversineDistance(off.Latitude, off.Longitude, *req.Latitude, *req.Longitude)
-				if dist < minDist {
-					minDist = dist
-					nearestOffice = off
-				}
-				verified, msg := VerifyGeofence(off, *req.Latitude, *req.Longitude, req.WiFiBSSID)
-				if verified {
-					isGeofenceVerified = true
-					verificationMsg = msg
-					break
-				}
-			}
-
-			if !isGeofenceVerified && req.OfflineSignature == "" {
-				if nearestOffice != nil {
-					return nil, fmt.Errorf("geofence check failed: you are %.1fm away from '%s' (allowed radius: %dm). Punch rejected", minDist, nearestOffice.Name, nearestOffice.RadiusMeters)
-				}
-				return nil, errors.New("geofence check failed: outside designated office perimeter. Punch rejected")
-			}
-		}
-	}
-
-	// 2. Cryptographic Ed25519 Offline Signature Verification
-	isOfflineSigned := false
-	if req.OfflineSignature != "" {
-		sigBytes, sigErr := hex.DecodeString(req.OfflineSignature)
-		if sigErr == nil && len(sigBytes) == ed25519.SignatureSize {
-			isOfflineSigned = true
-			verificationMsg = "offline cryptographic signature verified"
-		}
-	}
-
-	punch := &AttendancePunch{
-		ID:                 uuid.New(),
-		TenantID:           tenantID,
-		EmployeeID:         emp.ID,
-		PunchType:          req.PunchType,
-		PunchedAt:          punchedAt,
-		Latitude:           req.Latitude,
-		Longitude:          req.Longitude,
-		AccuracyMeters:     req.AccuracyMeters,
-		IsGeofenceVerified: isGeofenceVerified,
-		IsOfflineSigned:    isOfflineSigned,
-		Source:             req.Source,
-	}
-	if req.LocationID != nil && *req.LocationID != "" {
-		if locID, err := uuid.Parse(*req.LocationID); err == nil {
-			punch.LocationID = &locID
-		}
-	}
-	if req.OfflineSignature != "" {
-		punch.OfflineSignature = &req.OfflineSignature
-	}
-
-	if err := s.repo.CreateAttendancePunch(ctx, punch); err != nil {
-		return nil, fmt.Errorf("failed to record punch: %w", err)
-	}
-
-	return &PunchResponse{
-		ID:                 punch.ID.String(),
-		PunchType:          punch.PunchType,
-		PunchedAt:          punch.PunchedAt,
-		IsGeofenceVerified: punch.IsGeofenceVerified,
-		IsOfflineSigned:    punch.IsOfflineSigned,
-		Message:            verificationMsg,
-	}, nil
-}
-
 func (s *service) GetAttendanceSummary(ctx context.Context, tenantID, userID uuid.UUID) (*AttendanceSummaryResponse, error) {
 	emp, err := s.repo.GetEmployeeByUserID(ctx, tenantID, userID)
 	if err != nil || emp == nil {
 		return nil, errors.New("employee profile not found")
 	}
 
-	punches, err := s.repo.GetTodayPunches(ctx, tenantID, emp.ID)
+	// "Today" is the calendar day in the time zone of the employee's shift.
+	loc, shift := EmployeeLocation(ctx, s.repo, tenantID, emp.ID, time.Now())
+	punches, err := s.repo.GetTodayPunches(ctx, tenantID, emp.ID, DayStart(time.Now(), loc))
 	if err != nil {
 		return nil, err
 	}
@@ -375,7 +269,7 @@ func (s *service) GetAttendanceSummary(ctx context.Context, tenantID, userID uui
 	if lastPunch != nil {
 		lastPunchType = lastPunch.PunchType
 		lastPunchTime = &lastPunch.PunchedAt
-		punchedIn = (lastPunch.PunchType == "in" || lastPunch.PunchType == "break_end")
+		punchedIn = PunchState(lastPunch) == "working"
 	}
 
 	// Calculate accumulated hours today
@@ -401,7 +295,6 @@ func (s *service) GetAttendanceSummary(ctx context.Context, tenantID, userID uui
 		presence = "in_office_active"
 	}
 
-	shift, _ := s.repo.GetEmployeeShift(ctx, tenantID, emp.ID, time.Now())
 	shiftName := ""
 	if shift != nil {
 		shiftName = shift.Name
@@ -445,6 +338,9 @@ func (s *service) PreviewLeave(ctx context.Context, tenantID, userID uuid.UUID, 
 	if err != nil {
 		return nil, errors.New("invalid to_date format")
 	}
+	if toDate.Before(fromDate) {
+		return nil, errors.New("to_date must be on or after from_date")
+	}
 
 	holidays, _ := s.repo.ListPublicHolidays(ctx, tenantID, fromDate.Year())
 	var holidayDates []time.Time
@@ -483,6 +379,20 @@ func (s *service) ApplyLeave(ctx context.Context, tenantID, userID uuid.UUID, re
 	leaveTypeID, _ := uuid.Parse(req.LeaveTypeID)
 	fromDate, _ := time.Parse("2006-01-02", req.FromDate)
 	toDate, _ := time.Parse("2006-01-02", req.ToDate)
+
+	if preview.TotalDeductedDays <= 0 {
+		return nil, errors.New("the selected dates contain no working days")
+	}
+	// The same day cannot be on leave twice (it would be deducted twice).
+	if overlap, err := s.repo.HasOverlappingLeave(ctx, tenantID, emp.ID, fromDate, toDate); err != nil {
+		return nil, err
+	} else if overlap {
+		return nil, errors.New("you already have a pending or approved leave on some of these dates")
+	}
+	// Where a balance is tracked for this leave type, it must cover the request.
+	if bal, _ := s.repo.GetLeaveBalance(ctx, tenantID, emp.ID, leaveTypeID, fromDate.Year()); bal != nil && bal.Balance < preview.TotalDeductedDays {
+		return nil, fmt.Errorf("not enough leave balance: %s day(s) left, %s requested", trimNum(bal.Balance), trimNum(preview.TotalDeductedDays))
+	}
 
 	leaveReq := &LeaveRequest{
 		ID:                   uuid.New(),
@@ -586,6 +496,13 @@ func (s *service) CreateShift(ctx context.Context, tenantID uuid.UUID, req *Crea
 	if errStr := req.Validate(); errStr != "" {
 		return nil, errors.New(errStr)
 	}
+	// The zone comes from the admin dashboard that creates the shift and is fixed from then on.
+	if req.TimeZone == "" {
+		return nil, errors.New("time_zone is required: it is taken from the admin dashboard creating the shift")
+	}
+	if !ValidZone(req.TimeZone) {
+		return nil, errors.New("time_zone is not a known time zone: " + req.TimeZone)
+	}
 
 	shift := &Shift{
 		ID:                  uuid.New(),
@@ -593,6 +510,7 @@ func (s *service) CreateShift(ctx context.Context, tenantID uuid.UUID, req *Crea
 		Name:                strings.TrimSpace(req.Name),
 		StartTime:           normalizeTimeString(req.StartTime),
 		EndTime:             normalizeTimeString(req.EndTime),
+		TimeZone:            req.TimeZone,
 		GraceMinutes:        req.GraceMinutes,
 		HalfDayHours:        req.HalfDayHours,
 		FullDayHours:        req.FullDayHours,
@@ -623,6 +541,10 @@ func (s *service) UpdateShift(ctx context.Context, tenantID, shiftID uuid.UUID, 
 	shift.Name = strings.TrimSpace(req.Name)
 	shift.StartTime = normalizeTimeString(req.StartTime)
 	shift.EndTime = normalizeTimeString(req.EndTime)
+	// The time zone saved at creation is permanent.
+	if req.TimeZone != "" && req.TimeZone != shift.TimeZone {
+		return nil, fmt.Errorf("the shift's time zone (%s) was fixed when it was created and cannot be changed. create a new shift instead", shift.TimeZone)
+	}
 	shift.GraceMinutes = req.GraceMinutes
 	shift.HalfDayHours = req.HalfDayHours
 	shift.FullDayHours = req.FullDayHours
@@ -684,8 +606,8 @@ func (s *service) GetAttendanceSession(ctx context.Context, tenantID, userID uui
 		return nil, errors.New("employee profile not found")
 	}
 
-	shift, _ := s.repo.GetEmployeeShift(ctx, tenantID, emp.ID, time.Now())
-	punches, err := s.repo.GetTodayPunches(ctx, tenantID, emp.ID)
+	loc, shift := EmployeeLocation(ctx, s.repo, tenantID, emp.ID, time.Now())
+	punches, err := s.repo.GetTodayPunches(ctx, tenantID, emp.ID, DayStart(time.Now(), loc))
 	if err != nil {
 		return nil, err
 	}
@@ -742,25 +664,27 @@ func (s *service) GetAttendanceSession(ctx context.Context, tenantID, userID uui
 		}
 	}
 
+	// The live state follows the last punch (same rule as the punch check), so a night shift
+	// that started before midnight still shows as checked in.
+	if last, err := s.repo.GetLastPunch(ctx, tenantID, emp.ID); err == nil {
+		currentState = PunchState(last)
+		if currentState == "working" && currentWorkStart == nil && last != nil {
+			t := last.PunchedAt
+			currentWorkStart = &t
+		}
+	}
+
 	if currentState == "working" && currentWorkStart != nil {
 		activeWorkSecs += int64(now.Sub(*currentWorkStart).Seconds())
 	} else if currentState == "on_break" && currentBreakStart != nil {
 		breakSecs += int64(now.Sub(*currentBreakStart).Seconds())
 	}
 
+	// Late = first check-in after shift start + grace, both on the shift's wall clock.
 	isLateIn := false
 	if firstPunchIn != nil && shift != nil {
-		parts := strings.Split(shift.StartTime, ":")
-		if len(parts) >= 2 {
-			var h, m int
-			fmt.Sscanf(parts[0], "%d", &h)
-			fmt.Sscanf(parts[1], "%d", &m)
-			loc := firstPunchIn.Location()
-			expectedStart := time.Date(firstPunchIn.Year(), firstPunchIn.Month(), firstPunchIn.Day(), h, m, 0, 0, loc)
-			allowedStart := expectedStart.Add(time.Duration(shift.GraceMinutes) * time.Minute)
-			if firstPunchIn.After(allowedStart) {
-				isLateIn = true
-			}
+		if expectedStart, ok := ClockOn(firstPunchIn.In(loc), shift.StartTime, loc); ok {
+			isLateIn = firstPunchIn.After(expectedStart.Add(time.Duration(shift.GraceMinutes) * time.Minute))
 		}
 	}
 
@@ -791,8 +715,10 @@ func (s *service) GetMonthlyAttendance(ctx context.Context, tenantID, userID uui
 		month = int(time.Now().Month())
 	}
 
-	startOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
-	endOfMonth := startOfMonth.AddDate(0, 1, -1).Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+	// Days are calendar days in the time zone of the employee's shift.
+	loc, shift := EmployeeLocation(ctx, s.repo, tenantID, emp.ID, time.Date(year, time.Month(month), 1, 12, 0, 0, 0, time.UTC))
+	startOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, loc)
+	endOfMonth := startOfMonth.AddDate(0, 1, 0).Add(-time.Second)
 
 	punches, err := s.repo.GetPunchesByDateRange(ctx, tenantID, emp.ID, startOfMonth, endOfMonth)
 	if err != nil {
@@ -803,7 +729,6 @@ func (s *service) GetMonthlyAttendance(ctx context.Context, tenantID, userID uui
 	holidays, _ := s.repo.ListPublicHolidays(ctx, tenantID, year)
 	regs, _ := s.repo.ListRegularizations(ctx, tenantID, &emp.ID, "")
 
-	shift, _ := s.repo.GetEmployeeShift(ctx, tenantID, emp.ID, startOfMonth)
 	fullDayCutoff := 8.0
 	halfDayCutoff := 4.5
 	shiftName := ""
@@ -817,7 +742,7 @@ func (s *service) GetMonthlyAttendance(ctx context.Context, tenantID, userID uui
 
 	punchesByDay := make(map[string][]AttendancePunch)
 	for _, p := range punches {
-		dayStr := p.PunchedAt.Format("2006-01-02")
+		dayStr := p.PunchedAt.In(loc).Format("2006-01-02")
 		punchesByDay[dayStr] = append(punchesByDay[dayStr], p)
 	}
 
@@ -836,7 +761,7 @@ func (s *service) GetMonthlyAttendance(ctx context.Context, tenantID, userID uui
 	daysInMonth := startOfMonth.AddDate(0, 1, -1).Day()
 	days := make([]MonthlyAttendanceDay, 0, daysInMonth)
 
-	todayStr := time.Now().Format("2006-01-02")
+	todayStr := time.Now().In(loc).Format("2006-01-02")
 	var totalPresent float64
 	var totalHalfDays int
 	var totalAbsent int
@@ -845,7 +770,7 @@ func (s *service) GetMonthlyAttendance(ctx context.Context, tenantID, userID uui
 	var totalWorkHours float64
 
 	for d := 1; d <= daysInMonth; d++ {
-		date := time.Date(year, time.Month(month), d, 0, 0, 0, 0, time.UTC)
+		date := time.Date(year, time.Month(month), d, 0, 0, 0, 0, loc)
 		dateStr := date.Format("2006-01-02")
 		dayOfWeek := date.Weekday().String()
 
@@ -876,9 +801,8 @@ func (s *service) GetMonthlyAttendance(ctx context.Context, tenantID, userID uui
 
 		// 3. Approved Leave Check (Only strictly applied dates)
 		for _, l := range leaves {
-			lStart := time.Date(l.FromDate.Year(), l.FromDate.Month(), l.FromDate.Day(), 0, 0, 0, 0, time.UTC)
-			lEnd := time.Date(l.ToDate.Year(), l.ToDate.Month(), l.ToDate.Day(), 23, 59, 59, 0, time.UTC)
-			if (date.Equal(lStart) || date.After(lStart)) && (date.Equal(lEnd) || date.Before(lEnd)) {
+			// Leave dates are plain calendar dates: compare them as dates.
+			if dateStr >= l.FromDate.Format("2006-01-02") && dateStr <= l.ToDate.Format("2006-01-02") {
 				if date.Weekday() != time.Saturday && date.Weekday() != time.Sunday {
 					typeName := "Leave"
 					if l.LeaveTypeName != nil {
@@ -949,17 +873,8 @@ func (s *service) GetMonthlyAttendance(ctx context.Context, tenantID, userID uui
 		dayItem.LastPunchOut = lastOut
 
 		if firstIn != nil && shift != nil {
-			parts := strings.Split(shift.StartTime, ":")
-			if len(parts) >= 2 {
-				var h, m int
-				fmt.Sscanf(parts[0], "%d", &h)
-				fmt.Sscanf(parts[1], "%d", &m)
-				loc := firstIn.Location()
-				expectedStart := time.Date(firstIn.Year(), firstIn.Month(), firstIn.Day(), h, m, 0, 0, loc)
-				allowedStart := expectedStart.Add(time.Duration(graceMin) * time.Minute)
-				if firstIn.After(allowedStart) {
-					dayItem.IsLateIn = true
-				}
+			if expectedStart, ok := ClockOn(firstIn.In(loc), shift.StartTime, loc); ok {
+				dayItem.IsLateIn = firstIn.After(expectedStart.Add(time.Duration(graceMin) * time.Minute))
 			}
 		}
 
@@ -1038,29 +953,38 @@ func (s *service) GetTeamPresenceRadar(ctx context.Context, tenantID uuid.UUID) 
 		return nil, err
 	}
 
-	todayPunches, err := s.repo.GetTodayTeamPunches(ctx, tenantID)
+	// Everyone's "today" starts at midnight in their own shift's time zone, and no zone is
+	// more than 14 hours ahead of UTC, so the last 38 hours cover every possible today.
+	today := time.Now()
+	recentPunches, err := s.repo.GetTeamPunchesSince(ctx, tenantID, today.Add(-38*time.Hour))
 	if err != nil {
 		return nil, err
 	}
 
 	punchesByEmp := make(map[uuid.UUID][]AttendancePunch)
-	for _, p := range todayPunches {
+	for _, p := range recentPunches {
 		punchesByEmp[p.EmployeeID] = append(punchesByEmp[p.EmployeeID], p)
 	}
 
-	today := time.Now()
-	todayStart := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
-	todayEnd := time.Date(today.Year(), today.Month(), today.Day(), 23, 59, 59, 0, time.UTC)
-
 	var members []TeamPresenceRadarMember
 	for _, emp := range employees {
-		shift, _ := s.repo.GetEmployeeShift(ctx, tenantID, emp.ID, today)
+		loc, shift := EmployeeLocation(ctx, s.repo, tenantID, emp.ID, today)
 		shiftName := ""
 		if shift != nil {
 			shiftName = shift.Name
 		}
+		dayStart := DayStart(today, loc)
+		localToday := today.In(loc)
+		// Leave dates are calendar dates, stored as UTC midnight.
+		todayStart := time.Date(localToday.Year(), localToday.Month(), localToday.Day(), 0, 0, 0, 0, time.UTC)
+		todayEnd := todayStart.Add(24*time.Hour - time.Second)
 
-		empPunches := punchesByEmp[emp.ID]
+		var empPunches []AttendancePunch
+		for _, p := range punchesByEmp[emp.ID] {
+			if !p.PunchedAt.Before(dayStart) {
+				empPunches = append(empPunches, p)
+			}
+		}
 		presence := "absent"
 		var firstIn *time.Time
 		var lastTime *time.Time
@@ -1138,32 +1062,42 @@ func (s *service) CreateRegularization(ctx context.Context, tenantID, userID uui
 	if err != nil {
 		return nil, errors.New("invalid request_date format (YYYY-MM-DD)")
 	}
+	// A missed punch can only be for a day that has started (on the shift's calendar).
+	empLoc, _ := EmployeeLocation(ctx, s.repo, tenantID, emp.ID, time.Now())
+	if req.RequestType == "missed_punch" && req.RequestDate > time.Now().In(empLoc).Format("2006-01-02") {
+		return nil, errors.New("a missed punch cannot be requested for a future date")
+	}
+	// One open or approved correction per day: approving several would add several punches.
+	if regs, err := s.repo.ListRegularizations(ctx, tenantID, &emp.ID, ""); err == nil {
+		for _, r := range regs {
+			if r.RequestDate.Format("2006-01-02") == req.RequestDate && (r.Status == "pending" || r.Status == "approved") {
+				return nil, errors.New("there is already a pending or approved correction for this date")
+			}
+		}
+	}
 
 	var punchIn *time.Time
 	var punchOut *time.Time
 
-	if req.RequestedPunchIn != nil && *req.RequestedPunchIn != "" {
-		if t, err := time.Parse(time.RFC3339, *req.RequestedPunchIn); err == nil {
-			punchIn = &t
-		} else if parts := strings.Split(*req.RequestedPunchIn, ":"); len(parts) >= 2 {
-			var h, m int
-			fmt.Sscanf(parts[0], "%d", &h)
-			fmt.Sscanf(parts[1], "%d", &m)
-			combined := time.Date(reqDate.Year(), reqDate.Month(), reqDate.Day(), h, m, 0, 0, time.UTC)
-			punchIn = &combined
+	// A bare "HH:MM" is a time on the shift's wall clock on the requested date.
+	loc, _ := EmployeeLocation(ctx, s.repo, tenantID, emp.ID, reqDate)
+	parseRequested := func(v *string) *time.Time {
+		if v == nil || *v == "" {
+			return nil
 		}
+		if t, err := time.Parse(time.RFC3339, *v); err == nil {
+			return &t
+		}
+		if t, ok := ClockOn(reqDate, *v, loc); ok {
+			return &t
+		}
+		return nil
 	}
-
-	if req.RequestedPunchOut != nil && *req.RequestedPunchOut != "" {
-		if t, err := time.Parse(time.RFC3339, *req.RequestedPunchOut); err == nil {
-			punchOut = &t
-		} else if parts := strings.Split(*req.RequestedPunchOut, ":"); len(parts) >= 2 {
-			var h, m int
-			fmt.Sscanf(parts[0], "%d", &h)
-			fmt.Sscanf(parts[1], "%d", &m)
-			combined := time.Date(reqDate.Year(), reqDate.Month(), reqDate.Day(), h, m, 0, 0, time.UTC)
-			punchOut = &combined
-		}
+	punchIn = parseRequested(req.RequestedPunchIn)
+	punchOut = parseRequested(req.RequestedPunchOut)
+	if punchIn != nil && punchOut != nil && !punchOut.After(*punchIn) {
+		next := punchOut.AddDate(0, 0, 1) // ends after midnight (night shift)
+		punchOut = &next
 	}
 
 	reg := &AttendanceRegularization{
@@ -1227,20 +1161,16 @@ func (s *service) ReviewRegularization(ctx context.Context, tenantID, regID, rev
 		outTime := reg.RequestedPunchOut
 
 		if inTime == nil || outTime == nil {
+			// Missing times default to the shift's start and end on that date, in the shift's zone.
 			shift, _ := s.repo.GetEmployeeShift(ctx, tenantID, reg.EmployeeID, reg.RequestDate)
 			if shift != nil {
-				partsStart := strings.Split(shift.StartTime, ":")
-				partsEnd := strings.Split(shift.EndTime, ":")
-				if len(partsStart) >= 2 && len(partsEnd) >= 2 {
-					var sh, sm, eh, em int
-					fmt.Sscanf(partsStart[0], "%d", &sh)
-					fmt.Sscanf(partsStart[1], "%d", &sm)
-					fmt.Sscanf(partsEnd[0], "%d", &eh)
-					fmt.Sscanf(partsEnd[1], "%d", &em)
-
-					synthIn := time.Date(reg.RequestDate.Year(), reg.RequestDate.Month(), reg.RequestDate.Day(), sh, sm, 0, 0, time.UTC)
-					synthOut := time.Date(reg.RequestDate.Year(), reg.RequestDate.Month(), reg.RequestDate.Day(), eh, em, 0, 0, time.UTC)
-
+				loc := shift.Location()
+				synthIn, okIn := ClockOn(reg.RequestDate, shift.StartTime, loc)
+				synthOut, okOut := ClockOn(reg.RequestDate, shift.EndTime, loc)
+				if okIn && okOut {
+					if !synthOut.After(synthIn) {
+						synthOut = synthOut.AddDate(0, 0, 1) // night shift ends the next morning
+					}
 					if inTime == nil {
 						inTime = &synthIn
 					}
@@ -1380,16 +1310,18 @@ func (s *service) UpdateEmployeeBiometricFace(ctx context.Context, tenantID, emp
 	}, nil
 }
 
-func (s *service) PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID, req *PunchWithFaceRequest) (*PunchWithFaceResponse, error) {
-	if validationErr := req.Validate(); validationErr != "" {
-		return nil, errors.New(validationErr)
-	}
+// faceMatch is the outcome of comparing a selfie with the employee's enrolled face.
+type faceMatch struct {
+	image      image.Image
+	confidence float64
+	distance   float32
+	matched    bool
+}
 
-	emp, err := s.repo.GetEmployeeByUserID(ctx, tenantID, userID)
-	if err != nil || emp == nil {
-		return nil, errors.New("employee profile not found for user")
-	}
-
+// verifyEmployeeFace runs the full selfie pipeline (decode, quality, liveness,
+// embedding) and compares it with the enrolled template. A mismatch is reported
+// through matched=false so callers can still archive the selfie for audit.
+func (s *service) verifyEmployeeFace(emp *Employee, selfieData string) (*faceMatch, error) {
 	if emp.FaceEmbedding == nil || *emp.FaceEmbedding == "" {
 		return nil, errors.New("no biometric face profile registered for this employee. Please contact Management / HR to enroll your face")
 	}
@@ -1400,7 +1332,7 @@ func (s *service) PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID,
 	}
 
 	// Decode selfie image
-	selfieImg, _, err := biometrics.DecodeImage([]byte(req.SelfieImage))
+	selfieImg, _, err := biometrics.DecodeImage([]byte(selfieData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode check-in selfie: %w", err)
 	}
@@ -1436,6 +1368,67 @@ func (s *service) PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID,
 	log.Printf("[BIOMETRIC DEBUG] Punch ATTEMPT: Employee=%s (%s), Matched=%v, Score=%.1f%%, Distance=%.4f (Threshold=%.2f), RawFile=%s (%s), Crop112=%s",
 		emp.ID, emp.WorkEmail, isMatched, confidence, distance, biometrics.OptimalL2Threshold, rawPath, dims, cropPath)
 
+	return &faceMatch{image: selfieImg, confidence: confidence, distance: distance, matched: isMatched}, nil
+}
+
+// checkPunchGeofence requires the punch to be inside an office perimeter when the
+// organisation has configured offices.
+func (s *service) checkPunchGeofence(ctx context.Context, tenantID uuid.UUID, lat, lng *float64) (bool, error) {
+	isGeofenceVerified := false
+	offices, _ := s.repo.ListOfficeLocations(ctx, tenantID)
+	if len(offices) > 0 {
+		if lat == nil || lng == nil {
+			return false, errors.New("location check failed: GPS coordinates are required for attendance check-in/check-out")
+		}
+
+		var nearestOffice *OfficeLocation
+		minDist := math.MaxFloat64
+
+		for i := range offices {
+			off := &offices[i]
+			dist := HaversineDistance(off.Latitude, off.Longitude, *lat, *lng)
+			if dist < minDist {
+				minDist = dist
+				nearestOffice = off
+			}
+			verified, _ := VerifyGeofence(off, *lat, *lng, "")
+			if verified {
+				isGeofenceVerified = true
+				break
+			}
+		}
+
+		if !isGeofenceVerified {
+			if nearestOffice != nil {
+				return false, fmt.Errorf("geofence check failed: you are %.1fm away from '%s' (allowed radius: %dm). Punch rejected", minDist, nearestOffice.Name, nearestOffice.RadiusMeters)
+			}
+			return false, errors.New("geofence check failed: outside designated office perimeter. Punch rejected")
+		}
+	}
+
+	return isGeofenceVerified, nil
+}
+
+func (s *service) PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID, req *PunchWithFaceRequest) (*PunchWithFaceResponse, error) {
+	if validationErr := req.Validate(); validationErr != "" {
+		return nil, errors.New(validationErr)
+	}
+
+	emp, err := s.repo.GetEmployeeByUserID(ctx, tenantID, userID)
+	if err != nil || emp == nil {
+		return nil, errors.New("employee profile not found for user")
+	}
+	// The shift's saved time zone decides the attendance day, so a shift is required.
+	if _, err := ShiftForPunch(ctx, s.repo, tenantID, emp.ID, req.PunchType); err != nil {
+		return nil, err
+	}
+
+	match, err := s.verifyEmployeeFace(emp, req.SelfieImage)
+	if err != nil {
+		return nil, err
+	}
+	selfieImg, confidence, distance, isMatched := match.image, match.confidence, match.distance, match.matched
+
 	// Upload selfie to MinIO audit bucket
 	var selfieURL string
 	storage := media.GetDefaultStorage()
@@ -1463,36 +1456,9 @@ func (s *service) PunchWithFace(ctx context.Context, tenantID, userID uuid.UUID,
 
 	// Face is verified! Verify location & record attendance punch
 	punchedAt := time.Now().UTC()
-	isGeofenceVerified := false
-	offices, _ := s.repo.ListOfficeLocations(ctx, tenantID)
-	if len(offices) > 0 {
-		if req.Latitude == nil || req.Longitude == nil {
-			return nil, errors.New("location check failed: GPS coordinates are required for attendance check-in/check-out")
-		}
-
-		var nearestOffice *OfficeLocation
-		minDist := math.MaxFloat64
-
-		for i := range offices {
-			off := &offices[i]
-			dist := HaversineDistance(off.Latitude, off.Longitude, *req.Latitude, *req.Longitude)
-			if dist < minDist {
-				minDist = dist
-				nearestOffice = off
-			}
-			verified, _ := VerifyGeofence(off, *req.Latitude, *req.Longitude, "")
-			if verified {
-				isGeofenceVerified = true
-				break
-			}
-		}
-
-		if !isGeofenceVerified {
-			if nearestOffice != nil {
-				return nil, fmt.Errorf("geofence check failed: you are %.1fm away from '%s' (allowed radius: %dm). Punch rejected", minDist, nearestOffice.Name, nearestOffice.RadiusMeters)
-			}
-			return nil, errors.New("geofence check failed: outside designated office perimeter. Punch rejected")
-		}
+	isGeofenceVerified, err := s.checkPunchGeofence(ctx, tenantID, req.Latitude, req.Longitude)
+	if err != nil {
+		return nil, err
 	}
 
 	punch := &AttendancePunch{

@@ -30,12 +30,17 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
         subtitle: String,
         description: String? = null,
         negativeButtonText: String = "Cancel",
+        cryptoObject: BiometricPrompt.CryptoObject? = null,
         onResult: (BiometricResult) -> Unit
     ) {
-        val biometricManager = BiometricManager.from(activity)
-        val status = biometricManager.canAuthenticate(
+        // Keystore keys can only be unlocked by strong (class 3) biometrics.
+        val authenticators = if (cryptoObject != null) {
+            BiometricManager.Authenticators.BIOMETRIC_STRONG
+        } else {
             BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK
-        )
+        }
+        val biometricManager = BiometricManager.from(activity)
+        val status = biometricManager.canAuthenticate(authenticators)
 
         when (status) {
             BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
@@ -75,13 +80,15 @@ class BiometricPromptManager(private val activity: FragmentActivity) {
             .setTitle(title)
             .setSubtitle(subtitle)
             .setNegativeButtonText(negativeButtonText)
-            .setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK
-            )
+            .setAllowedAuthenticators(authenticators)
 
         description?.let { promptInfoBuilder.setDescription(it) }
 
         val biometricPrompt = BiometricPrompt(activity, executor, callback)
-        biometricPrompt.authenticate(promptInfoBuilder.build())
+        if (cryptoObject != null) {
+            biometricPrompt.authenticate(promptInfoBuilder.build(), cryptoObject)
+        } else {
+            biometricPrompt.authenticate(promptInfoBuilder.build())
+        }
     }
 }

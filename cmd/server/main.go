@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 	"syscall"
 	"time"
+	_ "time/tzdata" // shift time zones must resolve even in minimal container images
 
 	"humora-backend/configs"
 	"humora-backend/internal/fusion"
@@ -29,6 +30,11 @@ import (
 )
 
 func main() {
+	// The server works in UTC only: every time it stores, compares or sends is UTC, and the
+	// apps convert to the viewer's own time zone when they display it. This also makes a
+	// developer machine behave exactly like a container.
+	time.Local = time.UTC
+
 	// Configure GC soft memory target to pace Go GC smoothly and prevent OOM
 	if os.Getenv("GOMEMLIMIT") == "" {
 		debug.SetMemoryLimit(512 * 1024 * 1024) // 512 MiB

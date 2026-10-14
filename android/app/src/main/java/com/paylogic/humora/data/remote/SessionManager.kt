@@ -80,14 +80,6 @@ class SessionManager(context: Context) {
                 userRole.equals("admin", ignoreCase = true) ||
                 userRole.equals("hr_admin", ignoreCase = true)
 
-    fun isFingerprintEnrolledFor(employeeId: String): Boolean {
-        return prefs.getBoolean("fp_enrolled_$employeeId", false)
-    }
-
-    fun setFingerprintEnrolledFor(employeeId: String, enrolled: Boolean) {
-        prefs.edit().putBoolean("fp_enrolled_$employeeId", enrolled).apply()
-    }
-
     private val userNameStored: String
         get() = prefs.getString(KEY_USER_NAME, "") ?: ""
 

@@ -1,6 +1,5 @@
 package com.paylogic.humora.presentation.viewmodel
 
-import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.paylogic.humora.HumoraApp
@@ -8,7 +7,6 @@ import com.paylogic.humora.data.model.SprintTaskItem
 import com.paylogic.humora.data.model.TeamMemberPresence
 import com.paylogic.humora.data.remote.NetworkResult
 import com.paylogic.humora.data.repository.AttendanceRepository
-import com.paylogic.humora.data.repository.PunchResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -114,53 +112,6 @@ class WorkdayViewModel(
     private fun stopTimer() {
         timerJob?.cancel()
         timerJob = null
-    }
-
-    fun handleSwipePunch(targetPunchIn: Boolean, location: Location?, onComplete: (String) -> Unit) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isActionLoading = true)
-            val punchType = if (targetPunchIn) "in" else "out"
-
-            val effectiveLocation = location ?: com.paylogic.humora.core.location.LocationProvider.getLastKnownLocation(HumoraApp.instance)
-            if (effectiveLocation == null) {
-                _uiState.value = _uiState.value.copy(
-                    isActionLoading = false,
-                    bannerMessage = "Location check failed: GPS coordinates are required for attendance check-in/check-out. Please turn on GPS."
-                )
-                onComplete("Location check failed: GPS coordinates required.")
-                return@launch
-            }
-
-            val result = attendanceRepo.recordPunch(punchType, effectiveLocation)
-            _uiState.value = _uiState.value.copy(isActionLoading = false)
-
-            when (result) {
-                is PunchResult.Success -> {
-                    val msg = if (result.isOfflineQueued) {
-                        "Punch ${punchType.uppercase()} queued offline. Will sync when connected."
-                    } else {
-                        "Punch ${punchType.uppercase()} verified with backend!"
-                    }
-                    _uiState.value = _uiState.value.copy(bannerMessage = msg)
-                    onComplete(msg)
-                }
-                is PunchResult.SecurityRejection -> {
-                    val msg = "Security Alert: ${result.reason}"
-                    _uiState.value = _uiState.value.copy(bannerMessage = msg)
-                    onComplete(msg)
-                }
-                is PunchResult.GeofenceRejection -> {
-                    val msg = "Geofence Alert: You are ${result.distanceMeters.toInt()}m away (max allowed ${result.allowedMeters.toInt()}m)"
-                    _uiState.value = _uiState.value.copy(bannerMessage = msg)
-                    onComplete(msg)
-                }
-                is PunchResult.Error -> {
-                    val msg = "Punch failed: ${result.message}"
-                    _uiState.value = _uiState.value.copy(bannerMessage = msg)
-                    onComplete(msg)
-                }
-            }
-        }
     }
 
     fun clearBanner() {

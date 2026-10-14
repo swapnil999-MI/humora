@@ -43,6 +43,7 @@ import {
   Send,
   ShieldCheck,
 } from 'lucide-react';
+import { formatClock } from '../../utils/time';
 
 export const MyWorkdayHub: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -115,20 +116,9 @@ export const MyWorkdayHub: React.FC = () => {
           source: 'web_hub',
         })
       ).unwrap();
-      dispatch(
-        addToast({
-          type: 'success',
-          message: punchType === 'in' ? 'Clocked in successfully. Workday started!' : 'Clocked out successfully. Great work today!',
-        })
-      );
       dispatch(fetchMyWorkday());
-    } catch (err: any) {
-      dispatch(
-        addToast({
-          type: 'error',
-          message: err || 'Failed to update attendance punch',
-        })
-      );
+    } catch {
+      // The face-check dialog shows its own errors; a rejection here only means it was cancelled.
     } finally {
       setIsSubmittingPunch(false);
     }
@@ -1541,7 +1531,7 @@ export const MyWorkdayHub: React.FC = () => {
                       color: 'var(--text-muted)',
                     }}
                   >
-                    {new Date(log.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatClock(log.started_at)}
                   </span>
                   <span
                     style={{

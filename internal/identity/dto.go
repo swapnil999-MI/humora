@@ -106,8 +106,8 @@ func (r *ResetPasswordRequest) Validate() string {
 	if len(strings.TrimSpace(r.OTP)) < 4 {
 		return "valid OTP verification code is required"
 	}
-	if len(r.NewPassword) < 3 {
-		return "new_password must be at least 3 characters"
+	if len(r.NewPassword) < 8 {
+		return "new_password must be at least 8 characters"
 	}
 	return ""
 }
@@ -118,6 +118,8 @@ type AuthProvidersResponse struct {
 	Github    bool `json:"github"`
 	Microsoft bool `json:"microsoft"`
 	QRCode    bool `json:"qr_code"`
+	// Signup reports whether POST /auth/register accepts new organizations.
+	Signup bool `json:"signup"`
 }
 
 // QRInitiateResponse returns session token for QR rendering

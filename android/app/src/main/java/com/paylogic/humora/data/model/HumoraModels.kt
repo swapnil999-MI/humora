@@ -76,25 +76,66 @@ data class OAuthExchangeRequest(val code: String, val verifier: String)
 // 2. ATTENDANCE & PUNCH DTOs
 // ==========================================
 
+// Fingerprint punch: the phone signs a one-time server challenge with a Keystore key
+// that only works after a fingerprint scan. The key is registered once with a face match.
 @Serializable
-data class PunchRequest(
-    @SerialName("punch_type") val punchType: String, // "in", "out", "break_start", "break_end"
-    val latitude: Double? = null,
-    val longitude: Double? = null,
-    @SerialName("accuracy_meters") val accuracyMeters: Double? = null,
-    @SerialName("location_id") val locationId: String? = null,
-    @SerialName("wifi_bssid") val wifiBssid: String = "",
-    @SerialName("punched_at") val punchedAt: String? = null,
-    val source: String = "android"
+data class FingerprintDeviceStatus(
+    /** HR/admin turned fingerprint punching on for this employee. */
+    val allowed: Boolean = false,
+    val registered: Boolean = false,
+    @SerialName("public_key") val publicKey: String? = null,
+    @SerialName("device_label") val deviceLabel: String? = null
+)
+
+/** Admin view: an employee allowed to punch with a fingerprint, and their phone once set up. */
+@Serializable
+data class FingerprintAccess(
+    @SerialName("employee_id") val employeeId: String,
+    @SerialName("device_label") val deviceLabel: String = "",
+    @SerialName("allowed_at") val allowedAt: String? = null,
+    @SerialName("registered_at") val registeredAt: String? = null
+) {
+    val isPhoneRegistered: Boolean get() = !registeredAt.isNullOrBlank()
+}
+
+@Serializable
+data class RegisterFingerprintDeviceRequest(
+    @SerialName("public_key") val publicKey: String,
+    @SerialName("selfie_image") val selfieImage: String,
+    @SerialName("device_label") val deviceLabel: String,
+    /** The server's registration challenge; its SHA-256 is sealed into the key attestation. */
+    val challenge: String,
+    /** Android Key Attestation chain for the key, base64 DER, leaf first. */
+    @SerialName("attestation_chain") val attestationChain: List<String>
 )
 
 @Serializable
-data class PunchResponse(
+data class PunchChallengeRequest(@SerialName("punch_type") val punchType: String)
+
+@Serializable
+data class PunchChallengeResponse(
+    val challenge: String = "",
+    @SerialName("expires_in") val expiresIn: Int = 0
+)
+
+@Serializable
+data class PunchWithFingerprintRequest(
+    @SerialName("punch_type") val punchType: String,
+    val challenge: String,
+    val signature: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerialName("accuracy_meters") val accuracyMeters: Double? = null,
+    val source: String = "android_fingerprint"
+)
+
+@Serializable
+data class PunchWithFingerprintResponse(
     val id: String = "",
     @SerialName("punch_type") val punchType: String = "",
     @SerialName("punched_at") val punchedAt: String = "",
+    @SerialName("is_device_verified") val isDeviceVerified: Boolean = false,
     @SerialName("is_geofence_verified") val isGeofenceVerified: Boolean = false,
-    @SerialName("is_offline_signed") val isOfflineSigned: Boolean = false,
     val message: String = ""
 )
 

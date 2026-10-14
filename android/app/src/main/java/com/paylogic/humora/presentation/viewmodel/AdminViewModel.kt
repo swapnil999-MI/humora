@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.paylogic.humora.HumoraApp
 import com.paylogic.humora.data.model.BurnoutSentinelReport
 import com.paylogic.humora.data.model.EmployeeDetail
+import com.paylogic.humora.data.model.FingerprintAccess
 import com.paylogic.humora.data.model.TeamCapacityResponse
 import com.paylogic.humora.data.remote.NetworkResult
 import com.paylogic.humora.data.repository.AdminRepository
@@ -23,8 +24,17 @@ enum class AdminDeskTab {
 data class EmployeeBiometricState(
     val employee: EmployeeDetail,
     val isFaceRegistered: Boolean,
-    val isFingerprintRegistered: Boolean
-)
+    /** Server record: present when HR/admin allowed fingerprint punching for this employee. */
+    val fingerprint: FingerprintAccess? = null
+) {
+    val isFingerprintAllowed: Boolean get() = fingerprint != null
+    val isFingerprintRegistered: Boolean get() = fingerprint?.isPhoneRegistered == true
+}
+
+enum class BiometricKind { FACE, FINGERPRINT }
+
+/** A delete the admin must confirm before it is sent. */
+data class PendingBiometricDelete(val employee: EmployeeDetail, val kind: BiometricKind)
 
 data class AdminUiState(
     val isLoading: Boolean = false,
@@ -41,7 +51,9 @@ data class AdminUiState(
     val errorMessage: String? = null,
     val successMessage: String? = null,
     val activeFaceEnrollEmployee: EmployeeDetail? = null,
-    val activeFingerprintEnrollEmployee: EmployeeDetail? = null
+    val activeBiometricEmployeeId: String? = null,
+    val pendingBiometricDelete: PendingBiometricDelete? = null,
+    val isUpdatingBiometrics: Boolean = false
 )
 
 class AdminViewModel(
@@ -162,11 +174,13 @@ class AdminViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             when (val res = adminRepo.getEmployees(search)) {
                 is NetworkResult.Success -> {
+                    val access = (adminRepo.listFingerprintAccess() as? NetworkResult.Success)?.data
+                        ?.associateBy { it.employeeId } ?: emptyMap()
                     val biometricStates = res.data.map { emp ->
                         EmployeeBiometricState(
                             employee = emp,
                             isFaceRegistered = emp.isFaceRegistered,
-                            isFingerprintRegistered = adminRepo.isFingerprintEnrolled(emp.id)
+                            fingerprint = access[emp.id]
                         )
                     }
                     _uiState.value = _uiState.value.copy(
@@ -230,25 +244,62 @@ class AdminViewModel(
         }
     }
 
-    fun openFingerprintEnrollment(emp: EmployeeDetail) {
-        _uiState.value = _uiState.value.copy(
-            activeFingerprintEnrollEmployee = emp,
-            errorMessage = null,
-            successMessage = null
+    // ── Fingerprint access and biometric deletion (server-side; takes effect immediately) ──
+
+    fun openBiometricAccess(emp: EmployeeDetail) {
+        _uiState.value = _uiState.value.copy(activeBiometricEmployeeId = emp.id, errorMessage = null, successMessage = null)
+    }
+
+    fun closeBiometricAccess() {
+        _uiState.value = _uiState.value.copy(activeBiometricEmployeeId = null, pendingBiometricDelete = null)
+    }
+
+    fun allowFingerprint(emp: EmployeeDetail) {
+        runBiometricUpdate(
+            call = { adminRepo.allowFingerprint(emp.id) },
+            success = "Fingerprint punch allowed for ${emp.fullName}. They finish setup on their own phone with a face check."
         )
     }
 
-    fun closeFingerprintEnrollment() {
-        _uiState.value = _uiState.value.copy(activeFingerprintEnrollEmployee = null)
+    fun requestBiometricDelete(emp: EmployeeDetail, kind: BiometricKind) {
+        _uiState.value = _uiState.value.copy(pendingBiometricDelete = PendingBiometricDelete(emp, kind), errorMessage = null, successMessage = null)
     }
 
-    fun onFingerprintEnrolled(employeeId: String) {
-        adminRepo.setFingerprintEnrolled(employeeId, true)
-        _uiState.value = _uiState.value.copy(
-            activeFingerprintEnrollEmployee = null,
-            successMessage = "Fingerprint credential successfully bound to employee"
-        )
-        loadEmployees()
+    fun cancelBiometricDelete() {
+        _uiState.value = _uiState.value.copy(pendingBiometricDelete = null)
+    }
+
+    fun confirmBiometricDelete() {
+        val pending = _uiState.value.pendingBiometricDelete ?: return
+        _uiState.value = _uiState.value.copy(pendingBiometricDelete = null)
+        val name = pending.employee.fullName
+        when (pending.kind) {
+            BiometricKind.FACE -> runBiometricUpdate(
+                call = { adminRepo.deleteFace(pending.employee.id) },
+                success = "Face data deleted for $name. Face punch is disabled until the face is enrolled again."
+            )
+            BiometricKind.FINGERPRINT -> runBiometricUpdate(
+                call = { adminRepo.deleteFingerprint(pending.employee.id) },
+                success = "Fingerprint data deleted for $name. Fingerprint punch is disabled for them."
+            )
+        }
+    }
+
+    private fun runBiometricUpdate(call: suspend () -> NetworkResult<Unit>, success: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isUpdatingBiometrics = true, errorMessage = null, successMessage = null)
+            when (val res = call()) {
+                is NetworkResult.Success -> {
+                    _uiState.value = _uiState.value.copy(isUpdatingBiometrics = false, successMessage = success)
+                    loadEmployees()
+                }
+                is NetworkResult.Error -> _uiState.value = _uiState.value.copy(isUpdatingBiometrics = false, errorMessage = res.message)
+                is NetworkResult.Exception -> _uiState.value = _uiState.value.copy(
+                    isUpdatingBiometrics = false,
+                    errorMessage = res.throwable.message ?: "Could not reach the server"
+                )
+            }
+        }
     }
 
     fun clearMessages() {

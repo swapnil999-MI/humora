@@ -117,24 +117,6 @@ fun BiometricFacePunchSheet(
         return "data:image/jpeg;base64,$base64"
     }
 
-    // Helper to generate simulated synthetic face portrait if camera is disabled/emulator
-    fun generateSimulatedFaceDataUrl(): String {
-        val bmp = Bitmap.createBitmap(150, 150, Bitmap.Config.ARGB_8888)
-        for (y in 0 until 150) {
-            for (x in 0 until 150) {
-                val dx = (x - 75).toDouble()
-                val dy = (y - 75).toDouble()
-                val dist = (dx * dx + dy * dy).toInt()
-                val tex = (dist * 3 + (x * 11 + y * 13)) % 256
-                val r = 220
-                val g = 160
-                val b = 110 + (tex % 80)
-                bmp.setPixel(x, y, android.graphics.Color.argb(255, r, g, b))
-            }
-        }
-        return bitmapToBase64DataUrl(bmp)
-    }
-
     fun executeFaceVerification(base64Image: String) {
         capturedBase64 = base64Image
         isVerifying = true

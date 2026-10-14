@@ -21,6 +21,7 @@ import { AppRail } from './components/AppRail';
 import { SubNavPane } from './components/SubNavPane';
 import { Header } from './components/Header';
 import { ToastContainer } from './components/ToastContainer';
+import { FacePunchModal } from './components/FacePunchModal';
 
 // Pages & Router
 import { PageRouter } from './pages/PageRouter';
@@ -383,6 +384,7 @@ export const App: React.FC = () => {
       <CreateIssueModal />
       <CreateProjectModal />
       <RegularizationModal />
+      <FacePunchModal />
       <ToastContainer />
     </div>
   );

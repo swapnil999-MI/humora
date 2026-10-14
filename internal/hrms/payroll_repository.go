@@ -12,8 +12,7 @@ import (
 type PayrollRepository interface {
 	GetCompensationStructure(ctx context.Context, tenantID, employeeID uuid.UUID) (*CompensationStructure, error)
 	ListActiveCompensationStructures(ctx context.Context, tenantID uuid.UUID) ([]CompensationStructure, error)
-	GetDistinctPunchDatesInMonth(ctx context.Context, tenantID, employeeID uuid.UUID, year, month int) ([]time.Time, error)
-	GetApprovedLeaveDaysInMonth(ctx context.Context, tenantID, employeeID uuid.UUID, year, month int) (float64, error)
+	GetDistinctPunchDatesInMonth(ctx context.Context, tenantID, employeeID uuid.UUID, year, month int, loc *time.Location) ([]time.Time, error)
 	CreateOrUpdatePayrollRun(ctx context.Context, run *PayrollRun) error
 	ListPayrollRuns(ctx context.Context, tenantID uuid.UUID) ([]PayrollRun, error)
 	CreatePayslip(ctx context.Context, p *Payslip) error
@@ -63,37 +62,21 @@ func (r *payrollRepository) ListActiveCompensationStructures(ctx context.Context
 	return comps, err
 }
 
-func (r *payrollRepository) GetDistinctPunchDatesInMonth(ctx context.Context, tenantID, employeeID uuid.UUID, year, month int) ([]time.Time, error) {
-	startDate := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+// GetDistinctPunchDatesInMonth returns the calendar days (in loc, the employee's shift
+// zone) of the month on which the employee punched.
+func (r *payrollRepository) GetDistinctPunchDatesInMonth(ctx context.Context, tenantID, employeeID uuid.UUID, year, month int, loc *time.Location) ([]time.Time, error) {
+	startDate := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, loc)
 	endDate := startDate.AddDate(0, 1, 0)
 
 	var dates []time.Time
 	query := `
-		SELECT DISTINCT date_trunc('day', punched_at) as punch_date
+		SELECT DISTINCT (punched_at AT TIME ZONE $5)::date AS punch_date
 		FROM hrms_attendance_punches
 		WHERE tenant_id = $1 AND employee_id = $2
 		  AND punched_at >= $3 AND punched_at < $4
 		ORDER BY punch_date ASC`
-	err := r.db.SelectContext(ctx, &dates, query, tenantID, employeeID, startDate, endDate)
+	err := r.db.SelectContext(ctx, &dates, query, tenantID, employeeID, startDate, endDate, loc.String())
 	return dates, err
-}
-
-func (r *payrollRepository) GetApprovedLeaveDaysInMonth(ctx context.Context, tenantID, employeeID uuid.UUID, year, month int) (float64, error) {
-	startDate := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
-	endDate := startDate.AddDate(0, 1, 0)
-
-	var totalLeaveDays *float64
-	query := `
-		SELECT COALESCE(SUM(total_days), 0.0)
-		FROM hrms_leave_requests
-		WHERE tenant_id = $1 AND employee_id = $2
-		  AND status = 'approved'
-		  AND from_date < $4 AND to_date >= $3`
-	err := r.db.GetContext(ctx, &totalLeaveDays, query, tenantID, employeeID, startDate, endDate)
-	if err != nil || totalLeaveDays == nil {
-		return 0.0, err
-	}
-	return *totalLeaveDays, nil
 }
 
 func (r *payrollRepository) CreateOrUpdatePayrollRun(ctx context.Context, run *PayrollRun) error {
@@ -185,18 +168,20 @@ func (r *payrollRepository) ListPayslips(ctx context.Context, tenantID uuid.UUID
 		       p.total_deductions, p.net_pay, p.net_pay_in_words, p.created_at,
 		       e.first_name || ' ' || e.last_name as employee_name,
 		       e.employee_code as employee_code,
-		       COALESCE(des.title, 'Software Engineer') as designation_title,
-		       COALESCE(dep.name, 'Engineering') as department_name,
+		       COALESCE(des.title, '') as designation_title,
+		       COALESCE(dep.name, '') as department_name,
 		       COALESCE(e.date_of_joining, CURRENT_DATE) as date_of_joining,
-		       'HDFC Bank Ltd' as bank_name,
-		       '•••• •••• 8821' as bank_account_masked,
-		       'HDFC0001824' as bank_ifsc,
-		       'ABCDE1234F' as pan,
-		       '101234567890' as uan
+		       -- Statutory and bank fields come from the employee's own bank details; empty when not on file.
+		       COALESCE(bank.data->>'bank_name', '') as bank_name,
+		       COALESCE(bank.data->>'account_number_masked', '') as bank_account_masked,
+		       COALESCE(bank.data->>'routing_number', '') as bank_ifsc,
+		       COALESCE(bank.data->>'tax_id_masked', '') as pan,
+		       '' as uan
 		FROM hrms_payslips p
 		JOIN hrms_employees e ON p.employee_id = e.id
 		LEFT JOIN hrms_designations des ON e.designation_id = des.id
 		LEFT JOIN hrms_departments dep ON e.department_id = dep.id
+		LEFT JOIN hrms_employee_subforms bank ON bank.employee_id = e.id AND bank.subform_name = 'bank_details'
 		WHERE p.tenant_id = $1`
 
 	args := []interface{}{tenantID}
@@ -232,18 +217,20 @@ func (r *payrollRepository) GetPayslipByID(ctx context.Context, tenantID, paysli
 		       p.total_deductions, p.net_pay, p.net_pay_in_words, p.created_at,
 		       e.first_name || ' ' || e.last_name as employee_name,
 		       e.employee_code as employee_code,
-		       COALESCE(des.title, 'Software Engineer') as designation_title,
-		       COALESCE(dep.name, 'Engineering') as department_name,
+		       COALESCE(des.title, '') as designation_title,
+		       COALESCE(dep.name, '') as department_name,
 		       COALESCE(e.date_of_joining, CURRENT_DATE) as date_of_joining,
-		       'HDFC Bank Ltd' as bank_name,
-		       '•••• •••• 8821' as bank_account_masked,
-		       'HDFC0001824' as bank_ifsc,
-		       'ABCDE1234F' as pan,
-		       '101234567890' as uan
+		       -- Statutory and bank fields come from the employee's own bank details; empty when not on file.
+		       COALESCE(bank.data->>'bank_name', '') as bank_name,
+		       COALESCE(bank.data->>'account_number_masked', '') as bank_account_masked,
+		       COALESCE(bank.data->>'routing_number', '') as bank_ifsc,
+		       COALESCE(bank.data->>'tax_id_masked', '') as pan,
+		       '' as uan
 		FROM hrms_payslips p
 		JOIN hrms_employees e ON p.employee_id = e.id
 		LEFT JOIN hrms_designations des ON e.designation_id = des.id
 		LEFT JOIN hrms_departments dep ON e.department_id = dep.id
+		LEFT JOIN hrms_employee_subforms bank ON bank.employee_id = e.id AND bank.subform_name = 'bank_details'
 		WHERE p.tenant_id = $1 AND p.id = $2`
 	err := r.db.GetContext(ctx, &p, query, tenantID, payslipID)
 	if err != nil {

@@ -75,43 +75,6 @@ fun AttendanceDeskScreen(
             }
         }
 
-        // Offline Queue Banner (if punches are stored in SQLite Room)
-        if (uiState.pendingOfflineSyncCount > 0) {
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(AmberWarning.copy(alpha = 0.15f))
-                        .border(1.dp, AmberWarning, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "${uiState.pendingOfflineSyncCount} Punches Stored Locally",
-                            color = AmberWarning,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                        Text(
-                            text = "Room DB has offline punches awaiting backend sync.",
-                            color = TextSecondaryDark,
-                            fontSize = 11.sp
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.triggerOfflineSync() },
-                        colors = ButtonDefaults.buttonColors(containerColor = AmberWarning),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Sync Now", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                    }
-                }
-            }
-        }
-
         // 1. GEOFENCE RADAR & ANTI-SPOOF STATUS
         item {
             GlassCard {
@@ -211,18 +174,6 @@ fun AttendanceDeskScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    ClayButton(
-                        text = "Sync Offline Queue",
-                        icon = Icons.Default.Sync,
-                        brush = ClayDarkButtonGradient,
-                        contentColor = TextSecondaryDark,
-                        modifier = Modifier.fillMaxWidth(),
-                        cornerRadius = 14.dp,
-                        elevation = 4.dp,
-                        onClick = { viewModel.triggerOfflineSync() }
-                    )
                 }
             }
         }

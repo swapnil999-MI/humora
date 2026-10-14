@@ -87,29 +87,10 @@ export const Header: React.FC<{ onOpenCommandPalette?: () => void }> = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
+  // Opens the face check; it reads the location itself. Cancelling is not an error.
   const handlePunchToggle = () => {
-    const isCurrentlyIn = attendanceSummary?.punched_in;
-    const punchType = isCurrentlyIn ? 'out' : 'in';
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          dispatch(
-            recordPunch({
-              punch_type: punchType,
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              source: 'web',
-            })
-          );
-        },
-        () => {
-          dispatch(recordPunch({ punch_type: punchType, source: 'web' }));
-        }
-      );
-    } else {
-      dispatch(recordPunch({ punch_type: punchType, source: 'web' }));
-    }
+    const punchType = attendanceSummary?.punched_in ? 'out' : 'in';
+    dispatch(recordPunch({ punch_type: punchType, source: 'web' })).catch(() => {});
   };
 
   const todayHours = attendanceSummary?.today_hours || 0;

@@ -2,13 +2,19 @@ package mailer
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"net/smtp"
 	"strings"
 	"time"
+
+	"humora-backend/configs"
 )
+
+// ErrNotConfigured means the tenant has no SMTP server, so the email was not sent.
+var ErrNotConfigured = errors.New("no outgoing mail server is configured for this organization")
 
 type SMTPConfig struct {
 	Host       string
@@ -23,8 +29,13 @@ type SMTPConfig struct {
 // SendEmail transmits an HTML email through SMTP or logs to console in fallback/dev mode.
 func SendEmail(cfg *SMTPConfig, to string, subject string, htmlBody string) error {
 	if cfg == nil || cfg.Host == "" {
-		log.Printf("[Mailer/DevFallback] To: %s | Subject: %q\n[Body]\n%s\n", to, subject, htmlBody)
-		return nil
+		// Bodies carry reset codes and invite links: print them only on a developer machine.
+		if configs.AppConfig != nil && configs.AppConfig.IsLocal() {
+			log.Printf("[Mailer/DevFallback] To: %s | Subject: %q\n[Body]\n%s\n", to, subject, htmlBody)
+			return nil
+		}
+		log.Printf("[Mailer] Not sent (no SMTP configured): subject %q", subject)
+		return ErrNotConfigured
 	}
 
 	fromName := cfg.FromName
@@ -68,20 +79,22 @@ func SendEmail(cfg *SMTPConfig, to string, subject string, htmlBody string) erro
 
 	// SSL/TLS connection (typically port 465)
 	if strings.EqualFold(cfg.Encryption, "ssl") || cfg.Port == 465 {
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: false,
-			ServerName:         cfg.Host,
-		}
-		conn, err := tls.Dial("tcp", addr, tlsConfig)
-		if err != nil {
-			log.Printf("[Mailer/Error] TLS Dial to %s failed: %v", addr, err)
-			return fmt.Errorf("failed to establish SSL/TLS connection to %s: %w", addr, err)
-		}
-		defer conn.Close()
-
-		client, err := smtp.NewClient(conn, cfg.Host)
+		rawConn, err := dialSMTP(host, cfg.Port)
 		if err != nil {
 			return err
+		}
+		conn := tls.Client(rawConn, &tls.Config{ServerName: host})
+		defer conn.Close()
+		_ = conn.SetDeadline(time.Now().Add(2 * time.Minute))
+		if err := conn.Handshake(); err != nil {
+			log.Printf("[Mailer] TLS handshake with %s failed: %v", addr, err)
+			return errors.New("SSL/TLS handshake with the SMTP server failed. check the port and encryption settings")
+		}
+
+		client, err := smtp.NewClient(conn, host)
+		if err != nil {
+			log.Printf("[Mailer] SMTP greeting from %s failed: %v", addr, err)
+			return errUnreachable
 		}
 		defer client.Quit()
 
@@ -105,16 +118,19 @@ func SendEmail(cfg *SMTPConfig, to string, subject string, htmlBody string) erro
 	}
 
 	// STARTTLS or Standard connection (typically port 587 or 25)
-	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
-	if err != nil {
-		log.Printf("[Mailer/Warning] SMTP Dial to %s failed: %v", addr, err)
-		return fmt.Errorf("failed to connect to SMTP server %s: %w", addr, err)
-	}
-	defer conn.Close()
-
-	client, err := smtp.NewClient(conn, cfg.Host)
+	conn, err := dialSMTP(host, cfg.Port)
 	if err != nil {
 		return err
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(2 * time.Minute))
+
+	// Errors from here on can quote whatever the remote service sent, so they are
+	// logged rather than returned: the API must not relay banners of arbitrary hosts.
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		log.Printf("[Mailer] SMTP greeting from %s failed: %v", addr, err)
+		return errUnreachable
 	}
 	defer client.Quit()
 

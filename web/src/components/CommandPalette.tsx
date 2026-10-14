@@ -83,13 +83,13 @@ export const CommandPalette: React.FC<{ isOpen: boolean; onClose: () => void }> 
         <LogIn size={16} color="var(--accent-emerald)" />
       ),
       action: () => {
+        onClose();
         dispatch(
           recordPunch({
             punch_type: attendanceSummary?.punched_in ? 'out' : 'in',
             source: 'web',
           })
-        );
-        onClose();
+        ).catch(() => {});
       },
     });
 

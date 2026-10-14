@@ -12,6 +12,7 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.plugins.logging.SIMPLE
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -218,19 +219,72 @@ class HumoraApiClient(
     // ==========================================
     // 3. ATTENDANCE & PUNCH
     // ==========================================
-    suspend fun punch(request: PunchRequest): NetworkResult<PunchResponse> {
-        return executeRequest {
-            post(endpoint("hrms/attendance/punch")) {
-                setBody(request)
-            }
-        }
-    }
-
     suspend fun punchWithFace(request: PunchWithFaceRequest): NetworkResult<PunchWithFaceResponse> {
         return executeRequest {
             post(endpoint("hrms/attendance/punch-with-face")) {
                 setBody(request)
             }
+        }
+    }
+
+    suspend fun getFingerprintDevice(): NetworkResult<FingerprintDeviceStatus> {
+        return executeRequest {
+            get(endpoint("hrms/attendance/fingerprint/device"))
+        }
+    }
+
+    suspend fun getFingerprintRegistrationChallenge(): NetworkResult<PunchChallengeResponse> {
+        return executeRequest {
+            post(endpoint("hrms/attendance/fingerprint/device/challenge"))
+        }
+    }
+
+    suspend fun registerFingerprintDevice(request: RegisterFingerprintDeviceRequest): NetworkResult<FingerprintDeviceStatus> {
+        return executeRequest {
+            post(endpoint("hrms/attendance/fingerprint/device")) {
+                setBody(request)
+            }
+        }
+    }
+
+    suspend fun getPunchChallenge(punchType: String): NetworkResult<PunchChallengeResponse> {
+        return executeRequest {
+            post(endpoint("hrms/attendance/fingerprint/challenge")) {
+                setBody(PunchChallengeRequest(punchType))
+            }
+        }
+    }
+
+    suspend fun punchWithFingerprint(request: PunchWithFingerprintRequest): NetworkResult<PunchWithFingerprintResponse> {
+        return executeRequest {
+            post(endpoint("hrms/attendance/punch-with-fingerprint")) {
+                setBody(request)
+            }
+        }
+    }
+
+    // ── HR/admin biometric controls ──
+    suspend fun listFingerprintAccess(): NetworkResult<List<FingerprintAccess>> {
+        return executeRequest {
+            get(endpoint("hrms/attendance/fingerprint/devices"))
+        }
+    }
+
+    suspend fun allowEmployeeFingerprint(employeeId: String): NetworkResult<Unit> {
+        return executeRequest {
+            post(endpoint("hrms/employees/$employeeId/fingerprint"))
+        }
+    }
+
+    suspend fun deleteEmployeeFingerprint(employeeId: String): NetworkResult<Unit> {
+        return executeRequest {
+            delete(endpoint("hrms/employees/$employeeId/fingerprint"))
+        }
+    }
+
+    suspend fun deleteEmployeeFace(employeeId: String): NetworkResult<Unit> {
+        return executeRequest {
+            delete(endpoint("hrms/employees/$employeeId/biometric-face"))
         }
     }
 

@@ -11,6 +11,7 @@ import (
 type Repository interface {
 	CreateProject(ctx context.Context, p *Project) error
 	GetProjectByID(ctx context.Context, tenantID, id uuid.UUID) (*Project, error)
+	EmployeeInTenant(ctx context.Context, tenantID, employeeID uuid.UUID) (bool, error)
 	GetProjectByKey(ctx context.Context, tenantID uuid.UUID, key string) (*Project, error)
 	ListProjects(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]Project, int64, error)
 	IncrementIssueNumber(ctx context.Context, tenantID, projectID uuid.UUID) (int, error)
@@ -21,10 +22,10 @@ type Repository interface {
 	GetWorkflowStatus(ctx context.Context, statusID uuid.UUID) (*WorkflowStatus, error)
 
 	CreateSprint(ctx context.Context, s *Sprint) error
-	GetSprintByID(ctx context.Context, id uuid.UUID) (*Sprint, error)
-	ListSprintsByProject(ctx context.Context, projectID uuid.UUID) ([]Sprint, error)
+	GetSprintByID(ctx context.Context, tenantID, id uuid.UUID) (*Sprint, error)
+	ListSprintsByProject(ctx context.Context, tenantID, projectID uuid.UUID) ([]Sprint, error)
 	GetActiveSprint(ctx context.Context, projectID uuid.UUID) (*Sprint, error)
-	UpdateSprintStatus(ctx context.Context, id uuid.UUID, status string) error
+	UpdateSprintStatus(ctx context.Context, tenantID, id uuid.UUID, status string) error
 	UpdateSprintCapacity(ctx context.Context, id uuid.UUID, hours float64) error
 
 	CreateIssue(ctx context.Context, issue *Issue) error
@@ -64,6 +65,12 @@ func (r *repository) CreateProject(ctx context.Context, p *Project) error {
 		p.ID, p.TenantID, p.Key, p.Name, p.LeadID, p.WorkflowID, p.ProjectType, 0,
 	)
 	return err
+}
+
+func (r *repository) EmployeeInTenant(ctx context.Context, tenantID, employeeID uuid.UUID) (bool, error) {
+	var ok bool
+	err := r.db.GetContext(ctx, &ok, `SELECT EXISTS (SELECT 1 FROM hrms_employees WHERE tenant_id = $1 AND id = $2)`, tenantID, employeeID)
+	return ok, err
 }
 
 func (r *repository) GetProjectByID(ctx context.Context, tenantID, id uuid.UUID) (*Project, error) {
@@ -207,10 +214,11 @@ func (r *repository) CreateSprint(ctx context.Context, s *Sprint) error {
 	return err
 }
 
-func (r *repository) GetSprintByID(ctx context.Context, id uuid.UUID) (*Sprint, error) {
+// Sprints carry no tenant_id of their own, so every lookup goes through the project's tenant.
+func (r *repository) GetSprintByID(ctx context.Context, tenantID, id uuid.UUID) (*Sprint, error) {
 	var s Sprint
-	query := `SELECT * FROM work_sprints WHERE id = $1 LIMIT 1`
-	err := r.db.GetContext(ctx, &s, query, id)
+	query := `SELECT s.* FROM work_sprints s JOIN work_projects p ON p.id = s.project_id WHERE s.id = $1 AND p.tenant_id = $2 LIMIT 1`
+	err := r.db.GetContext(ctx, &s, query, id, tenantID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -220,10 +228,10 @@ func (r *repository) GetSprintByID(ctx context.Context, id uuid.UUID) (*Sprint, 
 	return &s, nil
 }
 
-func (r *repository) ListSprintsByProject(ctx context.Context, projectID uuid.UUID) ([]Sprint, error) {
+func (r *repository) ListSprintsByProject(ctx context.Context, tenantID, projectID uuid.UUID) ([]Sprint, error) {
 	var sprints []Sprint
-	query := `SELECT * FROM work_sprints WHERE project_id = $1 ORDER BY created_at DESC`
-	err := r.db.SelectContext(ctx, &sprints, query, projectID)
+	query := `SELECT s.* FROM work_sprints s JOIN work_projects p ON p.id = s.project_id WHERE s.project_id = $1 AND p.tenant_id = $2 ORDER BY s.created_at DESC`
+	err := r.db.SelectContext(ctx, &sprints, query, projectID, tenantID)
 	return sprints, err
 }
 
@@ -240,9 +248,9 @@ func (r *repository) GetActiveSprint(ctx context.Context, projectID uuid.UUID) (
 	return &s, nil
 }
 
-func (r *repository) UpdateSprintStatus(ctx context.Context, id uuid.UUID, status string) error {
-	query := `UPDATE work_sprints SET status = $1 WHERE id = $2`
-	_, err := r.db.ExecContext(ctx, query, status, id)
+func (r *repository) UpdateSprintStatus(ctx context.Context, tenantID, id uuid.UUID, status string) error {
+	query := `UPDATE work_sprints s SET status = $1 FROM work_projects p WHERE s.id = $2 AND p.id = s.project_id AND p.tenant_id = $3`
+	_, err := r.db.ExecContext(ctx, query, status, id, tenantID)
 	return err
 }
 

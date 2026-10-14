@@ -80,7 +80,7 @@ fun AdminManagementScreen(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Register employee faces & bound fingerprints for kiosk attendance",
+                            text = "Enroll faces, allow or delete face & fingerprint punching",
                             fontSize = 12.sp,
                             color = TextMutedDark
                         )
@@ -246,7 +246,7 @@ fun AdminManagementScreen(
                     EmployeeAdminCard(
                         state = empState,
                         onRegisterFace = { adminViewModel.openFaceEnrollment(empState.employee) },
-                        onRegisterFingerprint = { adminViewModel.openFingerprintEnrollment(empState.employee) }
+                        onManageAccess = { adminViewModel.openBiometricAccess(empState.employee) }
                     )
                 }
             }
@@ -261,12 +261,8 @@ fun AdminManagementScreen(
             )
         }
 
-        uiState.activeFingerprintEnrollEmployee?.let { emp ->
-            AdminFingerprintEnrollmentSheet(
-                employee = emp,
-                adminViewModel = adminViewModel,
-                onDismiss = { adminViewModel.closeFingerprintEnrollment() }
-            )
+        if (uiState.activeBiometricEmployeeId != null) {
+            AdminBiometricAccessSheet(uiState = uiState, adminViewModel = adminViewModel)
         }
     }
 }
@@ -275,7 +271,7 @@ fun AdminManagementScreen(
 private fun EmployeeAdminCard(
     state: EmployeeBiometricState,
     onRegisterFace: () -> Unit,
-    onRegisterFingerprint: () -> Unit
+    onManageAccess: () -> Unit
 ) {
     val emp = state.employee
 
@@ -340,7 +336,11 @@ private fun EmployeeAdminCard(
                     modifier = Modifier.weight(1f)
                 )
                 BiometricStatusBadge(
-                    label = if (state.isFingerprintRegistered) "Fingerprint Bound" else "Fingerprint Pending",
+                    label = when {
+                        state.isFingerprintRegistered -> "Fingerprint On"
+                        state.isFingerprintAllowed -> "Fingerprint Allowed"
+                        else -> "Fingerprint Off"
+                    },
                     icon = Icons.Default.Fingerprint,
                     isRegistered = state.isFingerprintRegistered,
                     modifier = Modifier.weight(1f)
@@ -380,7 +380,7 @@ private fun EmployeeAdminCard(
                 }
 
                 OutlinedButton(
-                    onClick = onRegisterFingerprint,
+                    onClick = onManageAccess,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
@@ -400,7 +400,7 @@ private fun EmployeeAdminCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (state.isFingerprintRegistered) "Re-enroll Finger" else "Register Finger",
+                        text = "Manage Access",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )

@@ -1,14 +1,15 @@
 package hrms
 
 import (
-	"strconv"
-	"humora-backend/internal/notify"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"humora-backend/configs"
+	"humora-backend/internal/notify"
 	"math"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,6 +63,45 @@ func daysInMonth(year, month int) (totalDays int, workingDays int) {
 	return totalDays, workingDays
 }
 
+// accountedDays returns, for one employee and month, how many working days (Mon-Fri,
+// not public holidays) are covered by a punch and how many by approved leave. A day with
+// both counts once, as present.
+func (s *payrollService) accountedDays(ctx context.Context, tenantID, employeeID uuid.UUID, year, month int, holidays map[string]bool) (present, leave float64) {
+	loc, _ := EmployeeLocation(ctx, s.empRepo, tenantID, employeeID, time.Date(year, time.Month(month), 15, 12, 0, 0, 0, time.UTC))
+	punched := make(map[string]bool)
+	if dates, err := s.repo.GetDistinctPunchDatesInMonth(ctx, tenantID, employeeID, year, month, loc); err == nil {
+		for _, d := range dates {
+			punched[d.Format("2006-01-02")] = true
+		}
+	}
+	first := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	last := first.AddDate(0, 1, -1)
+	leaves, _ := s.empRepo.GetApprovedLeavesByDateRange(ctx, tenantID, employeeID, first, last)
+
+	for day := first; !day.After(last); day = day.AddDate(0, 0, 1) {
+		key := day.Format("2006-01-02")
+		if day.Weekday() == time.Saturday || day.Weekday() == time.Sunday || holidays[key] {
+			continue
+		}
+		if punched[key] {
+			present++
+			continue
+		}
+		for _, l := range leaves {
+			if key >= l.FromDate.Format("2006-01-02") && key <= l.ToDate.Format("2006-01-02") {
+				// A single-day leave of under a day (half day) counts as what was taken.
+				if l.TotalDays > 0 && l.TotalDays < 1 && l.FromDate.Equal(l.ToDate) {
+					leave += l.TotalDays
+				} else {
+					leave++
+				}
+				break
+			}
+		}
+	}
+	return present, leave
+}
+
 func (s *payrollService) PreviewPayrollRun(ctx context.Context, tenantID uuid.UUID, month, year int) (*PreviewPayrollResponse, error) {
 	if month < 1 || month > 12 {
 		return nil, errors.New("invalid month: must be between 1 and 12")
@@ -70,13 +110,35 @@ func (s *payrollService) PreviewPayrollRun(ctx context.Context, tenantID uuid.UU
 		return nil, errors.New("invalid year")
 	}
 
-	totalDays, workingDays := daysInMonth(year, month)
+	totalDays, _ := daysInMonth(year, month)
 	payPeriod := fmt.Sprintf("%s %d", time.Month(month).String(), year)
 
-	// Fetch all active employees
-	employees, _, err := s.empRepo.ListEmployees(ctx, tenantID, "", "", 200, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list employees: %w", err)
+	// Public holidays are paid days off: they are never loss of pay.
+	holidays := make(map[string]bool)
+	if hs, err := s.empRepo.ListPublicHolidays(ctx, tenantID, year); err == nil {
+		for _, h := range hs {
+			holidays[h.HolidayDate.Format("2006-01-02")] = true
+		}
+	}
+	workingDays := 0
+	for d := 1; d <= totalDays; d++ {
+		day := time.Date(year, time.Month(month), d, 0, 0, 0, 0, time.UTC)
+		if day.Weekday() != time.Saturday && day.Weekday() != time.Sunday && !holidays[day.Format("2006-01-02")] {
+			workingDays++
+		}
+	}
+
+	// Every employee, page by page (a fixed limit silently dropped people from payroll).
+	var employees []Employee
+	for offset := 0; ; offset += 200 {
+		page, _, err := s.empRepo.ListEmployees(ctx, tenantID, "", "", 200, offset)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list employees: %w", err)
+		}
+		employees = append(employees, page...)
+		if len(page) < 200 {
+			break
+		}
 	}
 
 	var items []PayrollPreviewItem
@@ -87,19 +149,27 @@ func (s *payrollService) PreviewPayrollRun(ctx context.Context, tenantID uuid.UU
 		finYear = fmt.Sprintf("%d-%d", year-1, year)
 	}
 
+	monthStart := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	monthEnd := monthStart.AddDate(0, 1, -1)
 	for _, emp := range employees {
+		// Only people employed during this month are paid for it.
+		if emp.DateOfExit != nil && emp.DateOfExit.Before(monthStart) {
+			continue
+		}
+		if emp.DateOfJoining.After(monthEnd) {
+			continue
+		}
+
 		// Fetch compensation structure
 		comp, err := s.repo.GetCompensationStructure(ctx, tenantID, emp.ID)
 		if err != nil || comp == nil {
 			continue // skip employee without compensation structure
 		}
 
-		// 1. Biometric Attendance Punch Days
-		punchDates, _ := s.repo.GetDistinctPunchDatesInMonth(ctx, tenantID, emp.ID, year, month)
-		presentDays := float64(len(punchDates))
-
-		// 2. Approved Leave Days
-		approvedLeaveDays, _ := s.repo.GetApprovedLeaveDaysInMonth(ctx, tenantID, emp.ID, year, month)
+		// 1-2. Day by day: a working day is paid if the employee punched in (on their shift's
+		// calendar) or was on approved leave. Weekends and holidays are never counted, and a
+		// leave that spans two months only counts the days inside this month.
+		presentDays, approvedLeaveDays := s.accountedDays(ctx, tenantID, emp.ID, year, month, holidays)
 
 		// 3. Loss of Pay (LOP) Days calculation
 		effectiveAccounted := presentDays + approvedLeaveDays
@@ -467,6 +537,24 @@ func (s *payrollService) GetITDeclaration(ctx context.Context, tenantID, employe
 }
 
 func (s *payrollService) SubmitReimbursement(ctx context.Context, tenantID, employeeID uuid.UUID, req *SubmitReimbursementRequest) (*ReimbursementClaim, error) {
+	if req.Amount <= 0 || req.Amount > 10_000_000 || math.IsNaN(req.Amount) {
+		return nil, errors.New("amount must be greater than 0 and at most 1,00,00,000")
+	}
+	switch req.Category {
+	case "broadband", "wellness", "travel", "learning", "office_supplies":
+	default:
+		return nil, errors.New("category must be broadband, wellness, travel, learning or office_supplies")
+	}
+	if !req.BillDate.IsZero() && req.BillDate.After(time.Now().Add(24*time.Hour)) {
+		return nil, errors.New("bill_date cannot be in the future")
+	}
+	// The receipt link is shown to approvers: only plain web links, never javascript: or data: URLs.
+	if req.ReceiptURL != nil && *req.ReceiptURL != "" {
+		if u, err := url.Parse(*req.ReceiptURL); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			return nil, errors.New("receipt_url must be an http(s) link")
+		}
+	}
+
 	catName := "Broadband / Internet Allowance"
 	switch req.Category {
 	case "wellness":

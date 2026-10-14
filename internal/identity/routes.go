@@ -39,7 +39,6 @@ func RegisterRoutes(router fiber.Router, handler *Handler) {
 	protected := authGroup.Group("/", middleware.AuthMiddleware())
 	protected.Get("/me", handler.GetProfile)
 	protected.Put("/presence", handler.UpdatePresence)
-	protected.Post("/device-key", handler.RegisterDeviceKey)
 
 	// QR Login Confirmation (Authorized by mobile device)
 	protected.Get("/qr/info", handler.GetQRInfo)

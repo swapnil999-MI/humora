@@ -21,11 +21,11 @@ import (
 
 type Service interface {
 	Register(ctx context.Context, req *RegisterRequest) (*AuthResponse, error)
+	SignupOpen(ctx context.Context) bool
 	Login(ctx context.Context, req *LoginRequest) (*AuthResponse, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*AuthResponse, error)
 	GetProfile(ctx context.Context, userID uuid.UUID) (*UserSummary, error)
 	UpdatePresence(ctx context.Context, userID uuid.UUID, status string) error
-	RegisterDeviceKey(ctx context.Context, userID uuid.UUID, publicKey string) error
 	RequestPasswordReset(ctx context.Context, req *ForgotPasswordRequest) error
 	ResetPassword(ctx context.Context, req *ResetPasswordRequest) error
 }
@@ -38,18 +38,35 @@ func NewService(repo Repository) Service {
 	return &service{repo: repo}
 }
 
+// ErrSignupClosed is returned when a stranger tries to create an organization on an
+// installation that already has one. Registering makes the caller a superadmin, so a
+// deployed server only allows it for the very first organization unless PUBLIC_SIGNUP=true.
+var ErrSignupClosed = errors.New("registration of new organizations is disabled on this server. ask your administrator for an invite")
+
+// SignupOpen reports whether a new organization may be registered right now.
+func (s *service) SignupOpen(ctx context.Context) bool {
+	if cfg := configs.AppConfig; cfg == nil || cfg.IsLocal() || cfg.Server.PublicSignup {
+		return true
+	}
+	exists, err := s.repo.HasAnyTenant(ctx)
+	return err == nil && !exists
+}
+
 func (s *service) Register(ctx context.Context, req *RegisterRequest) (*AuthResponse, error) {
+	if !s.SignupOpen(ctx) {
+		return nil, ErrSignupClosed
+	}
 	if validationErr := req.Validate(); validationErr != "" {
 		return nil, errors.New(validationErr)
 	}
 
 	// 0. Check if admin email already exists anywhere across the platform
-	conflict, entity, err := s.repo.CheckEmailConflict(ctx, req.AdminEmail)
+	conflict, _, err := s.repo.CheckEmailConflict(ctx, req.AdminEmail)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate email uniqueness: %w", err)
 	}
 	if conflict {
-		return nil, fmt.Errorf("email %q is already registered across the platform (conflict in %s)", req.AdminEmail, entity)
+		return nil, errors.New("this email address is already in use. sign in instead, or use a different address")
 	}
 
 	// 1. Check if tenant slug already exists
@@ -288,10 +305,6 @@ func (s *service) UpdatePresence(ctx context.Context, userID uuid.UUID, status s
 	return s.repo.UpdatePresence(ctx, userID, status)
 }
 
-func (s *service) RegisterDeviceKey(ctx context.Context, userID uuid.UUID, publicKey string) error {
-	return s.repo.RegisterDevicePublicKey(ctx, userID, publicKey)
-}
-
 // dummyPasswordHash is checked against when no account matches, so a login for an
 // unknown email takes as long as one for a real account.
 var dummyPasswordHash, _ = hashPassword("humora-timing-equaliser")
@@ -376,10 +389,8 @@ func hashPassword(password string) (string, error) {
 func verifyPassword(password, encodedHash string) (bool, error) {
 	parts := strings.Split(encodedHash, "$")
 	if len(parts) != 6 || parts[1] != "argon2id" {
-		// Fallback simple comparison for testing / legacy
-		if subtle.ConstantTimeCompare([]byte(password), []byte(encodedHash)) == 1 {
-			return true, nil
-		}
+		// Never compare against the raw column: a row holding anything but an
+		// Argon2id hash (an import, a script, a bug) must not become a login.
 		return false, errors.New("incompatible hash format")
 	}
 

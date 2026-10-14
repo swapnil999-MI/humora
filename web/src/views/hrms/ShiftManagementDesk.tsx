@@ -26,6 +26,13 @@ import {
   Briefcase,
 } from 'lucide-react';
 import { Shift, EmployeeShiftRoster } from '../../types';
+import { allTimeZones, deviceTimeZone, zoneOffsetLabel } from '../../utils/time';
+
+const TIME_ZONES = allTimeZones();
+const zoneLabel = (z: string) => {
+  const off = zoneOffsetLabel(z);
+  return `${z.replace(/_/g, ' ')}${off ? ` (${off})` : ''}`;
+};
 
 export const ShiftManagementDesk: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -52,6 +59,8 @@ export const ShiftManagementDesk: React.FC = () => {
   const [graceMinutes, setGraceMinutes] = useState(15);
   const [halfDayThresholdHours, setHalfDayThresholdHours] = useState(4.0);
   const [isNightShift, setIsNightShift] = useState(false);
+  // Chosen once, when the shift is created (defaults to this dashboard's zone); fixed afterwards.
+  const [timeZone, setTimeZone] = useState(deviceTimeZone());
   const [shiftColor, setShiftColor] = useState('#f59e0b');
 
   // Form states for Roster Assign Modal
@@ -82,6 +91,8 @@ export const ShiftManagementDesk: React.FC = () => {
       full_day_hours: 8.0,
       is_night_shift: isNightShift,
       night_shift_allowance: isNightShift ? 150.0 : 0.0,
+      // A new shift takes this dashboard's time zone; an existing shift keeps the one saved at creation.
+      ...(editingShift ? {} : { time_zone: timeZone }),
     };
 
     try {
@@ -240,6 +251,7 @@ export const ShiftManagementDesk: React.FC = () => {
               setGraceMinutes(15);
               setHalfDayThresholdHours(4.0);
               setIsNightShift(false);
+              setTimeZone(deviceTimeZone());
               setIsCreateShiftOpen(true);
             }}
           >
@@ -323,6 +335,12 @@ export const ShiftManagementDesk: React.FC = () => {
                   <div>
                     <span style={{ color: 'var(--text-dim)' }}>Half-Day Min: </span>
                     <strong style={{ color: 'var(--text-secondary)' }}>{s.half_day_hours}h</strong>
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <span style={{ color: 'var(--text-dim)' }}>Time Zone: </span>
+                    <strong style={{ color: 'var(--text-secondary)' }}>
+                      {s.time_zone} {zoneOffsetLabel(s.time_zone) && `(${zoneOffsetLabel(s.time_zone)})`}
+                    </strong>
                   </div>
                 </div>
 
@@ -636,6 +654,51 @@ export const ShiftManagementDesk: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* Time zone: selected when the shift is created, fixed afterwards */}
+              {editingShift ? (
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border-hairline)',
+                    fontSize: '12px',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Time zone: </span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{zoneLabel(editingShift.time_zone)}</strong>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Saved when this shift was created and cannot be changed. To use another zone, create a new shift.
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="shift_time_zone" style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                    Time Zone
+                  </label>
+                  <select
+                    id="shift_time_zone"
+                    className="input-field"
+                    value={timeZone}
+                    onChange={(e) => setTimeZone(e.target.value)}
+                    required
+                  >
+                    {(TIME_ZONES.includes(timeZone) ? TIME_ZONES : [timeZone, ...TIME_ZONES]).map((z) => (
+                      <option key={z} value={z}>
+                        {zoneLabel(z)}
+                      </option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
+                    The start and end times are in this zone, and attendance days, late check-ins and payroll days are counted in it.
+                    It cannot be changed after the shift is created.
+                  </span>
+                </div>
+              )}
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
                 <input

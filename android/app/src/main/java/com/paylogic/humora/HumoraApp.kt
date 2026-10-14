@@ -1,8 +1,6 @@
 package com.paylogic.humora
 
 import android.app.Application
-import androidx.room.Room
-import com.paylogic.humora.data.local.HumoraDatabase
 import com.paylogic.humora.data.remote.HumoraApiClient
 import com.paylogic.humora.data.remote.NetworkConfig
 import com.paylogic.humora.data.remote.SessionManager
@@ -10,9 +8,6 @@ import com.paylogic.humora.data.repository.*
 import com.paylogic.humora.pulse.PulseService
 
 class HumoraApp : Application() {
-
-    lateinit var database: HumoraDatabase
-        private set
 
     lateinit var sessionManager: SessionManager
         private set
@@ -50,18 +45,14 @@ class HumoraApp : Application() {
 
         NetworkConfig.init(this)
 
-        database = Room.databaseBuilder(
-            applicationContext,
-            HumoraDatabase::class.java,
-            "humora_enterprise.db"
-        ).fallbackToDestructiveMigration()
-         .build()
+        // Offline punch queue from older builds: punches are server-only now, so drop anything left.
+        deleteDatabase("humora_enterprise.db")
 
         sessionManager = SessionManager(this)
         apiClient = HumoraApiClient(sessionManager)
 
         authRepository = AuthRepository(apiClient, sessionManager)
-        attendanceRepository = AttendanceRepository(this, apiClient, database)
+        attendanceRepository = AttendanceRepository(this, apiClient)
         leavesRepository = LeavesRepository(apiClient)
         workRepository = WorkRepository(apiClient)
         payrollRepository = PayrollRepository(apiClient)

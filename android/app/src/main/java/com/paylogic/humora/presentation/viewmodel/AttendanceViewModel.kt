@@ -8,7 +8,6 @@ import com.paylogic.humora.data.model.MonthlyAttendanceDay
 import com.paylogic.humora.data.model.MonthlyAttendanceResponse
 import com.paylogic.humora.data.remote.NetworkResult
 import com.paylogic.humora.data.repository.AttendanceRepository
-import com.paylogic.humora.data.repository.PunchResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +22,6 @@ data class AttendanceUiState(
     /** null while loading; false when the organisation has no office configured. */
     val officesConfigured: Boolean? = null,
     val calendarError: String? = null,
-    val pendingOfflineSyncCount: Int = 0,
     val isFacePunching: Boolean = false,
     val isPunchedIn: Boolean = false,  // Bug #5 Fix: track punch-in/out state
     val actionMessage: String? = null
@@ -43,7 +41,6 @@ class AttendanceViewModel(
             updateCurrentLocation(com.paylogic.humora.core.location.LocationProvider.getLastKnownLocation(HumoraApp.instance))
         }
         loadMonthlyAttendance()
-        checkOfflinePunches()
     }
 
     fun updateCurrentLocation(loc: Location?) {
@@ -73,23 +70,6 @@ class AttendanceViewModel(
                     calendarError = "Attendance history is unavailable offline. It will load when you reconnect."
                 )
             }
-        }
-    }
-
-    fun checkOfflinePunches() {
-        viewModelScope.launch {
-            val pending = HumoraApp.instance.database.offlinePunchDao().getPendingPunches()
-            _uiState.value = _uiState.value.copy(pendingOfflineSyncCount = pending.size)
-        }
-    }
-
-    fun triggerOfflineSync() {
-        viewModelScope.launch {
-            val count = attendanceRepo.syncOfflinePunches()
-            checkOfflinePunches()
-            _uiState.value = _uiState.value.copy(
-                actionMessage = if (count > 0) "Successfully synced $count offline punches!" else "No pending punches to sync."
-            )
         }
     }
 

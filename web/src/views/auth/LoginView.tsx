@@ -40,11 +40,12 @@ export const LoginView: React.FC = () => {
   const [signInMethod, setSignInMethod] = useState<'password' | 'qr'>('password');
 
   // OAuth Providers State
-  const [authProviders, setAuthProviders] = useState<{ google: boolean; github: boolean; microsoft: boolean; qr_code: boolean }>({
+  const [authProviders, setAuthProviders] = useState<{ google: boolean; github: boolean; microsoft: boolean; qr_code: boolean; signup: boolean }>({
     google: false,
     github: false,
     microsoft: false,
     qr_code: true,
+    signup: false,
   });
 
   // WhatsApp-style QR Login State
@@ -54,7 +55,7 @@ export const LoginView: React.FC = () => {
 
   // Fetch enabled OAuth providers on mount
   useEffect(() => {
-    api.get<{ google: boolean; github: boolean; microsoft: boolean; qr_code: boolean }>('/auth/providers')
+    api.get<{ google: boolean; github: boolean; microsoft: boolean; qr_code: boolean; signup: boolean }>('/auth/providers')
       .then((data) => setAuthProviders(data))
       .catch(() => {});
   }, []);
@@ -254,8 +255,8 @@ export const LoginView: React.FC = () => {
       setForgotError('Please enter the valid 6-digit OTP code.');
       return;
     }
-    if (!newPassword || newPassword.length < 3) {
-      setForgotError('New password must be at least 3 characters.');
+    if (!newPassword || newPassword.length < 8) {
+      setForgotError('New password must be at least 8 characters.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -389,7 +390,8 @@ export const LoginView: React.FC = () => {
           </p>
         </div>
 
-        {/* Tab Toggle: Sign In vs Register Organization */}
+        {/* Tab Toggle: Sign In vs Register Organization (only when the server accepts new organizations) */}
+        {authProviders.signup && (
         <div
           style={{
             display: 'grid',
@@ -444,6 +446,7 @@ export const LoginView: React.FC = () => {
             Register Organization
           </button>
         </div>
+        )}
 
         {authMode === 'signin' ? (
           <>
@@ -882,6 +885,7 @@ export const LoginView: React.FC = () => {
               </div>
             )}
 
+            {authProviders.signup && (
             <div style={{ textAlign: 'center', marginTop: '16px' }}>
               <button
                 type="button"
@@ -897,6 +901,7 @@ export const LoginView: React.FC = () => {
                 Need to onboard a new company? <strong>Register as Admin →</strong>
               </button>
             </div>
+            )}
           </>
         ) : (
           /* Admin / Organization Registration Mode */

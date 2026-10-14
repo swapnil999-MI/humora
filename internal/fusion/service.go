@@ -107,11 +107,13 @@ func (s *service) GetMyWorkday(ctx context.Context, tenantID, userID uuid.UUID) 
 		       wl.time_spent_seconds, wl.started_at, wl.description, wl.is_billable
 		FROM work_worklogs wl
 		JOIN work_issues i ON wl.issue_id = i.id
-		WHERE wl.tenant_id = $1 AND wl.employee_id = $2 AND wl.started_at >= CURRENT_DATE
+		WHERE wl.tenant_id = $1 AND wl.employee_id = $2 AND wl.started_at >= $3
 		ORDER BY wl.started_at DESC
 	`
+	// "Today" starts at midnight in the time zone of the employee's shift.
+	loc, _ := hrms.EmployeeLocation(ctx, s.hrmsRepo, tenantID, emp.ID, time.Now())
 	var todayWorklogs []MyWorkdayWorklog
-	_ = s.db.SelectContext(ctx, &todayWorklogs, queryLogs, tenantID, emp.ID)
+	_ = s.db.SelectContext(ctx, &todayWorklogs, queryLogs, tenantID, emp.ID, hrms.DayStart(time.Now(), loc))
 
 	totalSecondsLogged := 0
 	for _, l := range todayWorklogs {
@@ -470,18 +472,20 @@ func (s *service) GetWeeklyTimesheet(ctx context.Context, tenantID, userID uuid.
 		return nil, errors.New("employee profile not found for user")
 	}
 
+	// Days run midnight to midnight in the time zone of the employee's shift.
+	loc, _ := hrms.EmployeeLocation(ctx, s.hrmsRepo, tenantID, emp.ID, time.Now())
 	var monday time.Time
 	if weekStartStr != "" {
-		parsed, err := time.Parse("2006-01-02", weekStartStr)
+		parsed, err := time.ParseInLocation("2006-01-02", weekStartStr, loc)
 		if err == nil {
 			monday = parsed
 		}
 	}
 	if monday.IsZero() {
-		now := time.Now().UTC()
+		now := time.Now().In(loc)
 		weekday := int(now.Weekday())
 		offset := (weekday + 6) % 7 // Monday = 0, Sunday = 6
-		monday = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -offset)
+		monday = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, -offset)
 	}
 
 	sunday := monday.AddDate(0, 0, 6)
@@ -656,6 +660,7 @@ func (s *service) ReviewWeeklyTimesheet(ctx context.Context, tenantID, managerUs
 		UPDATE hrms_timesheet_submissions
 		SET status = $1, reviewed_by = $2, reviewed_at = $3, reviewer_comments = $4, updated_at = $5
 		WHERE id = $6 AND tenant_id = $7
+		  AND employee_id NOT IN (SELECT id FROM hrms_employees WHERE user_id = $2)
 	`
 	res, err := s.db.ExecContext(ctx, query, req.Status, managerUserID, now, req.ReviewerComments, now, submissionID, tenantID)
 	if err != nil {
@@ -663,7 +668,7 @@ func (s *service) ReviewWeeklyTimesheet(ctx context.Context, tenantID, managerUs
 	}
 	rows, _ := res.RowsAffected()
 	if rows == 0 {
-		return errors.New("timesheet submission not found")
+		return errors.New("timesheet submission not found (you cannot review your own timesheet)")
 	}
 	return nil
 }
@@ -881,16 +886,20 @@ func (s *service) GetBurnoutSentinel(ctx context.Context, tenantID uuid.UUID) (*
 	thirtyDaysAgo := now.AddDate(0, 0, -30)
 
 	for _, emp := range employees {
+		// "After 8 PM" and "weekend" are judged on the employee's own (shift) clock, not UTC.
+		loc, _ := hrms.EmployeeLocation(ctx, s.hrmsRepo, tenantID, emp.ID, now)
+		zone := loc.String()
+
 		var lateDays int
 		queryLate := `
-			SELECT COUNT(DISTINCT date_trunc('day', punched_at))
+			SELECT COUNT(DISTINCT (punched_at AT TIME ZONE $4)::date)
 			FROM hrms_attendance_punches
 			WHERE tenant_id = $1 AND employee_id = $2
 			  AND punched_at >= $3
 			  AND punch_type IN ('out', 'break_start')
-			  AND EXTRACT(HOUR FROM punched_at) >= 20
+			  AND EXTRACT(HOUR FROM punched_at AT TIME ZONE $4) >= 20
 		`
-		_ = s.db.GetContext(ctx, &lateDays, queryLate, tenantID, emp.ID, thirtyDaysAgo)
+		_ = s.db.GetContext(ctx, &lateDays, queryLate, tenantID, emp.ID, thirtyDaysAgo, zone)
 
 		var weekendSeconds int
 		queryWeekend := `
@@ -898,9 +907,9 @@ func (s *service) GetBurnoutSentinel(ctx context.Context, tenantID uuid.UUID) (*
 			FROM work_worklogs
 			WHERE tenant_id = $1 AND employee_id = $2
 			  AND started_at >= $3
-			  AND EXTRACT(DOW FROM started_at) IN (0, 6)
+			  AND EXTRACT(DOW FROM started_at AT TIME ZONE $4) IN (0, 6)
 		`
-		_ = s.db.GetContext(ctx, &weekendSeconds, queryWeekend, tenantID, emp.ID, thirtyDaysAgo)
+		_ = s.db.GetContext(ctx, &weekendSeconds, queryWeekend, tenantID, emp.ID, thirtyDaysAgo, zone)
 		weekendHours := float64(weekendSeconds) / 3600.0
 
 		var activePoints int

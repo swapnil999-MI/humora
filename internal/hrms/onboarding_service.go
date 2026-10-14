@@ -43,24 +43,8 @@ type onboardingService struct {
 }
 
 func NewOnboardingService(db *sqlx.DB, hrmsRepo Repository, companyService CompanyService) OnboardingService {
-	// Auto-migrate candidate payable columns idempotently
-	if db != nil {
-		migration := `
-			ALTER TABLE hrms_onboarding_candidates ADD COLUMN IF NOT EXISTS annual_ctc NUMERIC(12, 2) DEFAULT 0.00;
-			ALTER TABLE hrms_onboarding_candidates ADD COLUMN IF NOT EXISTS monthly_gross NUMERIC(12, 2) DEFAULT 0.00;
-			ALTER TABLE hrms_onboarding_candidates ADD COLUMN IF NOT EXISTS basic_salary NUMERIC(12, 2) DEFAULT 0.00;
-			ALTER TABLE hrms_onboarding_candidates ADD COLUMN IF NOT EXISTS hra NUMERIC(12, 2) DEFAULT 0.00;
-			ALTER TABLE hrms_onboarding_candidates ADD COLUMN IF NOT EXISTS special_allowance NUMERIC(12, 2) DEFAULT 0.00;
-			ALTER TABLE hrms_onboarding_candidates ADD COLUMN IF NOT EXISTS provident_fund NUMERIC(12, 2) DEFAULT 0.00;
-			ALTER TABLE hrms_onboarding_candidates ADD COLUMN IF NOT EXISTS professional_tax NUMERIC(12, 2) DEFAULT 0.00;
-			ALTER TABLE hrms_onboarding_candidates ADD COLUMN IF NOT EXISTS net_payable NUMERIC(12, 2) DEFAULT 0.00;
-			ALTER TABLE hrms_onboarding_candidates ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50) DEFAULT 'bank_transfer';
-			ALTER TABLE hrms_onboarding_candidates ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'USD';
-		`
-		if _, err := db.Exec(migration); err != nil {
-			logger.Warn(fmt.Sprintf("Failed to auto-migrate onboarding payable columns: %v", err))
-		}
-	}
+	// Schema changes live in database/migrations (20260924000001 adds the payable columns);
+	// the runtime database role does not need ALTER rights.
 	return &onboardingService{
 		db:             db,
 		hrmsRepo:       hrmsRepo,
@@ -235,7 +219,8 @@ func (s *onboardingService) InviteCandidate(ctx context.Context, tenantID uuid.U
 			if err := mailer.SendCandidateInviteEmail(mailerConfig, c.PersonalEmail, c.FirstName, companyName, inviteURL); err != nil {
 				logger.Warn(fmt.Sprintf("Failed to send candidate onboarding email to %s: %v", c.PersonalEmail, err))
 			} else {
-				logger.Info(fmt.Sprintf("Sent candidate onboarding invite email to %s (%s)", c.PersonalEmail, inviteURL))
+				// The invite URL is a bearer credential for the candidate portal, so it stays out of logs.
+				logger.Info(fmt.Sprintf("Sent candidate onboarding invite email to %s", c.PersonalEmail))
 			}
 		}(cand)
 	}
@@ -487,15 +472,33 @@ func (s *onboardingService) ApproveAndConvertCandidate(ctx context.Context, tena
 		empCode = fmt.Sprintf("EMP-%03d", count+1)
 	}
 
-	// Compute work email if not supplied
+	// The work email becomes the employee's login, so it must be real and unused:
+	// converting onto an existing account would hand that account to whoever converts.
 	workEmail := ""
-	if req.WorkEmail != nil && *req.WorkEmail != "" {
-		workEmail = *req.WorkEmail
-	} else {
-		workEmail = fmt.Sprintf("%s.%s@acme.io",
-			strings.ToLower(strings.ReplaceAll(cand.FirstName, " ", "")),
-			strings.ToLower(strings.ReplaceAll(cand.LastName, " ", "")),
-		)
+	if req.WorkEmail != nil {
+		workEmail = strings.ToLower(strings.TrimSpace(*req.WorkEmail))
+	}
+	if workEmail == "" || !strings.Contains(workEmail, "@") {
+		return nil, errors.New("a valid work email is required")
+	}
+	var emailTaken bool
+	if err := s.db.GetContext(ctx, &emailTaken, `SELECT EXISTS (SELECT 1 FROM users WHERE LOWER(email) = $1)`, workEmail); err != nil {
+		return nil, fmt.Errorf("failed to check work email: %w", err)
+	}
+	if emailTaken {
+		return nil, errors.New("a user with this work email already exists")
+	}
+
+	// Without an HR-chosen password the account gets a random one nobody knows;
+	// the employee sets their own through "Forgot password".
+	initialPassword := ""
+	if req.InitialPassword != nil {
+		initialPassword = *req.InitialPassword
+	}
+	if initialPassword == "" {
+		initialPassword = generateSecureToken(24)
+	} else if len(initialPassword) < 8 {
+		return nil, errors.New("initial password must be at least 8 characters")
 	}
 
 	deptID := cand.DepartmentID
@@ -580,21 +583,17 @@ func (s *onboardingService) ApproveAndConvertCandidate(ctx context.Context, tena
 	}
 
 	// Automatically create a user login account for the employee
-	initialPassword := "EmployeePass2026!"
-	if req.InitialPassword != nil && *req.InitialPassword != "" {
-		initialPassword = *req.InitialPassword
-	}
 	hash, err := hashCandidatePassword(initialPassword)
 	if err == nil {
 		newUserID := uuid.New()
 		userInsert := `
 			INSERT INTO users (id, tenant_id, email, password_hash, status, presence_status, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, 'active', 'offline', NOW(), NOW())
-			ON CONFLICT (tenant_id, email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+			ON CONFLICT (tenant_id, email) DO NOTHING
 			RETURNING id
 		`
 		var createdUserID uuid.UUID
-		if err := s.db.GetContext(ctx, &createdUserID, userInsert, newUserID, tenantID, strings.ToLower(workEmail), hash); err == nil {
+		if err := s.db.GetContext(ctx, &createdUserID, userInsert, newUserID, tenantID, workEmail, hash); err == nil {
 			// Link user_id to employee
 			_, _ = s.db.ExecContext(ctx, `UPDATE hrms_employees SET user_id = $1 WHERE id = $2`, createdUserID, newEmployeeID)
 			emp.UserID = &createdUserID
@@ -768,6 +767,15 @@ func (s *onboardingService) UpdateMyProfile(ctx context.Context, tenantID, userI
 		return errors.New("employee profile not found")
 	}
 
+	// Avatars and banners must be images this server stored (or its inline fallback):
+	// an arbitrary URL would make every colleague's browser call an outside server.
+	if req.AvatarURL != nil && !ownProfileMediaURL(*req.AvatarURL, "avatars") {
+		return errors.New("avatar_url must come from the profile photo upload")
+	}
+	if req.BannerURL != nil && !ownProfileMediaURL(*req.BannerURL, "banners") {
+		return errors.New("banner_url must come from the banner upload")
+	}
+
 	// Update phone, personal email, avatar_url, or banner_url on employee record if provided
 	if req.Phone != nil || req.PersonalEmail != nil || req.AvatarURL != nil || req.BannerURL != nil {
 		queryUpdateEmp := `
@@ -812,6 +820,24 @@ func (s *onboardingService) UpdateMyProfile(ctx context.Context, tenantID, userI
 	}
 
 	return nil
+}
+
+// ownProfileMediaURL accepts "" (clear), a URL of an object UploadProfileMedia stored under
+// subdir, or the inline image it falls back to when storage is unavailable.
+func ownProfileMediaURL(raw, subdir string) bool {
+	if raw == "" {
+		return true
+	}
+	for _, p := range []string{"data:image/png;base64,", "data:image/jpeg;base64,", "data:image/webp;base64,", "data:image/gif;base64,"} {
+		if strings.HasPrefix(raw, p) {
+			return true
+		}
+	}
+	if strings.Contains(raw, "..") {
+		return false
+	}
+	storage := media.GetDefaultStorage()
+	return storage != nil && strings.HasPrefix(raw, storage.FormatURL("paylogic-media/"+subdir+"/"))
 }
 
 func (s *onboardingService) UploadProfileMedia(ctx context.Context, tenantID, userID uuid.UUID, mediaType string, fileHeader *multipart.FileHeader) (string, error) {

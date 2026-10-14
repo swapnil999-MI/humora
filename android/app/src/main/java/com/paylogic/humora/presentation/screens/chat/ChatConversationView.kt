@@ -27,7 +27,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +46,9 @@ import com.paylogic.humora.data.model.ChatAttachment
 import com.paylogic.humora.data.model.ChatMessage
 import com.paylogic.humora.pulse.Tick
 import com.paylogic.humora.presentation.viewmodel.ChatUiState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
@@ -52,6 +62,9 @@ class ConversationActions(
     val onLoadOlder: () -> Unit,
     val onReact: (ChatMessage, String) -> Unit,
     val onReply: (ChatMessage) -> Unit,
+    val onStar: (ChatMessage) -> Unit,
+    /** Tapping a quoted message scrolls to the original. */
+    val onJumpTo: (String) -> Unit,
     val onEdit: (ChatMessage) -> Unit,
     val onDelete: (ChatMessage) -> Unit,
     val onRetry: (ChatMessage) -> Unit,
@@ -75,8 +88,28 @@ fun ChatConversationView(
     playingId: String?,
 ) {
     var inputText by remember(uiState.activeConversationId) { mutableStateOf("") }
-    var actionTarget by remember { mutableStateOf<ChatMessage?>(null) }
+    // WhatsApp-style selection: long-press (or right-click) a message to get its actions.
+    var selectedId by remember(uiState.activeConversationId) { mutableStateOf<String?>(null) }
+    val selected = selectedId?.let { id -> uiState.messages.firstOrNull { it.id == id } }
+    var confirmDelete by remember { mutableStateOf<ChatMessage?>(null) }
+    // Full emoji picker: null = closed, "" = typing a message, otherwise the message id to react to.
+    var emojiFor by remember(uiState.activeConversationId) { mutableStateOf<String?>(null) }
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    BackHandler(enabled = selected != null) { selectedId = null }
+    var highlightedId by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
+
+    // Tapping a quote: scroll the original into view and flash it, as WhatsApp does.
+    LaunchedEffect(uiState.jumpTarget) {
+        val target = uiState.jumpTarget ?: return@LaunchedEffect
+        val index = uiState.messages.indexOfFirst { it.id == target.messageId }
+        if (index < 0) return@LaunchedEffect
+        listState.animateScrollToItem(index, scrollOffset = -listState.layoutInfo.viewportSize.height / 3)
+        highlightedId = target.messageId
+        delay(1400)
+        if (highlightedId == target.messageId) highlightedId = null
+    }
 
     // Editing pre-fills the field with the original text.
     LaunchedEffect(uiState.editing?.id) { uiState.editing?.let { inputText = it.text } }
@@ -98,7 +131,24 @@ fun ChatConversationView(
     }
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0B141A))) {
-        ConversationTopBar(uiState, actions.onBack)
+        if (selected != null) {
+            SelectionTopBar(
+                message = selected,
+                onClose = { selectedId = null },
+                onReply = { actions.onReply(selected); selectedId = null },
+                onStar = { actions.onStar(selected); selectedId = null },
+                onCopy = {
+                    clipboard.setText(AnnotatedString(selected.text))
+                    Toast.makeText(context, "Message copied", Toast.LENGTH_SHORT).show()
+                    selectedId = null
+                },
+                onDelete = { confirmDelete = selected; selectedId = null },
+                onEdit = { actions.onEdit(selected); selectedId = null },
+                onRetry = { actions.onRetry(selected); selectedId = null },
+            )
+        } else {
+            ConversationTopBar(uiState, actions.onBack)
+        }
 
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(
@@ -110,20 +160,40 @@ fun ChatConversationView(
                 items(uiState.messages, key = { it.id }) { msg ->
                     Column {
                         msg.dayHeader?.let { DayPill(it) }
-                        MessageBubble(
-                            message = msg,
-                            showSender = uiState.activeKind != "dm",
-                            playing = playingId == msg.id,
-                            onLongPress = { actionTarget = msg },
-                            onReactionClick = { actions.onReact(msg, it) },
-                            onAttachmentClick = { actions.onOpenAttachment(msg) },
-                            onRetry = { actions.onRetry(msg) },
-                        )
+                        SwipeToReply(
+                            enabled = !msg.deleted && !msg.unavailable && msg.tick != Tick.PENDING && msg.tick != Tick.FAILED,
+                            onReply = { actions.onReply(msg) },
+                        ) {
+                            MessageBubble(
+                                message = msg,
+                                showSender = uiState.activeKind != "dm",
+                                playing = playingId == msg.id,
+                                highlighted = highlightedId == msg.id,
+                                selected = selectedId == msg.id,
+                                selectionActive = selectedId != null,
+                                onClearSelection = { selectedId = null },
+                                onLongPress = { if (!msg.deleted && !msg.unavailable) selectedId = msg.id },
+                                onReactionClick = { actions.onReact(msg, it) },
+                                onAttachmentClick = { actions.onOpenAttachment(msg) },
+                                onRetry = { actions.onRetry(msg) },
+                                onQuoteClick = actions.onJumpTo,
+                            )
+                        }
                     }
                 }
                 if (uiState.messages.isEmpty()) {
                     item { EncryptionNotice(Modifier.fillParentMaxWidth().padding(vertical = 48.dp)) }
                 }
+            }
+
+            // Quick reactions for the selected message, floating under the action bar.
+            if (selected != null && selected.tick != Tick.PENDING && selected.tick != Tick.FAILED) {
+                ReactionStrip(
+                    message = selected,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+                    onReact = { actions.onReact(selected, it); selectedId = null },
+                    onMore = { emojiFor = selected.id; selectedId = null },
+                )
             }
         }
 
@@ -148,18 +218,32 @@ fun ChatConversationView(
             recordingSince = uiState.recordingSince,
             onStartRecording = actions.onStartRecording,
             onStopRecording = actions.onStopRecording,
+            onEmoji = { emojiFor = "" },
         )
     }
 
-    actionTarget?.let { target ->
-        MessageActionSheet(
-            message = target,
-            onDismiss = { actionTarget = null },
-            onReact = { actions.onReact(target, it); actionTarget = null },
-            onReply = { actions.onReply(target); actionTarget = null },
-            onEdit = { actions.onEdit(target); actionTarget = null },
-            onDelete = { actions.onDelete(target); actionTarget = null },
-            onRetry = { actions.onRetry(target); actionTarget = null },
+    emojiFor?.let { target ->
+        EmojiPickerSheet(
+            closeOnPick = target.isNotEmpty(),
+            onDismiss = { emojiFor = null },
+            onPick = { emoji ->
+                if (target.isEmpty()) {
+                    inputText += emoji
+                    actions.onInputChanged(inputText)
+                } else {
+                    uiState.messages.firstOrNull { it.id == target }?.let { actions.onReact(it, emoji) }
+                }
+            },
+        )
+    }
+
+    confirmDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            title = { Text("Delete for everyone?") },
+            text = { Text("Everyone in this chat will see that the message was deleted.") },
+            confirmButton = { TextButton(onClick = { confirmDelete = null; actions.onDelete(target) }) { Text("Delete", color = Color(0xFFF15C6D)) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancel") } },
         )
     }
 }
@@ -247,25 +331,62 @@ private fun MessageBubble(
     message: ChatMessage,
     showSender: Boolean,
     playing: Boolean,
+    highlighted: Boolean,
+    selected: Boolean,
+    selectionActive: Boolean,
+    onClearSelection: () -> Unit,
     onLongPress: () -> Unit,
     onReactionClick: (String) -> Unit,
     onAttachmentClick: () -> Unit,
     onRetry: () -> Unit,
+    onQuoteClick: (String) -> Unit,
 ) {
     val isMe = message.isMe
+    // The right-click handler below outlives recompositions; use the latest callback.
+    val currentOnLongPress by rememberUpdatedState(onLongPress)
+    val flash by animateColorAsState(
+        targetValue = when {
+            selected -> Color(0x3300A884)
+            highlighted -> Color(0x3353BDEB)
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = if (highlighted) 150 else 900),
+        label = "QuoteJumpFlash"
+    )
     val shape = RoundedCornerShape(topStart = if (isMe) 14.dp else 4.dp, topEnd = if (isMe) 4.dp else 14.dp, bottomStart = 14.dp, bottomEnd = 14.dp)
     val bg = if (isMe) Brush.linearGradient(listOf(Color(0xFF005C4B), Color(0xFF025142)))
     else Brush.linearGradient(listOf(Color(0xFF202C33), Color(0xFF1D272E)))
 
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp), horizontalAlignment = if (isMe) Alignment.End else Alignment.Start) {
+    Column(
+        modifier = Modifier.fillMaxWidth().background(flash, RoundedCornerShape(6.dp)).padding(vertical = 1.dp),
+        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
+    ) {
         Box(
             modifier = Modifier
                 .widthIn(max = 300.dp)
                 .clip(shape)
                 .background(bg)
+                // A mouse right-click opens the same actions as a long-press.
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                                event.changes.forEach { it.consume() }
+                                currentOnLongPress()
+                            }
+                        }
+                    }
+                }
                 .combinedClickable(
-                    onClick = { if (message.tick == Tick.FAILED) onRetry() else if (message.attachment != null && !message.deleted) onAttachmentClick() },
-                    onLongClick = { if (!message.deleted && !message.unavailable) onLongPress() },
+                    onClick = {
+                        when {
+                            selectionActive -> onClearSelection()
+                            message.tick == Tick.FAILED -> onRetry()
+                            message.attachment != null && !message.deleted -> onAttachmentClick()
+                        }
+                    },
+                    onLongClick = onLongPress,
                 )
                 .padding(start = 9.dp, top = 6.dp, end = 9.dp, bottom = 5.dp)
         ) {
@@ -273,16 +394,13 @@ private fun MessageBubble(
                 if (!isMe && showSender) {
                     Text(message.senderName, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = senderColor(message.senderId), modifier = Modifier.padding(bottom = 3.dp))
                 }
-                message.replyTo?.let { r ->
-                    Row(
-                        Modifier.padding(bottom = 5.dp).clip(RoundedCornerShape(6.dp)).background(Color(0x33000000)).padding(end = 8.dp).height(IntrinsicSize.Min)
-                    ) {
-                        Box(Modifier.width(3.dp).fillMaxHeight().background(Color(0xFF53BDEB)))
-                        Column(Modifier.padding(start = 7.dp, top = 4.dp, bottom = 4.dp)) {
-                            Text(r.senderName, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF53BDEB))
-                            Text(r.text, fontSize = 12.sp, color = Color(0xFFB0BEC5), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
+                if (!message.deleted) message.replyTo?.let { r ->
+                    ReplyQuote(
+                        preview = r,
+                        background = if (isMe) Color(0xFF025144) else Color(0xFF1A2329),
+                        modifier = Modifier.padding(bottom = 5.dp),
+                        onClick = if (r.unavailable) null else ({ onQuoteClick(r.messageId) }),
+                    )
                 }
 
                 when {
@@ -307,6 +425,10 @@ private fun MessageBubble(
                     if (message.edited && !message.deleted) {
                         Text("edited", fontSize = 10.sp, fontStyle = FontStyle.Italic, color = Color(0xFF8DA39C))
                         Spacer(Modifier.width(4.dp))
+                    }
+                    if (message.starred) {
+                        Icon(Icons.Default.Star, contentDescription = "Starred", tint = Color(0xFF8DA39C), modifier = Modifier.size(11.dp))
+                        Spacer(Modifier.width(3.dp))
                     }
                     Text(message.timeLabel, fontSize = 10.5.sp, color = if (isMe) Color(0xFF8DA39C) else Color(0xFF8696A0))
                     message.tick?.let { Spacer(Modifier.width(3.dp)); TickIcon(it) }
@@ -400,60 +522,94 @@ private fun Waveform(samples: ByteArray?, modifier: Modifier) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** WhatsApp's contextual bar while a message is selected: reply, star, delete, copy, and more. */
 @Composable
-private fun MessageActionSheet(
+private fun SelectionTopBar(
     message: ChatMessage,
-    onDismiss: () -> Unit,
-    onReact: (String) -> Unit,
+    onClose: () -> Unit,
     onReply: () -> Unit,
-    onEdit: () -> Unit,
+    onStar: () -> Unit,
+    onCopy: () -> Unit,
     onDelete: () -> Unit,
+    onEdit: () -> Unit,
     onRetry: () -> Unit,
 ) {
-    val clipboard = LocalClipboardManager.current
-    var confirmDelete by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF1F2C34)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            REACTIONS.forEach { emoji ->
-                val mine = message.reactions.any { it.mine && it.emoji == emoji }
-                Text(
-                    emoji, fontSize = 26.sp,
-                    modifier = Modifier.clip(CircleShape).background(if (mine) Color(0xFF0F3E36) else Color.Transparent).clickable { onReact(emoji) }.padding(6.dp)
-                )
+    val sent = message.tick != Tick.PENDING && message.tick != Tick.FAILED
+    val canEdit = message.isMe && message.attachment == null && sent
+    val canDelete = message.isMe && message.tick != Tick.PENDING
+    var menuOpen by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF1F2C34))
+            .statusBarsPadding()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onClose, modifier = Modifier.size(44.dp)) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cancel selection", tint = TextPrimaryDark)
+        }
+        Text("1", color = TextPrimaryDark, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp))
+        Spacer(Modifier.weight(1f))
+        if (sent) BarIcon(Icons.AutoMirrored.Filled.Reply, "Reply", onReply)
+        BarIcon(if (message.starred) Icons.Default.StarBorder else Icons.Default.Star, if (message.starred) "Unstar" else "Star", onStar)
+        if (canDelete) BarIcon(Icons.Default.Delete, "Delete", onDelete)
+        if (message.text.isNotBlank()) BarIcon(Icons.Default.ContentCopy, "Copy", onCopy)
+        if (canEdit || message.tick == Tick.FAILED) {
+            Box {
+                BarIcon(Icons.Default.MoreVert, "More options") { menuOpen = true }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = Color(0xFF233138)) {
+                    if (message.tick == Tick.FAILED) {
+                        DropdownMenuItem(text = { Text("Try sending again", color = TextPrimaryDark) }, onClick = { menuOpen = false; onRetry() })
+                    }
+                    if (canEdit) {
+                        DropdownMenuItem(text = { Text("Edit", color = TextPrimaryDark) }, onClick = { menuOpen = false; onEdit() })
+                    }
+                }
             }
         }
-        HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
-        if (message.tick == Tick.FAILED) SheetAction(Icons.Default.Refresh, "Try sending again", onClick = onRetry)
-        if (message.tick != Tick.PENDING && message.tick != Tick.FAILED) SheetAction(Icons.AutoMirrored.Filled.Reply, "Reply", onClick = onReply)
-        if (message.text.isNotBlank()) SheetAction(Icons.Default.ContentCopy, "Copy text") { clipboard.setText(AnnotatedString(message.text)); onDismiss() }
-        if (message.isMe && message.attachment == null && message.tick != Tick.PENDING && message.tick != Tick.FAILED) SheetAction(Icons.Default.Edit, "Edit", onClick = onEdit)
-        if (message.isMe && message.tick != Tick.PENDING) SheetAction(Icons.Default.Delete, "Delete for everyone", tint = Color(0xFFF15C6D)) { confirmDelete = true }
-        Spacer(Modifier.height(24.dp))
-    }
-    if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("Delete for everyone?") },
-            text = { Text("Everyone in this chat will see that the message was deleted.") },
-            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete", color = Color(0xFFF15C6D)) } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
-        )
+        Spacer(Modifier.width(4.dp))
     }
 }
 
 @Composable
-private fun SheetAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, tint: Color = TextPrimaryDark, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(18.dp))
-        Text(label, color = tint, fontSize = 15.sp)
+private fun BarIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+        Icon(icon, contentDescription = label, tint = TextPrimaryDark, modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
+private fun ReactionStrip(message: ChatMessage, modifier: Modifier, onReact: (String) -> Unit, onMore: () -> Unit) {
+    Row(
+        modifier = modifier
+            .shadow(8.dp, RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(28.dp))
+            .background(Color(0xFF233138))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        REACTIONS.forEach { emoji ->
+            val mine = message.reactions.any { it.mine && it.emoji == emoji }
+            Text(
+                emoji, fontSize = 24.sp,
+                modifier = Modifier.clip(CircleShape).background(if (mine) Color(0xFF0F3E36) else Color.Transparent).clickable { onReact(emoji) }.padding(6.dp)
+            )
+        }
+        // Any other emoji, from the full picker.
+        Box(
+            Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF2A3942)).clickable(onClick = onMore),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "More reactions", tint = Color(0xFF8696A0), modifier = Modifier.size(20.dp))
+        }
     }
 }
 
 private val SENDER_COLORS = listOf(0xFF53BDEB, 0xFFFFD279, 0xFFE78FFF, 0xFF7AE3A6, 0xFFFF9D7A, 0xFF9DA8FF).map { Color(it) }
 
-private fun senderColor(userId: String) = SENDER_COLORS[(userId.hashCode() and 0x7fffffff) % SENDER_COLORS.size]
+internal fun senderColor(userId: String) = SENDER_COLORS[(userId.hashCode() and 0x7fffffff) % SENDER_COLORS.size]
 
 internal fun formatBytes(n: Long): String = when {
     n >= 1L shl 20 -> "%.1f MB".format(n / (1024.0 * 1024))

@@ -97,6 +97,8 @@ export interface Shift {
   full_day_hours: number;
   is_night_shift: boolean;
   night_shift_allowance: number;
+  /** IANA time zone the shift times are written in; attendance days are counted in it. */
+  time_zone: string;
   created_at: string;
 }
 

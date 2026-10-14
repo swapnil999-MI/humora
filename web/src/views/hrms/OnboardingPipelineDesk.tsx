@@ -47,6 +47,13 @@ import { OnboardingCandidate, CandidateOnboardingView } from '../../types';
 import { navigateToPage } from '../../store/uiSlice';
 import { api } from '../../api/client';
 
+// A fresh random password per hire: a shared default would let any colleague log in as a new joiner.
+function generateInitialPassword(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const bytes = crypto.getRandomValues(new Uint8Array(14));
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
+}
+
 export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: string) => void }> = ({
   onOpenCandidateWizard,
 }) => {
@@ -113,7 +120,7 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
   // Conversion / Staff Provisioning Form State
   const [convertEmpCode, setConvertEmpCode] = useState<string>('');
   const [convertWorkEmail, setConvertWorkEmail] = useState<string>('');
-  const [convertPassword, setConvertPassword] = useState<string>('EmployeePass2026!');
+  const [convertPassword, setConvertPassword] = useState<string>(generateInitialPassword);
   const [convertDepartmentId, setConvertDepartmentId] = useState<string>('');
   const [convertDesignationId, setConvertDesignationId] = useState<string>('');
   const [convertShiftId, setConvertShiftId] = useState<string>('');
@@ -306,7 +313,7 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
       const cleanFirst = activeCand.first_name.toLowerCase().replace(/[^a-z0-9]/g, '');
       const cleanLast = activeCand.last_name.toLowerCase().replace(/[^a-z0-9]/g, '');
       setConvertWorkEmail(`${cleanFirst}.${cleanLast}@humora.internal`);
-      setConvertPassword('EmployeePass2026!');
+      setConvertPassword(generateInitialPassword());
       setReviewTab('payable');
     } catch (err: any) {
       dispatch(addToast({ type: 'error', message: 'Failed to fetch candidate details' }));
@@ -1831,7 +1838,7 @@ export const OnboardingPipelineDesk: React.FC<{ onOpenCandidateWizard?: (token: 
                       onChange={(e) => setConvertPassword(e.target.value)}
                     />
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                      The candidate will use this initial password along with their work email to log in to the workforce portal.
+                      Unique to this employee: share it with them privately. Leave empty and they can set their own with "Forgot password".
                     </span>
                   </div>
 

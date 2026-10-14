@@ -31,6 +31,9 @@ type ServerConfig struct {
 	// when the server runs behind a reverse proxy. Empty means use the socket address.
 	ProxyHeader    string
 	TrustedProxies []string
+	// PublicSignup lets anyone create a new organization (and become its superadmin)
+	// after the first one exists. Off by default outside local/test.
+	PublicSignup bool
 }
 
 type DatabaseConfig struct {
@@ -116,9 +119,11 @@ func LoadConfig() {
 		port = "8000"
 	}
 
+	// A missing ENV must not silently enable development secrets on a server:
+	// treat it as production so the strict checks below run. Developers set ENV=local.
 	env := GetEnv(EnvEnv)
 	if env == "" {
-		env = "local"
+		env = "production"
 	}
 	local := isLocalEnv(env)
 
@@ -245,6 +250,7 @@ func LoadConfig() {
 			LogLevel:              logLevel,
 			ProxyHeader:           GetEnv(ProxyHeaderEnv),
 			TrustedProxies:        splitCSV(GetEnv(TrustedProxiesEnv)),
+			PublicSignup:          GetEnv(PublicSignupEnv) == "true",
 		},
 		DB: DatabaseConfig{
 			Host:     dbHost,
@@ -357,6 +363,12 @@ func (c *Config) validate() []string {
 	o := c.OAuth
 	if (o.GoogleClientID != "" || o.GithubClientID != "" || o.MicrosoftClientID != "") && o.RedirectBaseURL == "" {
 		errs = append(errs, "OAUTH_REDIRECT_BASE_URL is required when an OAuth provider is configured")
+	}
+	// Test-only switches that disable anti-spoofing or write raw face images to disk.
+	for _, name := range []string{"SKIP_LIVENESS_CHECK", "SKIP_FACE_PRESENCE_CHECK", "BIOMETRIC_DEBUG_DUMP"} {
+		if GetEnv(name) == "true" {
+			errs = append(errs, name+" is only allowed with ENV=local or ENV=test")
+		}
 	}
 	if s.ProxyHeader != "" && len(s.TrustedProxies) == 0 {
 		errs = append(errs, "TRUSTED_PROXIES is required when PROXY_HEADER is set, otherwise clients can spoof their IP")

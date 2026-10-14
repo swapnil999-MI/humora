@@ -47,7 +47,26 @@ data class ChatAttachment(
     override fun hashCode() = fileName.hashCode() * 31 + sizeBytes.hashCode()
 }
 
-data class ChatReplyPreview(val messageId: String, val senderName: String, val text: String)
+/**
+ * The quoted message shown above a reply (in the bubble and in the composer), WhatsApp-style:
+ * coloured sender name, one-line snippet, a media icon and a thumbnail for photos.
+ */
+data class ChatReplyPreview(
+    val messageId: String,
+    val senderId: String,
+    val senderName: String,
+    val isMe: Boolean,
+    val text: String,
+    /** pulse.v1.MediaKind number, 0 for text. */
+    val mediaKind: Int = 0,
+    val thumbnail: ByteArray? = null,
+    /** The original is deleted, still locked, or not on this device; there is nothing to jump to. */
+    val unavailable: Boolean = false,
+) {
+    override fun equals(other: Any?) = other is ChatReplyPreview && other.messageId == messageId && other.text == text &&
+        other.senderName == senderName && other.unavailable == unavailable && other.mediaKind == mediaKind
+    override fun hashCode() = messageId.hashCode() * 31 + text.hashCode()
+}
 
 /** One message bubble, or a day separator when [dayHeader] is set. */
 data class ChatMessage(
@@ -68,6 +87,8 @@ data class ChatMessage(
     val attachment: ChatAttachment?,
     val replyTo: ChatReplyPreview?,
     val dayHeader: String? = null,
+    /** Starred on this phone (kept locally, like WhatsApp's starred messages). */
+    val starred: Boolean = false,
 )
 
 /** Someone the user can start a chat with. */

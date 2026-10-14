@@ -115,26 +115,6 @@ func (h *Handler) GetOrgTree(c *fiber.Ctx) error {
 	return response.TypedSuccess(c, fiber.StatusOK, "Org chart tree retrieved", tree)
 }
 
-// Punch handles geofenced / offline attendance punches.
-func (h *Handler) Punch(c *fiber.Ctx) error {
-	tenantID, userID, err := parseTenantAndUser(c)
-	if err != nil {
-		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
-	}
-
-	var req PunchRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid JSON payload")
-	}
-
-	res, err := h.service.RecordPunch(c.UserContext(), tenantID, userID, &req)
-	if err != nil {
-		return response.Error(c, fiber.StatusBadRequest, err.Error())
-	}
-
-	return response.TypedSuccess(c, fiber.StatusOK, "Attendance punch recorded", res)
-}
-
 // GetAttendanceSummary returns today's work hours and punch status.
 func (h *Handler) GetAttendanceSummary(c *fiber.Ctx) error {
 	tenantID, userID, err := parseTenantAndUser(c)
@@ -567,6 +547,147 @@ func (h *Handler) UpdateEmployeeBiometricFace(c *fiber.Ctx) error {
 	return response.TypedSuccess(c, fiber.StatusOK, "Biometric face profile registered successfully", res)
 }
 
+// GetPunchDevice reports whether fingerprint punch is set up for the caller.
+func (h *Handler) GetPunchDevice(c *fiber.Ctx) error {
+	tenantID, userID, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	res, err := h.service.GetPunchDevice(c.UserContext(), tenantID, userID)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+	return response.TypedSuccess(c, fiber.StatusOK, "Fingerprint device status", res)
+}
+
+// RegisterPunchDevice sets up fingerprint punch on a phone after a face match.
+func (h *Handler) RegisterPunchDevice(c *fiber.Ctx) error {
+	tenantID, userID, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	var req RegisterPunchDeviceRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid JSON payload")
+	}
+	res, err := h.service.RegisterPunchDevice(c.UserContext(), tenantID, userID, &req)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
+	return response.TypedSuccess(c, fiber.StatusOK, "Fingerprint punch set up", res)
+}
+
+// IssueDeviceRegistrationChallenge returns the challenge a new punch key must be attested for.
+func (h *Handler) IssueDeviceRegistrationChallenge(c *fiber.Ctx) error {
+	tenantID, userID, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	res, err := h.service.IssueDeviceRegistrationChallenge(c.UserContext(), tenantID, userID)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+	return response.TypedSuccess(c, fiber.StatusOK, "Registration challenge issued", res)
+}
+
+// IssuePunchChallenge returns a one-time challenge for a fingerprint punch.
+func (h *Handler) IssuePunchChallenge(c *fiber.Ctx) error {
+	tenantID, userID, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	var req PunchChallengeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid JSON payload")
+	}
+	res, err := h.service.IssuePunchChallenge(c.UserContext(), tenantID, userID, req.PunchType)
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+	return response.TypedSuccess(c, fiber.StatusOK, "Punch challenge issued", res)
+}
+
+// PunchWithFingerprint records a punch signed by the phone's fingerprint-bound key.
+func (h *Handler) PunchWithFingerprint(c *fiber.Ctx) error {
+	tenantID, userID, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	var req PunchWithFingerprintRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid JSON payload")
+	}
+	res, err := h.service.PunchWithFingerprint(c.UserContext(), tenantID, userID, &req)
+	if err != nil {
+		if strings.Contains(err.Error(), "geofence") || strings.Contains(err.Error(), "location") {
+			return response.Error(c, fiber.StatusBadRequest, err.Error())
+		}
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
+	return response.TypedSuccess(c, fiber.StatusOK, res.Message, res)
+}
+
+// ListFingerprintAccess lists employees allowed to punch with a fingerprint (HR/admin).
+func (h *Handler) ListFingerprintAccess(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	res, err := h.service.ListFingerprintAccess(c.UserContext(), tenantID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, err.Error())
+	}
+	return response.TypedSuccess(c, fiber.StatusOK, "Fingerprint access list", res)
+}
+
+// AllowEmployeeFingerprint lets an employee set up fingerprint punching (HR/admin).
+func (h *Handler) AllowEmployeeFingerprint(c *fiber.Ctx) error {
+	tenantID, adminUserID, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	empID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid employee ID")
+	}
+	if err := h.service.AllowFingerprint(c.UserContext(), tenantID, empID, adminUserID); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+	return response.Success(c, fiber.StatusOK, "Fingerprint punch allowed for employee", nil)
+}
+
+// RemoveEmployeeFingerprint deletes an employee's fingerprint access and phone key (HR/admin).
+func (h *Handler) RemoveEmployeeFingerprint(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	empID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid employee ID")
+	}
+	if err := h.service.RemoveFingerprint(c.UserContext(), tenantID, empID); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+	return response.Success(c, fiber.StatusOK, "Fingerprint data deleted for employee", nil)
+}
+
+// DeleteEmployeeBiometricFace deletes an employee's enrolled face data (HR/admin).
+func (h *Handler) DeleteEmployeeBiometricFace(c *fiber.Ctx) error {
+	tenantID, _, err := parseTenantAndUser(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Invalid session context")
+	}
+	empID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid employee ID")
+	}
+	if err := h.service.DeleteEmployeeFace(c.UserContext(), tenantID, empID); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
+	}
+	return response.Success(c, fiber.StatusOK, "Face data deleted for employee", nil)
+}
+
 // PunchWithFace verifies employee selfie and records biometric check-in/check-out.
 func (h *Handler) PunchWithFace(c *fiber.Ctx) error {
 	tenantID, userID, err := parseTenantAndUser(c)
@@ -768,9 +889,9 @@ func (h *Handler) CreateDesignation(c *fiber.Ctx) error {
 	return response.TypedSuccess(c, fiber.StatusCreated, "Designation created", desig)
 }
 
-// redactForViewer clears a colleague's private contact details unless the viewer
-// is HR/management or the employee themself: any employee can browse the
-// directory, but personal email and phone are not for everyone.
+// redactForViewer clears a colleague's private details unless the viewer is
+// HR/management or the employee themself: any employee can browse the directory,
+// but personal contact details, cost rate and custom HR fields are not for everyone.
 func redactForViewer(c *fiber.Ctx, e *Employee) {
 	switch role, _ := c.Locals("role").(string); role {
 	case "superadmin", "admin", "hr_admin":
@@ -781,4 +902,6 @@ func redactForViewer(c *fiber.Ctx, e *Employee) {
 	}
 	e.PersonalEmail = nil
 	e.Phone = nil
+	e.HourlyCostRate = 0
+	e.CustomProfileFields = "{}"
 }

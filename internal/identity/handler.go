@@ -1,6 +1,8 @@
 package identity
 
 import (
+	"errors"
+
 	"humora-backend/pkg/response"
 
 	"github.com/gofiber/fiber/v2"
@@ -24,6 +26,9 @@ func (h *Handler) Register(c *fiber.Ctx) error {
 	}
 
 	res, err := h.service.Register(c.UserContext(), &req)
+	if errors.Is(err, ErrSignupClosed) {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, err.Error())
 	}
@@ -105,28 +110,6 @@ func (h *Handler) UpdatePresence(c *fiber.Ctx) error {
 	})
 }
 
-// RegisterDeviceKey saves the client Ed25519 public key for verifying offline attendance punches.
-func (h *Handler) RegisterDeviceKey(c *fiber.Ctx) error {
-	userIDStr, _ := c.Locals("user_id").(string)
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid user ID")
-	}
-
-	var body struct {
-		PublicKey string `json:"public_key"`
-	}
-	if err := c.BodyParser(&body); err != nil || body.PublicKey == "" {
-		return response.Error(c, fiber.StatusBadRequest, "public_key string is required")
-	}
-
-	if err := h.service.RegisterDeviceKey(c.UserContext(), userID, body.PublicKey); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, err.Error())
-	}
-
-	return response.Success(c, fiber.StatusOK, "Device public key registered successfully", nil)
-}
-
 // ForgotPassword initiates an OTP-based password recovery workflow.
 func (h *Handler) ForgotPassword(c *fiber.Ctx) error {
 	var req ForgotPasswordRequest
@@ -158,6 +141,7 @@ func (h *Handler) ResetPassword(c *fiber.Ctx) error {
 // GetAuthProviders returns which OAuth providers and auth methods are available.
 func (h *Handler) GetAuthProviders(c *fiber.Ctx) error {
 	providers := h.authExt.GetEnabledProviders()
+	providers.Signup = h.service.SignupOpen(c.UserContext())
 	return response.TypedSuccess(c, fiber.StatusOK, "Auth providers retrieved", providers)
 }
 

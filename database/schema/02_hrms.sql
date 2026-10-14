@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS hrms_shifts (
     full_day_hours NUMERIC(4, 2) NOT NULL DEFAULT 8.0,
     is_night_shift BOOLEAN NOT NULL DEFAULT FALSE,
     night_shift_allowance NUMERIC(10, 2) DEFAULT 0.00,
+    time_zone VARCHAR(64) NOT NULL, -- IANA zone of the admin dashboard that created the shift; fixed
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -138,7 +139,20 @@ CREATE TABLE IF NOT EXISTS hrms_attendance_punches (
     offline_signature TEXT,
     device_info JSONB,
     source VARCHAR(50) NOT NULL DEFAULT 'web',
+    is_device_verified BOOLEAN NOT NULL DEFAULT FALSE, -- fingerprint-signed punch
+    device_challenge TEXT, -- one-time challenge the fingerprint punch signed (unique)
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Fingerprint punch access: allowed by HR/admin, then one phone registered after a face match
+CREATE TABLE IF NOT EXISTS hrms_punch_devices (
+    employee_id UUID PRIMARY KEY REFERENCES hrms_employees(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    public_key TEXT,
+    device_label VARCHAR(120) NOT NULL DEFAULT '',
+    allowed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    allowed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    registered_at TIMESTAMPTZ
 );
 
 -- Attendance Regularizations & OD/WFH Requests

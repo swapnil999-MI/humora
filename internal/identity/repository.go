@@ -25,6 +25,7 @@ import (
 type Repository interface {
 	CreateTenant(ctx context.Context, tenant *Tenant) error
 	GetTenantBySlug(ctx context.Context, slug string) (*Tenant, error)
+	HasAnyTenant(ctx context.Context) (bool, error)
 	GetTenantByID(ctx context.Context, id uuid.UUID) (*Tenant, error)
 	GetFirstTenant(ctx context.Context) (*Tenant, error)
 
@@ -34,7 +35,6 @@ type Repository interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (*User, error)
 	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
 	UpdatePresence(ctx context.Context, id uuid.UUID, presence string) error
-	RegisterDevicePublicKey(ctx context.Context, id uuid.UUID, publicKey string) error
 
 	CreateDefaultRoles(ctx context.Context, tenantID uuid.UUID) error
 	SeedDefaultTenantData(ctx context.Context, tenantID uuid.UUID, orgName, adminEmail, adminName string) error
@@ -73,6 +73,12 @@ func (r *repository) CreateTenant(ctx context.Context, tenant *Tenant) error {
 		tenant.ID, tenant.Slug, tenant.Name, tenant.Domain, tenant.SubscriptionTier, tenant.CreatedAt, tenant.UpdatedAt,
 	)
 	return err
+}
+
+func (r *repository) HasAnyTenant(ctx context.Context) (bool, error) {
+	var exists bool
+	err := r.db.GetContext(ctx, &exists, `SELECT EXISTS (SELECT 1 FROM tenants)`)
+	return exists, err
 }
 
 func (r *repository) GetTenantBySlug(ctx context.Context, slug string) (*Tenant, error) {
@@ -210,12 +216,6 @@ func (r *repository) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
 func (r *repository) UpdatePresence(ctx context.Context, id uuid.UUID, presence string) error {
 	query := `UPDATE users SET presence_status = $1, updated_at = NOW() WHERE id = $2`
 	_, err := r.db.ExecContext(ctx, query, presence, id)
-	return err
-}
-
-func (r *repository) RegisterDevicePublicKey(ctx context.Context, id uuid.UUID, publicKey string) error {
-	query := `UPDATE users SET device_public_key = $1, updated_at = NOW() WHERE id = $2`
-	_, err := r.db.ExecContext(ctx, query, publicKey, id)
 	return err
 }
 

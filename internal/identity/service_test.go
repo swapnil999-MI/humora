@@ -28,6 +28,10 @@ func (m *mockRepository) CreateTenant(ctx context.Context, tenant *Tenant) error
 	return nil
 }
 
+func (m *mockRepository) HasAnyTenant(ctx context.Context) (bool, error) {
+	return len(m.tenants) > 0, nil
+}
+
 func (m *mockRepository) GetTenantBySlug(ctx context.Context, slug string) (*Tenant, error) {
 	return m.tenants[slug], nil
 }
@@ -91,16 +95,6 @@ func (m *mockRepository) UpdatePresence(ctx context.Context, id uuid.UUID, prese
 	for _, u := range m.users {
 		if u.ID == id {
 			u.PresenceStatus = presence
-			return nil
-		}
-	}
-	return nil
-}
-
-func (m *mockRepository) RegisterDevicePublicKey(ctx context.Context, id uuid.UUID, publicKey string) error {
-	for _, u := range m.users {
-		if u.ID == id {
-			u.DevicePublicKey = &publicKey
 			return nil
 		}
 	}

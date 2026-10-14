@@ -88,7 +88,9 @@ type Shift struct {
 	FullDayHours        float64   `db:"full_day_hours" json:"full_day_hours"`
 	IsNightShift        bool      `db:"is_night_shift" json:"is_night_shift"`
 	NightShiftAllowance float64   `db:"night_shift_allowance" json:"night_shift_allowance"`
-	CreatedAt           time.Time `db:"created_at" json:"created_at"`
+	// TimeZone is the IANA zone the start/end times are in, chosen by the admin.
+	TimeZone  string    `db:"time_zone" json:"time_zone"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
 // AttendancePunch represents an in/out biometric, geofenced, or offline punch.
@@ -111,7 +113,20 @@ type AttendancePunch struct {
 	FaceConfidence     *float64   `db:"face_confidence" json:"face_confidence,omitempty"`
 	FaceDistance       *float64   `db:"face_distance" json:"face_distance,omitempty"`
 	SelfieURL          *string    `db:"selfie_url" json:"selfie_url,omitempty"`
+	IsDeviceVerified   bool       `db:"is_device_verified" json:"is_device_verified"` // fingerprint-signed
+	DeviceChallenge    *string    `db:"device_challenge" json:"-"`
 	CreatedAt          time.Time  `db:"created_at" json:"created_at"`
+}
+
+// PunchDevice is an employee's fingerprint-punch access: allowed by HR/admin, and
+// bound to a phone key once the employee sets it up (PublicKey empty until then).
+type PunchDevice struct {
+	EmployeeID   uuid.UUID  `db:"employee_id" json:"employee_id"`
+	TenantID     uuid.UUID  `db:"tenant_id" json:"-"`
+	PublicKey    string     `db:"public_key" json:"-"`
+	DeviceLabel  string     `db:"device_label" json:"device_label"`
+	AllowedAt    time.Time  `db:"allowed_at" json:"allowed_at"`
+	RegisteredAt *time.Time `db:"registered_at" json:"registered_at,omitempty"`
 }
 
 // LeaveType defines accrual quotas, carry forward, and sandwich rules.

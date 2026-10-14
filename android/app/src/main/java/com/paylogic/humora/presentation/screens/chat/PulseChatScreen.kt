@@ -181,6 +181,8 @@ fun PulseChatScreen(
                         onLoadOlder = viewModel::loadOlder,
                         onReact = viewModel::toggleReaction,
                         onReply = viewModel::startReply,
+                        onJumpTo = viewModel::jumpToMessage,
+                        onStar = viewModel::toggleStar,
                         onEdit = viewModel::startEdit,
                         onDelete = viewModel::delete,
                         onRetry = viewModel::retry,

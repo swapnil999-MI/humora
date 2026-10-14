@@ -66,6 +66,16 @@ func DecodeImage(data []byte) (image.Image, string, error) {
 		}
 	}
 
+	// Check declared dimensions before decoding: a few KB of PNG can claim
+	// 30000x30000 pixels and force a multi-GB allocation.
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to decode image (supported formats: JPEG, PNG, WebP): %w", err)
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > maxImageSide || cfg.Height > maxImageSide || cfg.Width*cfg.Height > maxImagePixels {
+		return nil, "", fmt.Errorf("image is %dx%d; the maximum is %d megapixels", cfg.Width, cfg.Height, maxImagePixels/1_000_000)
+	}
+
 	reader := bytes.NewReader(data)
 	img, format, err := image.Decode(reader)
 	if err != nil {
@@ -81,6 +91,12 @@ func DecodeImage(data []byte) (image.Image, string, error) {
 
 	return img, format, nil
 }
+
+// Limits for uploaded face images; a 24 MP phone photo still fits.
+const (
+	maxImageSide   = 8192
+	maxImagePixels = 24_000_000
+)
 
 func isLikelyBase64(s string) bool {
 	if len(s)%4 != 0 {

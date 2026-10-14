@@ -64,12 +64,16 @@ export interface HrmsState {
   isLoadingOnboarding: boolean;
   isLoadingPayroll: boolean;
   error: string | null;
+  // Every punch is face-verified: punch buttons open FacePunchModal through this request.
+  facePunchRequest: FacePunchRequest | null;
+  requestFacePunch: (punchType: string) => Promise<any>;
+  finishFacePunch: (result: { ok: true; value: any } | { ok: false }) => void;
 
   fetchAttendanceSummary: () => Promise<AttendanceSummary | null>;
   recordPunch: (payload: { punch_type: string; latitude?: number; longitude?: number; source?: string }) => Promise<any>;
   fetchAttendanceSession: () => Promise<AttendanceSession | null>;
   executePunch: (payload: { punch_type: string; latitude?: number; longitude?: number; source?: string }) => Promise<any>;
-  punchWithFace: (payload: { punch_type: 'in' | 'out'; selfie_image: string; latitude?: number; longitude?: number; source?: string }) => Promise<any>;
+  punchWithFace: (payload: { punch_type: string; selfie_image: string; latitude?: number; longitude?: number; source?: string }) => Promise<any>;
   enrollBiometricFace: (employeeId: string, images: string[]) => Promise<any>;
   fetchMonthlyAttendance: (payload: { year: number; month: number }) => Promise<MonthlyAttendanceResponse | null>;
   fetchTeamRadar: () => Promise<TeamPresenceRadarMember[]>;
@@ -125,6 +129,19 @@ export interface HrmsState {
   createDesignation: (title: string, description?: string) => Promise<Designation>;
   resetHrmsStore: () => void;
 }
+
+export const PUNCH_CANCELLED = 'Punch cancelled';
+
+export interface FacePunchRequest {
+  punchType: string;
+  resolve: (value: any) => void;
+  reject: (reason: any) => void;
+}
+
+const normalizePunchType = (t: string) => {
+  const raw = (t || '').toLowerCase();
+  return raw === 'punch_out' ? 'out' : raw === 'punch_in' ? 'in' : raw;
+};
 
 // Helper to attach .unwrap() to returned promises for Redux Toolkit dispatch compatibility
 function withUnwrap<T>(promise: Promise<T>): Promise<T> & { unwrap: () => Promise<T> } {
@@ -219,6 +236,7 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
   isLoadingOnboarding: false,
   isLoadingPayroll: false,
   error: null,
+  facePunchRequest: null,
 
   resetHrmsStore: () => {
     set({
@@ -262,22 +280,8 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
     }
   },
 
-  recordPunch: async (payload) => {
-    set({ isPunching: true });
-    try {
-      const normalizedType = payload.punch_type === 'punch_out' ? 'out' : payload.punch_type === 'punch_in' ? 'in' : payload.punch_type;
-      const res = await api.post('/hrms/attendance/punch', {
-        ...payload,
-        punch_type: normalizedType,
-      });
-      set({ isPunching: false });
-      get().fetchAttendanceSummary();
-      return res;
-    } catch (err: any) {
-      set({ isPunching: false, error: err.message });
-      throw err;
-    }
-  },
+  // There is no location-only punch: both entry points open the face check.
+  recordPunch: (payload) => get().requestFacePunch(payload.punch_type),
 
   fetchAttendanceSession: async () => {
     set({ isLoadingAttendance: true });
@@ -291,23 +295,20 @@ export const useHrmsStore = create<HrmsState>((set, get) => ({
     }
   },
 
-  executePunch: async (payload) => {
-    set({ isPunching: true });
-    try {
-      const rawType = (payload.punch_type as string).toLowerCase();
-      const normalizedType = rawType === 'punch_out' ? 'out' : rawType === 'punch_in' ? 'in' : rawType;
-      const res = await api.post('/hrms/attendance/punch', {
-        ...payload,
-        punch_type: normalizedType,
-      });
-      set({ isPunching: false });
-      get().fetchAttendanceSession();
-      get().fetchAttendanceSummary();
-      return res;
-    } catch (err: any) {
-      set({ isPunching: false, error: err.message });
-      throw err;
-    }
+  executePunch: (payload) => get().requestFacePunch(payload.punch_type),
+
+  requestFacePunch: (punchType) =>
+    new Promise((resolve, reject) => {
+      get().facePunchRequest?.reject(PUNCH_CANCELLED);
+      set({ facePunchRequest: { punchType: normalizePunchType(punchType), resolve, reject } });
+    }),
+
+  finishFacePunch: (result) => {
+    const req = get().facePunchRequest;
+    set({ facePunchRequest: null });
+    if (!req) return;
+    if (result.ok) req.resolve(result.value);
+    else req.reject(PUNCH_CANCELLED);
   },
 
   punchWithFace: async (payload: { punch_type: string; selfie_image: string; latitude?: number; longitude?: number; source?: string }) => {

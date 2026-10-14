@@ -5,23 +5,13 @@ import android.location.Location
 import com.paylogic.humora.core.location.GeofenceManager
 import com.paylogic.humora.core.location.GeofenceStatus
 import com.paylogic.humora.core.security.AntiSpoofEngine
-import com.paylogic.humora.data.local.HumoraDatabase
-import com.paylogic.humora.data.local.OfflinePunchEntity
+import com.paylogic.humora.core.security.PunchKey
 import com.paylogic.humora.data.model.*
 import com.paylogic.humora.data.remote.HumoraApiClient
 import com.paylogic.humora.data.remote.NetworkResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.text.SimpleDateFormat
-import java.util.*
-
-sealed interface PunchResult {
-    data class Success(val response: PunchResponse, val isOfflineQueued: Boolean = false) : PunchResult
-    data class SecurityRejection(val reason: String) : PunchResult
-    data class GeofenceRejection(val distanceMeters: Double, val allowedMeters: Double) : PunchResult
-    data class Error(val message: String) : PunchResult
-}
 
 sealed interface BiometricPunchResult {
     data class Success(
@@ -39,8 +29,7 @@ sealed interface BiometricPunchResult {
 
 class AttendanceRepository(
     private val context: Context,
-    private val apiClient: HumoraApiClient,
-    private val database: HumoraDatabase? = null
+    private val apiClient: HumoraApiClient
 ) {
     // The organisation's configured offices (Admin > Geofence). Empty until loaded, or if none exist.
     @Volatile private var offices: List<OfficeLocationDto> = emptyList()
@@ -125,110 +114,6 @@ class AttendanceRepository(
         }
     }
 
-    suspend fun recordPunch(
-        punchType: String,
-        location: Location?
-    ): PunchResult {
-        if (location == null) {
-            return PunchResult.Error("Location check failed: GPS coordinates are required for attendance check-in/check-out. Please enable GPS.")
-        }
-        // 1. Anti-Spoof Validation
-        val securityCheck = AntiSpoofEngine.validateLocation(location, context)
-        if (!securityCheck.isSecure) {
-            return PunchResult.SecurityRejection(securityCheck.failureReason ?: "Location compromised")
-        }
-
-        val loc = location!!
-
-        // 2. Geofence pre-check (the server enforces it too)
-        val geofence = checkGeofence(loc)
-
-        if (geofence != null && !geofence.isInside) {
-            return PunchResult.GeofenceRejection(
-                distanceMeters = geofence.distanceMeters,
-                allowedMeters = geofence.radiusMeters
-            )
-        }
-
-        val normalizedType = punchType.lowercase() // "in" or "out"
-        val request = PunchRequest(
-            punchType = normalizedType,
-            latitude = loc.latitude,
-            longitude = loc.longitude,
-            accuracyMeters = loc.accuracy.toDouble(),
-            source = "android"
-        )
-
-        // 3. Attempt live punch with backend
-        return when (val networkResult = apiClient.punch(request)) {
-            is NetworkResult.Success -> {
-                val resp = networkResult.data
-                val isPunched = normalizedType == "in" || normalizedType == "break_end"
-                _summary.value = _summary.value.copy(
-                    punchedIn = isPunched,
-                    lastPunchType = normalizedType,
-                    lastPunchTime = resp.punchedAt,
-                    presenceStatus = if (isPunched) "working" else "out"
-                )
-                _session.value = _session.value.copy(
-                    currentState = if (isPunched) "working" else "out",
-                    lastPunchType = normalizedType,
-                    lastPunchTime = resp.punchedAt
-                )
-                PunchResult.Success(resp, isOfflineQueued = false)
-            }
-            is NetworkResult.Error -> {
-                val msg = networkResult.message
-                if ((msg.contains("geofence", ignoreCase = true) || msg.contains("outside", ignoreCase = true)) && geofence != null) {
-                    PunchResult.GeofenceRejection(
-                        distanceMeters = geofence.distanceMeters,
-                        allowedMeters = geofence.radiusMeters
-                    )
-                } else {
-                    PunchResult.Error(msg)
-                }
-            }
-            is NetworkResult.Exception -> {
-                // Offline fallback: Queue into Room DB
-                val now = System.currentTimeMillis()
-                try {
-                    database?.offlinePunchDao()?.insertPunch(
-                        OfflinePunchEntity(
-                            punchType = normalizedType,
-                            latitude = loc.latitude,
-                            longitude = loc.longitude,
-                            accuracy = loc.accuracy,
-                            timestamp = now,
-                            isSynced = false
-                        )
-                    )
-
-                    val isPunched = normalizedType == "in" || normalizedType == "break_end"
-                    _summary.value = _summary.value.copy(
-                        punchedIn = isPunched,
-                        lastPunchType = normalizedType,
-                        presenceStatus = if (isPunched) "working" else "out"
-                    )
-
-                    val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(now))
-                    PunchResult.Success(
-                        PunchResponse(
-                            id = "offline-$now",
-                            punchType = normalizedType,
-                            punchedAt = timeStr,
-                            isGeofenceVerified = true,
-                            isOfflineSigned = true,
-                            message = "Offline punch queued for background sync"
-                        ),
-                        isOfflineQueued = true
-                    )
-                } catch (e: Exception) {
-                    PunchResult.Error(e.message ?: "Failed to queue offline punch")
-                }
-            }
-        }
-    }
-
     suspend fun recordPunchWithFace(
         punchType: String,
         base64Image: String,
@@ -298,6 +183,100 @@ class AttendanceRepository(
         }
     }
 
+    // ── Fingerprint punch ────────────────────────────────────────────────────
+    // The phone signs a one-time server challenge with PunchKey after a fingerprint scan.
+
+    enum class FingerprintReadiness { NOT_ALLOWED, NEEDS_SETUP, READY }
+
+    /** READY only when HR/admin allowed fingerprint and this phone holds the key the server has on file. */
+    suspend fun fingerprintReadiness(userId: String): NetworkResult<FingerprintReadiness> {
+        val local = runCatching { PunchKey.publicKey(userId) }.getOrNull()
+        return when (val res = apiClient.getFingerprintDevice()) {
+            is NetworkResult.Success -> NetworkResult.Success(
+                when {
+                    !res.data.allowed -> {
+                        // Access was removed by HR/admin: drop the now useless key from this phone.
+                        PunchKey.delete(userId)
+                        FingerprintReadiness.NOT_ALLOWED
+                    }
+                    res.data.registered && local != null && res.data.publicKey == local -> FingerprintReadiness.READY
+                    else -> FingerprintReadiness.NEEDS_SETUP
+                }
+            )
+            is NetworkResult.Error -> res
+            is NetworkResult.Exception -> res
+        }
+    }
+
+    /** Creates a new fingerprint key and registers it; the server accepts it only if the selfie matches. */
+    suspend fun setUpFingerprint(userId: String, selfieBase64: String): NetworkResult<FingerprintDeviceStatus> {
+        // The new key's attestation must carry the server's fresh challenge.
+        val challenge = when (val res = apiClient.getFingerprintRegistrationChallenge()) {
+            is NetworkResult.Success -> res.data.challenge
+            is NetworkResult.Error -> return res
+            is NetworkResult.Exception -> return res
+        }
+        val created = try {
+            PunchKey.create(userId, java.security.MessageDigest.getInstance("SHA-256").digest(challenge.toByteArray(Charsets.UTF_8)))
+        } catch (e: Exception) {
+            return NetworkResult.Error("This phone cannot create a secure fingerprint key: ${e.message}")
+        }
+        val label = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}".trim()
+        val res = apiClient.registerFingerprintDevice(
+            RegisterFingerprintDeviceRequest(created.publicKey, selfieBase64, label, challenge, created.attestationChain)
+        )
+        if (res !is NetworkResult.Success) PunchKey.delete(userId)
+        return res
+    }
+
+    suspend fun getPunchChallenge(punchType: String): NetworkResult<PunchChallengeResponse> =
+        apiClient.getPunchChallenge(punchType.lowercase())
+
+    suspend fun submitFingerprintPunch(
+        punchType: String,
+        challenge: String,
+        signature: String,
+        location: Location
+    ): NetworkResult<PunchWithFingerprintResponse> {
+        val res = apiClient.punchWithFingerprint(
+            PunchWithFingerprintRequest(
+                punchType = punchType.lowercase(),
+                challenge = challenge,
+                signature = signature,
+                latitude = location.latitude,
+                longitude = location.longitude,
+                accuracyMeters = location.accuracy.toDouble()
+            )
+        )
+        if (res is NetworkResult.Success) {
+            val isPunched = punchType.equals("in", true) || punchType.equals("break_end", true)
+            _summary.value = _summary.value.copy(
+                punchedIn = isPunched,
+                lastPunchType = punchType.lowercase(),
+                lastPunchTime = res.data.punchedAt,
+                presenceStatus = if (isPunched) "working" else "out"
+            )
+            _session.value = _session.value.copy(
+                currentState = if (isPunched) "working" else "out",
+                lastPunchType = punchType.lowercase(),
+                lastPunchTime = res.data.punchedAt
+            )
+        }
+        return res
+    }
+
+    /** Same location checks a face punch runs before calling the server. */
+    fun precheckLocation(location: Location?): String? {
+        if (location == null) return "Location check failed: GPS coordinates are required for attendance check-in/check-out. Please enable GPS."
+        val security = AntiSpoofEngine.validateLocation(location, context)
+        if (!security.isSecure) return "Security Alert: ${security.failureReason ?: "Location compromised"}"
+        val geofence = checkGeofence(location)
+        if (geofence != null && !geofence.isInside) {
+            return "Geofence Violation: You are ${geofence.distanceMeters.toInt()}m from the office (max ${geofence.radiusMeters.toInt()}m)."
+        }
+        return null
+    }
+
     suspend fun enrollBiometricFace(images: List<String>): NetworkResult<EnrollBiometricFaceResponse> {
         val profileRes = apiClient.getMyProfile()
         val empId = if (profileRes is NetworkResult.Success) profileRes.data.employee.id else ""
@@ -305,31 +284,6 @@ class AttendanceRepository(
             return NetworkResult.Error("Could not retrieve employee record for face enrollment. Ensure user is logged in.")
         }
         return apiClient.enrollBiometricFace(empId, images)
-    }
-
-    suspend fun syncOfflinePunches(): Int {
-        val dao = database?.offlinePunchDao() ?: return 0
-        val pending = dao.getPendingPunches()
-        var syncedCount = 0
-
-        for (item in pending) {
-            val req = PunchRequest(
-                punchType = item.punchType,
-                latitude = item.latitude,
-                longitude = item.longitude,
-                accuracyMeters = item.accuracy.toDouble(),
-                punchedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
-                    timeZone = TimeZone.getTimeZone("UTC")
-                }.format(Date(item.timestamp)),
-                source = "android"
-            )
-            val res = apiClient.punch(req)
-            if (res is NetworkResult.Success) {
-                dao.markPunchSynced(item.localId)
-                syncedCount++
-            }
-        }
-        return syncedCount
     }
 
     suspend fun getMonthlyAttendance(year: Int = 2026, month: Int = 9): NetworkResult<MonthlyAttendanceResponse> {

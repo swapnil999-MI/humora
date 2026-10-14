@@ -15,6 +15,7 @@ import { b64encode } from '../pulse/ids';
 import wasmUrl from '../pulse/wasm/pulse_crypto_bg.wasm?url';
 import type { Employee } from '../types';
 import { useAuthStore } from './authStore';
+import { formatClock } from '../utils/time';
 
 export interface PulseAttachment {
   id: string;
@@ -72,6 +73,9 @@ export interface PulseMessage {
   threadRepliesCount?: number;
   /** Set on replies posted inside a thread: the id of the thread's first message. */
   threadRootId?: string;
+  /** WhatsApp-style quoted reply: the message this one answers. */
+  replyToId?: string;
+  replyTo?: PulseReplyPreview;
   isPinned?: boolean;
   isStarred?: boolean;
   /** Delivery state of the user's own messages: one tick, two ticks, blue ticks. */
@@ -80,6 +84,20 @@ export interface PulseMessage {
   isDeleted?: boolean;
   /** Stored encrypted on the server, but this device has not been given its key. */
   isUnavailable?: boolean;
+}
+
+/** The quoted message shown above a reply, in the bubble and in the composer. */
+export interface PulseReplyPreview {
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  isMe: boolean;
+  /** One-line snippet: the text, or "Photo" / "Voice message (0:12)" / the file name. */
+  text: string;
+  kind: 'text' | 'image' | 'video' | 'voice' | 'document';
+  thumbnailUrl?: string;
+  /** Deleted, still locked, or not on this device: nothing to jump to. */
+  unavailable: boolean;
 }
 
 interface LastMessage {
@@ -161,17 +179,21 @@ export interface PulseState {
     attachments?: PulseAttachment[],
     taggedTasks?: PulseTaskTag[],
     voiceNote?: PulseVoiceNote,
-    options?: { threadRootId?: string }
+    options?: { threadRootId?: string; replyToId?: string }
   ) => Promise<void>;
   /** Encrypts and sends a file. Images get a small inline preview. */
-  sendFile: (conversationId: string, file: File) => Promise<boolean>;
+  sendFile: (conversationId: string, file: File, options?: { replyToId?: string }) => Promise<boolean>;
   /** Encrypts and sends a recorded voice note. */
-  sendVoiceNote: (conversationId: string, recording: Blob, durationMs: number) => Promise<boolean>;
+  sendVoiceNote: (conversationId: string, recording: Blob, durationMs: number, options?: { replyToId?: string }) => Promise<boolean>;
   /** Downloads and decrypts a message's attachment; resolves to a local URL for it. */
   openMedia: (messageId: string) => Promise<string | null>;
   toggleReaction: (messageId: string, emoji: string, currentUserId?: string) => void;
   toggleStarMessage: (messageId: string) => void;
   togglePinMessage: (messageId: string) => void;
+  /** Edits one of the user's own text messages for everyone. */
+  editMessage: (messageId: string, text: string) => Promise<void>;
+  /** Deletes one of the user's own messages for everyone. Received messages cannot be deleted. */
+  deleteMessage: (messageId: string) => Promise<void>;
   toggleHuddle: (channelId: string) => void;
   setActiveThreadMessage: (message: PulseMessage | null) => void;
   createChannel: (name: string, topic: string, isPrivate: boolean) => Promise<void>;
@@ -202,8 +224,29 @@ const unread = new Map<string, number>();
 const mediaUrls = new Map<string, string>();
 // Stored form of the messages currently on screen, for attachment lookups.
 const localMessages = new Map<string, LocalMessage>();
+// Starred and pinned messages are kept on this device only, per signed-in user.
 const starred = new Set<string>();
 const pinned = new Set<string>();
+const markKey = (kind: 'starred' | 'pinned') => `pulse:${kind}:${client?.userId ?? ''}`;
+
+function loadMarks() {
+  for (const [kind, set] of [['starred', starred], ['pinned', pinned]] as const) {
+    set.clear();
+    try {
+      for (const id of JSON.parse(localStorage.getItem(markKey(kind)) ?? '[]')) set.add(String(id));
+    } catch {
+      // storage blocked or corrupt: start empty
+    }
+  }
+}
+
+function saveMarks(kind: 'starred' | 'pinned', set: Set<string>) {
+  try {
+    localStorage.setItem(markKey(kind), JSON.stringify([...set]));
+  } catch {
+    // storage blocked: the mark lasts for this session only
+  }
+}
 
 const person = (userId: string): Person =>
   people.get(userId) ?? { name: `User ${userId.slice(0, 8)}`, role: '', department: '' };
@@ -211,7 +254,7 @@ const person = (userId: string): Person =>
 function formatTime(ts: number): string {
   const d = new Date(ts);
   const today = new Date();
-  if (d.toDateString() === today.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === today.toDateString()) return formatClock(d);
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
@@ -344,7 +387,7 @@ function toView(m: LocalMessage, me: string): PulseMessage {
       : m.unavailable
         ? 'This message was sent before this device joined the conversation.'
         : m.text,
-    timestamp: new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    timestamp: formatClock(m.ts),
     createdAt: new Date(m.ts).toISOString(),
     attachments,
     voiceNote,
@@ -357,6 +400,44 @@ function toView(m: LocalMessage, me: string): PulseMessage {
     isDeleted: m.deleted,
     isUnavailable: m.unavailable,
     threadRootId: m.threadRootId,
+    replyToId: m.replyToId,
+  };
+}
+
+/** WhatsApp-style preview of the message a reply quotes; `original` is undefined when it is not on this device. */
+function replyPreview(id: string, original: LocalMessage | undefined, me: string): PulseReplyPreview {
+  if (!original) {
+    return { messageId: id, senderId: '', senderName: '', isMe: false, text: 'Original message is not available', kind: 'text', unavailable: true };
+  }
+  const mine = original.senderId === me;
+  const media = original.deleted || original.unavailable ? undefined : original.media;
+  const kind: PulseReplyPreview['kind'] = !media
+    ? 'text'
+    : media.kind === MediaKind.IMAGE
+      ? 'image'
+      : media.kind === MediaKind.VIDEO
+        ? 'video'
+        : media.kind === MediaKind.VOICE_NOTE || media.kind === MediaKind.AUDIO
+          ? 'voice'
+          : 'document';
+  const body = original.text.replace(/\s+/g, ' ').trim();
+  let text: string;
+  if (original.deleted) text = 'This message was deleted';
+  else if (original.unavailable) text = 'Waiting for this message';
+  else if (body) text = body;
+  else if (kind === 'image') text = 'Photo';
+  else if (kind === 'video') text = 'Video';
+  else if (kind === 'voice') text = `Voice message (${formatDuration((media?.durationMs ?? 0) / 1000)})`;
+  else text = media?.fileName || 'Document';
+  return {
+    messageId: id,
+    senderId: mine ? CURRENT_USER : original.senderId,
+    senderName: mine ? 'You' : person(original.senderId).name,
+    isMe: mine,
+    text,
+    kind,
+    thumbnailUrl: kind === 'image' && media?.thumbnail.length ? `data:image/jpeg;base64,${b64encode(media.thumbnail)}` : undefined,
+    unavailable: original.deleted || original.unavailable,
   };
 }
 
@@ -411,7 +492,18 @@ export const usePulseStore = create<PulseState>((set, get) => {
       localMessages.clear();
       for (const m of list) localMessages.set(m.id, m);
     }
-    set((state) => ({ messages: { ...state.messages, [conversationId]: list.map((m) => toView(m, me)) } }));
+    const byId = new Map(list.map((m) => [m.id, m]));
+    const views = await Promise.all(
+      list.map(async (m) => {
+        const view = toView(m, me);
+        if (m.replyToId) {
+          const original = byId.get(m.replyToId) ?? (await client!.message(conversationId, m.replyToId));
+          view.replyTo = replyPreview(m.replyToId, original, me);
+        }
+        return view;
+      })
+    );
+    set((state) => ({ messages: { ...state.messages, [conversationId]: views } }));
   };
 
   const markReadIfVisible = async (conversationId: string) => {
@@ -648,6 +740,7 @@ export const usePulseStore = create<PulseState>((set, get) => {
         next.subscribe(onEvent);
         await next.start();
         client = next;
+        loadMarks();
         await Promise.all(next.conversations().map((c) => summarize(c.id)));
         rebuild();
         set({ status: 'ready' });
@@ -681,13 +774,13 @@ export const usePulseStore = create<PulseState>((set, get) => {
         const tags = taggedTasks
           .filter((t) => UUID.test(t.id))
           .map((t) => ({ type: TagType.TASK, id: t.id, title: `${t.key} ${t.title}`, status: t.status }));
-        await client.sendText(id, text, { tags, threadRootId: options.threadRootId });
+        await client.sendText(id, text, { tags, threadRootId: options.threadRootId, replyToId: options.replyToId });
       } catch (err: any) {
         set({ error: err?.message ?? 'Message could not be sent' });
       }
     },
 
-    sendFile: async (conversationId, file) => {
+    sendFile: async (conversationId, file, options = {}) => {
       if (!client) return false;
       if (file.size > MAX_MEDIA_BYTES - 1024) {
         set({ error: 'Files larger than 100 MB cannot be sent' });
@@ -701,7 +794,7 @@ export const usePulseStore = create<PulseState>((set, get) => {
           fileName: file.name,
           mimeType: file.type || 'application/octet-stream',
           ...(isImage ? await imagePreview(file) : {}),
-        });
+        }, { replyToId: options.replyToId });
         return true;
       } catch (err: any) {
         set({ error: err?.message ?? 'File could not be sent' });
@@ -709,7 +802,7 @@ export const usePulseStore = create<PulseState>((set, get) => {
       }
     },
 
-    sendVoiceNote: async (conversationId, recording, durationMs) => {
+    sendVoiceNote: async (conversationId, recording, durationMs, options = {}) => {
       if (!client) return false;
       try {
         const id = await ensureConversation(conversationId);
@@ -719,7 +812,7 @@ export const usePulseStore = create<PulseState>((set, get) => {
           fileName: 'voice-note',
           mimeType: recording.type || 'audio/webm',
           ...audio,
-        });
+        }, { replyToId: options.replyToId });
         return true;
       } catch (err: any) {
         set({ error: err?.message ?? 'Voice note could not be sent' });
@@ -754,12 +847,39 @@ export const usePulseStore = create<PulseState>((set, get) => {
 
     toggleStarMessage: (messageId) => {
       if (!starred.delete(messageId)) starred.add(messageId);
+      saveMarks('starred', starred);
       void loadMessages(get().activeId);
     },
 
     togglePinMessage: (messageId) => {
       if (!pinned.delete(messageId)) pinned.add(messageId);
+      saveMarks('pinned', pinned);
       void loadMessages(get().activeId);
+    },
+
+    editMessage: async (messageId, text) => {
+      const { activeId, messages } = get();
+      const msg = messages[activeId]?.find((m) => m.id === messageId);
+      const body = text.trim();
+      // Only your own, still-present text messages can be edited.
+      if (!client || !msg || !body || msg.senderId !== CURRENT_USER || msg.isDeleted) return;
+      try {
+        await client.editMessage(activeId, messageId, body);
+      } catch (err: any) {
+        set({ error: err?.message ?? 'Message could not be edited' });
+      }
+    },
+
+    deleteMessage: async (messageId) => {
+      const { activeId, messages } = get();
+      const msg = messages[activeId]?.find((m) => m.id === messageId);
+      // Only the sender can delete a message; received messages cannot be deleted.
+      if (!client || !msg || msg.senderId !== CURRENT_USER || msg.isDeleted) return;
+      try {
+        await client.deleteMessage(activeId, messageId);
+      } catch (err: any) {
+        set({ error: err?.message ?? 'Message could not be deleted' });
+      }
     },
 
     toggleHuddle: (channelId) => {

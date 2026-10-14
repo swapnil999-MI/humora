@@ -16,7 +16,9 @@ var DB *sqlx.DB
 func ConnectDB() error {
 	cfg := AppConfig.DB
 
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+	// timezone=UTC: timestamps come back from Postgres (and NOW()/CURRENT_DATE run) in UTC,
+	// whatever the database server's own time zone is.
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s timezone=UTC",
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Name, cfg.SSLMode)
 
 	var err error

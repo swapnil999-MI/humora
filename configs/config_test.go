@@ -36,3 +36,11 @@ func TestValidateAcceptsSafeProductionConfig(t *testing.T) {
 		t.Fatalf("expected no errors, got %v", errs)
 	}
 }
+
+func TestValidateRejectsBiometricTestSwitches(t *testing.T) {
+	t.Setenv("SKIP_LIVENESS_CHECK", "true")
+	c := &Config{Server: ServerConfig{Env: "production"}}
+	if errs := strings.Join(c.validate(), "\n"); !strings.Contains(errs, "SKIP_LIVENESS_CHECK") {
+		t.Fatalf("expected SKIP_LIVENESS_CHECK to be rejected, got:\n%s", errs)
+	}
+}

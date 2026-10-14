@@ -17,8 +17,8 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -28,6 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -43,7 +46,7 @@ import com.paylogic.humora.data.model.ChatReplyPreview
 import kotlinx.coroutines.delay
 
 /**
- * ChatInputBar — WhatsApp-style input dock: reply/edit banner, a rounded input pill with attach and
+ * ChatInputBar — WhatsApp-style input dock: edit banner, a rounded input pill (with the quoted message on top when replying), attach and
  * camera, and a round action button that sends text or, when the field is empty, records a voice
  * message (tap to start, tap again to send; the bin cancels).
  */
@@ -60,9 +63,21 @@ fun ChatInputBar(
     recordingSince: Long?,
     onStartRecording: () -> Unit,
     onStopRecording: (send: Boolean) -> Unit,
+    /** Opens the full emoji picker. */
+    onEmoji: () -> Unit,
 ) {
     val hasText = inputText.isNotBlank()
     val recording = recordingSince != null
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    // Starting a reply puts the cursor in the field and opens the keyboard, like WhatsApp.
+    LaunchedEffect(replyTo?.messageId) {
+        if (replyTo != null) {
+            runCatching { focusRequester.requestFocus() }
+            keyboard?.show()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -71,12 +86,8 @@ fun ChatInputBar(
             .navigationBarsPadding()
             .imePadding()
     ) {
-        // Reply / edit banner
-        val banner = when {
-            editing != null -> Triple(Icons.Default.Edit, "Edit message", editing.text)
-            replyTo != null -> Triple(Icons.AutoMirrored.Filled.Reply, "Replying to ${replyTo.senderName}", replyTo.text)
-            else -> null
-        }
+        // Edit banner (a reply is shown inside the input pill instead)
+        val banner = if (editing != null) Triple(Icons.Default.Edit, "Edit message", editing.text) else null
         AnimatedVisibility(visible = banner != null) {
             if (banner != null) {
                 Row(
@@ -110,20 +121,35 @@ fun ChatInputBar(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Box(
+            val showQuote = replyTo != null && editing == null && !recording
+            val pillShape = RoundedCornerShape(if (showQuote) 20.dp else 26.dp)
+            Column(
                 modifier = Modifier
                     .weight(1f)
                     .defaultMinSize(minHeight = 48.dp)
-                    .shadow(2.dp, RoundedCornerShape(26.dp), ambientColor = Color(0x33000000))
-                    .clip(RoundedCornerShape(26.dp))
+                    .shadow(2.dp, pillShape, ambientColor = Color(0x33000000))
+                    .clip(pillShape)
                     .background(Color(0xFF202C33))
-                    .border(0.6.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(26.dp))
+                    .border(0.6.dp, Color.White.copy(alpha = 0.08f), pillShape)
                     .padding(horizontal = 4.dp, vertical = 4.dp)
             ) {
+                AnimatedVisibility(visible = showQuote, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                    replyTo?.let {
+                        ReplyQuote(
+                            preview = it,
+                            background = Color(0xFF1A2329),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                            onClose = onCancelCompose,
+                        )
+                    }
+                }
                 if (recording) {
                     RecordingIndicator(recordingSince!!, onCancel = { onStopRecording(false) })
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        IconButton(onClick = onEmoji, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.EmojiEmotions, contentDescription = "Emoji", tint = Color(0xFF8696A0), modifier = Modifier.size(22.dp))
+                        }
                         BasicTextField(
                             value = inputText,
                             onValueChange = onInputChange,
@@ -138,7 +164,8 @@ fun ChatInputBar(
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp)
+                                .focusRequester(focusRequester)
+                                .padding(start = 4.dp, end = 6.dp, top = 8.dp, bottom = 8.dp)
                         )
                         if (editing == null) {
                             IconButton(onClick = onAttach, modifier = Modifier.size(36.dp)) {

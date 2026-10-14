@@ -47,6 +47,9 @@ enum class ChatFilter(val label: String) {
     DMS("Direct")
 }
 
+/** A one-shot request to scroll to and highlight [messageId]; [nonce] makes repeats distinct. */
+data class JumpTarget(val messageId: String, val nonce: Long)
+
 data class ChatUiState(
     // Roster
     val rows: List<ChatRow> = emptyList(),
@@ -65,6 +68,8 @@ data class ChatUiState(
     val hasOlder: Boolean = false,
     val replyTo: ChatReplyPreview? = null,
     val editing: ChatMessage? = null,
+    /** Set when the view should scroll to a message and flash it (tapping a quote). */
+    val jumpTarget: JumpTarget? = null,
 
     // New chat
     val contacts: List<ChatContact> = emptyList(),
@@ -104,6 +109,10 @@ class ChatViewModel(
 
     private val client: PulseClient? get() = service.client.value
     private val me: String get() = client?.userId.orEmpty()
+
+    // Starred messages stay on this phone, per signed-in user.
+    private val starPrefs get() = HumoraApp.instance.getSharedPreferences("pulse_starred_$me", android.content.Context.MODE_PRIVATE)
+    private fun starredIds(): Set<String> = starPrefs.getStringSet("ids", emptySet()) ?: emptySet()
 
     /** conversationId -> userId -> time the typing indicator expires. */
     private val typing = HashMap<String, HashMap<String, Long>>()
@@ -295,16 +304,13 @@ class ChatViewModel(
 
     private suspend fun toUi(c: PulseClient, raw: List<LocalMessage>): List<ChatMessage> {
         var lastDay: LocalDate? = null
+        val starred = starredIds()
         return raw.map { m ->
             val day = Instant.ofEpochMilli(m.ts).atZone(ZoneId.systemDefault()).toLocalDate()
             val header = if (day != lastDay) dayLabel(day) else null
             lastDay = day
             val media = m.media?.let { runCatching { Media.parseFrom(it) }.getOrNull() }
-            val reply = m.replyToId?.let { rid ->
-                c.message(m.conversationId, rid)?.let { r ->
-                    ChatReplyPreview(rid, if (r.senderId == me) "You" else service.person(r.senderId).name, if (r.deleted) "Deleted message" else r.text.ifBlank { attachmentLabel(r.media?.let { Media.parseFrom(it) }) })
-                }
-            }
+            val reply = m.replyToId?.let { rid -> replyPreview(rid, c.message(m.conversationId, rid)) }
             ChatMessage(
                 id = m.id,
                 senderId = m.senderId,
@@ -327,6 +333,7 @@ class ChatViewModel(
                 },
                 replyTo = reply,
                 dayHeader = header,
+                starred = m.id in starred,
             )
         }
     }
@@ -360,8 +367,82 @@ class ChatViewModel(
         }
     }
 
-    fun startReply(message: ChatMessage) = _uiState.update {
-        it.copy(replyTo = ChatReplyPreview(message.id, message.senderName, message.text.ifBlank { message.attachment?.fileName ?: "" }), editing = null)
+    fun startReply(message: ChatMessage) {
+        if (message.deleted || message.unavailable) return
+        val att = message.attachment
+        _uiState.update {
+            it.copy(
+                replyTo = ChatReplyPreview(
+                    messageId = message.id,
+                    senderId = message.senderId,
+                    senderName = message.senderName,
+                    isMe = message.isMe,
+                    text = replySnippet(message.text, att?.kind ?: 0, att?.fileName, att?.durationMs ?: 0),
+                    mediaKind = att?.kind ?: 0,
+                    thumbnail = att?.thumbnail,
+                ),
+                editing = null,
+            )
+        }
+    }
+
+    /**
+     * Tapping a quote jumps to the original: older pages are loaded until it is in the list,
+     * then the view scrolls to it and flashes it (see [ChatUiState.jumpTarget]).
+     */
+    fun jumpToMessage(messageId: String) {
+        val id = _uiState.value.activeConversationId ?: return
+        viewModelScope.launch {
+            val c = client ?: return@launch
+            var pages = 0
+            while (_uiState.value.messages.none { it.id == messageId } && _uiState.value.hasOlder && pages < 40) {
+                val state = _uiState.value
+                val oldest = state.messages.firstOrNull() ?: break
+                val older = c.messages(id, beforeOrder = oldest.sortOrder, limit = PAGE)
+                val current = c.messages(id, beforeOrder = Long.MAX_VALUE, limit = state.messages.size)
+                if (id != _uiState.value.activeConversationId) return@launch
+                _uiState.update { it.copy(messages = toUi(c, older + current), hasOlder = older.size >= PAGE) }
+                pages++
+            }
+            if (_uiState.value.messages.any { it.id == messageId }) {
+                _uiState.update { it.copy(jumpTarget = JumpTarget(messageId, System.nanoTime())) }
+            } else {
+                showError("The original message is no longer available.")
+            }
+        }
+    }
+
+    private fun replyPreview(rid: String, r: LocalMessage?): ChatReplyPreview {
+        if (r == null) return ChatReplyPreview(rid, "", "", false, "Original message is not available", unavailable = true)
+        val media = r.media?.let { runCatching { Media.parseFrom(it) }.getOrNull() }
+        val isMe = r.senderId == me
+        return ChatReplyPreview(
+            messageId = rid,
+            senderId = r.senderId,
+            senderName = if (isMe) "You" else service.person(r.senderId).name,
+            isMe = isMe,
+            text = when {
+                r.deleted -> "This message was deleted"
+                r.unavailable -> "Waiting for this message"
+                else -> replySnippet(r.text, media?.kindValue ?: 0, media?.fileName, media?.durationMs ?: 0, media?.caption)
+            },
+            mediaKind = if (r.deleted || r.unavailable) 0 else media?.kindValue ?: 0,
+            thumbnail = if (r.deleted) null else media?.thumbnail?.toByteArray()?.takeIf { it.isNotEmpty() },
+            unavailable = r.deleted || r.unavailable,
+        )
+    }
+
+    /** WhatsApp-style one-line snippet: the text, or "Photo" / "Voice message (0:12)" / the file name. */
+    private fun replySnippet(text: String, kind: Int, fileName: String?, durationMs: Int, caption: String? = null): String {
+        val body = text.ifBlank { caption.orEmpty() }.replace('\n', ' ').trim()
+        if (body.isNotEmpty()) return body
+        return when (kind) {
+            1 -> "Photo"
+            2 -> "Video"
+            3, 4 -> "Voice message" + if (durationMs > 0) " (%d:%02d)".format(durationMs / 60000, durationMs / 1000 % 60) else ""
+            0 -> ""
+            else -> fileName ?: "Document"
+        }
     }
 
     fun startEdit(message: ChatMessage) {
@@ -370,6 +451,13 @@ class ChatViewModel(
     }
 
     fun cancelCompose() = _uiState.update { it.copy(replyTo = null, editing = null) }
+
+    fun toggleStar(message: ChatMessage) {
+        val ids = starredIds().toMutableSet()
+        val nowStarred = ids.add(message.id) || run { ids.remove(message.id); false }
+        starPrefs.edit().putStringSet("ids", ids).apply()
+        _uiState.update { s -> s.copy(messages = s.messages.map { if (it.id == message.id) it.copy(starred = nowStarred) else it }) }
+    }
 
     fun delete(message: ChatMessage) {
         val id = _uiState.value.activeConversationId ?: return

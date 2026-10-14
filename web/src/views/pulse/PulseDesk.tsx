@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import {
   Hash,
   Plus,
@@ -23,13 +23,25 @@ import {
   MoreVertical,
   Copy,
   ArrowLeft,
+  Camera,
+  Video,
+  ChevronDown,
+  Star,
+  StarOff,
+  PinOff,
+  Pencil,
+  Trash2,
+  Plus as PlusIcon,
 } from 'lucide-react';
+import { EmojiPicker } from './EmojiPicker';
 import {
   usePulseStore,
   PulseAttachment,
   PulseTaskTag,
   PulseMemberView,
   PulseTick,
+  PulseMessage,
+  PulseReplyPreview,
 } from '../../store/pulseStore';
 import {
   useAuthStore,
@@ -68,6 +80,182 @@ const MessageTick: React.FC<{ tick?: PulseTick; size?: number }> = ({ tick, size
   }
 };
 
+// Group sender names and quotes use a stable colour per person, as in WhatsApp.
+const SENDER_COLORS = ['#1fa2d6', '#d99a06', '#c050d8', '#20a464', '#e2643c', '#5b6ee8'];
+const OWN_QUOTE_COLOR = '#11a683';
+
+function senderColor(userId: string): string {
+  let h = 0;
+  for (let i = 0; i < userId.length; i++) h = (h * 31 + userId.charCodeAt(i)) | 0;
+  return SENDER_COLORS[Math.abs(h) % SENDER_COLORS.length];
+}
+
+/** Builds the composer quote for a message the user is replying to. */
+function replyPreviewOf(msg: PulseMessage): PulseReplyPreview {
+  const att = msg.attachments?.[0];
+  const kind: PulseReplyPreview['kind'] = msg.voiceNote
+    ? 'voice'
+    : att?.type === 'image'
+      ? 'image'
+      : att
+        ? 'document'
+        : 'text';
+  const body = msg.content.replace(/\s+/g, ' ').trim();
+  return {
+    messageId: msg.id,
+    senderId: msg.senderId,
+    senderName: msg.senderName,
+    isMe: msg.senderId === 'user-current',
+    text:
+      body ||
+      (kind === 'voice' ? `Voice message (${msg.voiceNote?.duration ?? '0:00'})` : kind === 'image' ? 'Photo' : att?.name || ''),
+    kind,
+    thumbnailUrl: kind === 'image' ? att?.previewUrl : undefined,
+    unavailable: false,
+  };
+}
+
+const QUOTE_ICONS: Partial<Record<PulseReplyPreview['kind'], React.ReactNode>> = {
+  image: <Camera size={13} />,
+  video: <Video size={13} />,
+  voice: <Mic size={13} />,
+  document: <FileText size={13} />,
+};
+
+/** The quoted message: coloured bar and name, one-line snippet, photo thumbnail on the right. */
+const ReplyQuote: React.FC<{ preview: PulseReplyPreview; onClick?: () => void }> = ({ preview, onClick }) => {
+  const accent = preview.isMe ? OWN_QUOTE_COLOR : preview.senderId ? senderColor(preview.senderId) : 'var(--text-muted)';
+  const content = (
+    <>
+      <span className="pulse-quote-bar" style={{ background: accent }} />
+      <span className="pulse-quote-body">
+        {preview.senderName && (
+          <span className="pulse-quote-name" style={{ color: accent }}>
+            {preview.senderName}
+          </span>
+        )}
+        <span className="pulse-quote-text">
+          {QUOTE_ICONS[preview.kind]}
+          <span>{preview.text}</span>
+        </span>
+      </span>
+      {preview.thumbnailUrl && <img className="pulse-quote-thumb" src={preview.thumbnailUrl} alt="" />}
+    </>
+  );
+  return onClick ? (
+    <button type="button" className="pulse-quote" onClick={onClick} title="Go to the original message">
+      {content}
+    </button>
+  ) : (
+    <div className="pulse-quote is-static">{content}</div>
+  );
+};
+
+const MENU_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+interface MessageMenuProps {
+  msg: PulseMessage;
+  x: number;
+  y: number;
+  onClose: () => void;
+  onReact: (emoji: string) => void;
+  /** Opens the full emoji picker to react with any emoji. */
+  onMoreReactions: (x: number, y: number) => void;
+  onReply: () => void;
+  onCopy: () => void;
+  onStar: () => void;
+  onPin: () => void;
+  onThread: () => void;
+  onDownload?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}
+
+/** WhatsApp Web's message menu: quick reactions on top, then the actions for this message. */
+const MessageMenu: React.FC<MessageMenuProps> = ({ msg, x, y, onClose, ...a }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: x, top: y });
+
+  // Keep the menu on screen: open upwards / leftwards when there is no room.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    setPos({
+      left: Math.max(8, Math.min(x, window.innerWidth - width - 8)),
+      top: y + height > window.innerHeight - 8 ? Math.max(8, y - height) : y,
+    });
+  }, [x, y]);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onClose);
+    document.addEventListener('scroll', onClose, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onClose);
+      document.removeEventListener('scroll', onClose, true);
+    };
+  }, [onClose]);
+
+  const run = (fn?: () => void) => () => {
+    onClose();
+    fn?.();
+  };
+  const mine = msg.reactions?.find((r) => r.users.includes('user-current'))?.emoji;
+  const item = (icon: React.ReactNode, label: string, fn?: () => void, danger = false) => (
+    <button type="button" role="menuitem" className={`pulse-menu-item${danger ? ' is-danger' : ''}`} onClick={run(fn)}>
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+
+  return (
+    <div ref={ref} className="pulse-msg-menu" role="menu" style={{ left: pos.left, top: pos.top }} onContextMenu={(e) => e.preventDefault()}>
+      <div className="pulse-menu-reactions">
+        {MENU_REACTIONS.map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            className={mine === emoji ? 'is-mine' : ''}
+            onClick={run(() => a.onReact(emoji))}
+            aria-label={`React ${emoji}`}
+          >
+            {emoji}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="pulse-more-reactions"
+          title="More reactions"
+          aria-label="More reactions"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            onClose();
+            a.onMoreReactions(r.left, r.bottom + 6);
+          }}
+        >
+          <PlusIcon size={16} />
+        </button>
+      </div>
+      {item(<Reply size={16} />, 'Reply', a.onReply)}
+      {msg.content && item(<Copy size={16} />, 'Copy', a.onCopy)}
+      {item(msg.isStarred ? <StarOff size={16} /> : <Star size={16} />, msg.isStarred ? 'Unstar' : 'Star', a.onStar)}
+      {item(msg.isPinned ? <PinOff size={16} /> : <Pin size={16} />, msg.isPinned ? 'Unpin' : 'Pin', a.onPin)}
+      {item(<MessageSquare size={16} />, 'Reply in thread', a.onThread)}
+      {a.onDownload && item(<Download size={16} />, 'Download', a.onDownload)}
+      {a.onEdit && item(<Pencil size={16} />, 'Edit', a.onEdit)}
+      {a.onDelete && item(<Trash2 size={16} />, 'Delete for everyone', a.onDelete, true)}
+    </div>
+  );
+};
+
 export const PulseDesk: React.FC = () => {
   const {
     activeType,
@@ -92,6 +280,8 @@ export const PulseDesk: React.FC = () => {
     toggleReaction,
     toggleStarMessage,
     togglePinMessage,
+    editMessage,
+    deleteMessage,
     typing,
     notifyTyping,
     setActiveThreadMessage,
@@ -152,10 +342,20 @@ export const PulseDesk: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [stagedAttachments, setStagedAttachments] = useState<PulseAttachment[]>([]);
   const [stagedTaskTags, setStagedTaskTags] = useState<PulseTaskTag[]>([]);
-  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  // Full emoji picker: for the message box, or to react to one message with any emoji.
+  const [emojiPicker, setEmojiPicker] = useState<{ mode: 'compose' | 'react'; messageId?: string; x: number; y: number } | null>(null);
   const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  // WhatsApp-style quoted reply being composed, and the message flashed after jumping to it.
+  const [replyingTo, setReplyingTo] = useState<PulseReplyPreview | null>(null);
+  const [flashMessageId, setFlashMessageId] = useState<string | null>(null);
+  // Right-click / chevron menu, message being edited, and delete confirmation.
+  const [messageMenu, setMessageMenu] = useState<{ msg: PulseMessage; x: number; y: number } | null>(null);
+  const [editingMessage, setEditingMessage] = useState<PulseMessage | null>(null);
+  const [confirmDeleteMsg, setConfirmDeleteMsg] = useState<PulseMessage | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const swipeRef = useRef<{ id: string; x: number; y: number; dx: number; el: HTMLElement } | null>(null);
 
   // WhatsApp-Style Filter Pills (All, Unread, Groups, Direct)
   const [chatFilter, setChatFilter] = useState<'all' | 'unread' | 'groups' | 'dms'>('all');
@@ -299,8 +499,104 @@ export const PulseDesk: React.FC = () => {
       )
     : timelineMessages;
 
+  // Replying: the quote sits above the composer and the cursor goes to the field (WhatsApp).
+  const startReply = (msg: PulseMessage) => {
+    if (msg.isDeleted || msg.isUnavailable) return;
+    if (editingMessage) cancelEdit();
+    setReplyingTo(replyPreviewOf(msg));
+    setActiveThreadMessage(null);
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  useEffect(() => {
+    setReplyingTo(null);
+    setEditingMessage(null);
+    setMessageMenu(null);
+    setEmojiPicker(null);
+  }, [activeId]);
+
+  const openMessageMenu = (msg: PulseMessage, x: number, y: number) => {
+    if (msg.isDeleted || msg.isUnavailable) return;
+    setMessageMenu({ msg, x, y });
+  };
+
+  const startEdit = (msg: PulseMessage) => {
+    setReplyingTo(null);
+    setEditingMessage(msg);
+    setInputText(msg.content);
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  // Puts an emoji at the caret in the message box (replacing any selection), like WhatsApp.
+  const insertEmoji = (emoji: string) => {
+    const ta = composerRef.current;
+    const start = ta?.selectionStart ?? inputText.length;
+    const end = ta?.selectionEnd ?? start;
+    setInputText(inputText.slice(0, start) + emoji + inputText.slice(end));
+    requestAnimationFrame(() => {
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingMessage(null);
+    setInputText('');
+  };
+
+  // Tapping a quote scrolls to the original and flashes it.
+  const jumpToMessage = (messageId: string) => {
+    const el = document.getElementById(`pulse-msg-${messageId}`);
+    if (!el) {
+      addToast({ type: 'info', message: 'The original message is not in this view.' });
+      return;
+    }
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setFlashMessageId(null);
+    requestAnimationFrame(() => setFlashMessageId(messageId));
+    window.setTimeout(() => setFlashMessageId((cur) => (cur === messageId ? null : cur)), 1500);
+  };
+
+  // Touch screens: swipe a message to the right to reply.
+  const onRowTouchStart = (msg: PulseMessage, e: React.TouchEvent<HTMLDivElement>) => {
+    if (msg.isDeleted || msg.isUnavailable) return;
+    const t = e.touches[0];
+    swipeRef.current = { id: msg.id, x: t.clientX, y: t.clientY, dx: 0, el: e.currentTarget };
+  };
+  const onRowTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    const sw = swipeRef.current;
+    if (!sw) return;
+    const t = e.touches[0];
+    const dx = t.clientX - sw.x;
+    if (Math.abs(t.clientY - sw.y) > 30 && sw.dx < 10) {
+      swipeRef.current = null; // vertical scroll, not a swipe
+      sw.el.style.transform = '';
+      return;
+    }
+    sw.dx = Math.max(0, Math.min(80, dx));
+    sw.el.style.transform = `translateX(${sw.dx}px)`;
+    sw.el.style.transition = 'none';
+  };
+  const onRowTouchEnd = (msg: PulseMessage) => {
+    const sw = swipeRef.current;
+    swipeRef.current = null;
+    if (!sw) return;
+    sw.el.style.transition = 'transform 0.2s ease-out';
+    sw.el.style.transform = '';
+    if (sw.dx >= 56) {
+      if (navigator.vibrate) navigator.vibrate(15);
+      startReply(msg);
+    }
+  };
+
   // Send message handler
   const handleSend = () => {
+    if (editingMessage) {
+      if (inputText.trim() && inputText.trim() !== editingMessage.content) void editMessage(editingMessage.id, inputText);
+      cancelEdit();
+      return;
+    }
     if (!inputText.trim() && stagedAttachments.length === 0 && stagedTaskTags.length === 0) return;
 
     if (!inputText.trim()) {
@@ -311,16 +607,22 @@ export const PulseDesk: React.FC = () => {
     if (stagedTaskTags.some((t) => !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(t.id))) {
       addToast({ type: 'info', message: 'That tag does not point at a task you can access, so the message was sent without it.' });
     }
-    sendMessage(activeId, inputText, stagedAttachments, stagedTaskTags);
+    sendMessage(activeId, inputText, stagedAttachments, stagedTaskTags, undefined, { replyToId: replyingTo?.messageId });
+    setReplyingTo(null);
     setInputText('');
     setStagedAttachments([]);
     setStagedTaskTags([]);
-    setIsEmojiPickerOpen(false);
     setIsAttachMenuOpen(false);
   };
 
   // Keyboard shortcut in message textarea
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape' && (replyingTo || editingMessage)) {
+      e.preventDefault();
+      if (editingMessage) cancelEdit();
+      else setReplyingTo(null);
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -334,7 +636,9 @@ export const PulseDesk: React.FC = () => {
     setIsAttachMenuOpen(false);
     if (!file) return;
     addToast({ type: 'info', message: `Encrypting and sending "${file.name}"...` });
-    if (await sendFile(activeId, file)) addToast({ type: 'success', message: `Sent "${file.name}".` });
+    const replyToId = replyingTo?.messageId;
+    setReplyingTo(null);
+    if (await sendFile(activeId, file, { replyToId })) addToast({ type: 'success', message: `Sent "${file.name}".` });
   };
 
   // Decrypt an attachment and either save it or open it in a new tab.
@@ -375,6 +679,8 @@ export const PulseDesk: React.FC = () => {
     const recorder = new MediaRecorder(stream);
     const chunks: Blob[] = [];
     const conversationId = activeId;
+    const replyToId = replyingTo?.messageId;
+    setReplyingTo(null);
     const startedAt = Date.now();
     recorder.ondataavailable = (ev) => chunks.push(ev.data);
     recorder.onstop = async () => {
@@ -383,7 +689,7 @@ export const PulseDesk: React.FC = () => {
       setIsRecording(false);
       const recording = new Blob(chunks, { type: recorder.mimeType });
       if (recording.size === 0) return;
-      if (await sendVoiceNote(conversationId, recording, Date.now() - startedAt)) {
+      if (await sendVoiceNote(conversationId, recording, Date.now() - startedAt, { replyToId })) {
         addToast({ type: 'success', message: '🎙️ Voice note sent.' });
       }
     };
@@ -1033,9 +1339,18 @@ export const PulseDesk: React.FC = () => {
               )}
               <div
                 key={msg.id}
-                className={`pulse-msg-row ${isMe ? 'msg-out' : 'msg-in'}`}
+                id={`pulse-msg-${msg.id}`}
+                className={`pulse-msg-row ${isMe ? 'msg-out' : 'msg-in'}${flashMessageId === msg.id ? ' pulse-msg-flash' : ''}`}
                 onMouseEnter={() => setHoveredMessageId(msg.id)}
                 onMouseLeave={() => setHoveredMessageId(null)}
+                onContextMenu={(e) => {
+                  if (msg.isDeleted || msg.isUnavailable) return;
+                  e.preventDefault();
+                  openMessageMenu(msg, e.clientX, e.clientY);
+                }}
+                onTouchStart={(e) => onRowTouchStart(msg, e)}
+                onTouchMove={onRowTouchMove}
+                onTouchEnd={() => onRowTouchEnd(msg)}
                 style={{
                   position: 'relative',
                   display: 'flex',
@@ -1047,8 +1362,22 @@ export const PulseDesk: React.FC = () => {
                   marginLeft: !isMe ? '8px' : '0',
                 }}
               >
-                {/* Floating Micro Hover Reactions Pill */}
-                {isHovered && (
+                {/* WhatsApp-style quick reply arrow beside the bubble */}
+                {isHovered && !msg.isDeleted && !msg.isUnavailable && (
+                  <button
+                    type="button"
+                    className="pulse-quick-reply"
+                    style={{ [isMe ? 'left' : 'right']: '-36px' }}
+                    onClick={() => startReply(msg)}
+                    title="Reply"
+                    aria-label="Reply"
+                  >
+                    <Reply size={15} />
+                  </button>
+                )}
+
+                {/* Floating quick reactions on hover (the rest is in the message menu) */}
+                {isHovered && !msg.isDeleted && !msg.isUnavailable && (
                   <div
                     className="whatsapp-reaction-bar"
                     style={{
@@ -1066,70 +1395,31 @@ export const PulseDesk: React.FC = () => {
                       zIndex: 20,
                     }}
                   >
-                    <button
-                      onClick={() => toggleReaction(msg.id, '👍', 'user-current')}
-                      className="reaction-emoji-btn"
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
-                    >
-                      👍
-                    </button>
-                    <button
-                      onClick={() => toggleReaction(msg.id, '❤️', 'user-current')}
-                      className="reaction-emoji-btn"
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
-                    >
-                      ❤️
-                    </button>
-                    <button
-                      onClick={() => toggleReaction(msg.id, '🔥', 'user-current')}
-                      className="reaction-emoji-btn"
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
-                    >
-                      🔥
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleStarMessage(msg.id)}
-                      title={msg.isStarred ? 'Unstar' : 'Star (this device)'}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', opacity: msg.isStarred ? 1 : 0.6 }}
-                    >
-                      ⭐
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => togglePinMessage(msg.id)}
-                      title={msg.isPinned ? 'Unpin' : 'Pin (this device)'}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px', opacity: msg.isPinned ? 1 : 0.6 }}
-                    >
-                      📌
-                    </button>
-                    <button
-                      onClick={() => toggleReaction(msg.id, '🚀', 'user-current')}
-                      className="reaction-emoji-btn"
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
-                    >
-                      🚀
-                    </button>
-                    <button
-                      onClick={() => setActiveThreadMessage(msg)}
-                      className="reaction-emoji-btn"
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 2px' }}
-                      title="Reply"
-                    >
-                      <Reply size={12} />
-                    </button>
-                    {msg.content && (
+                    {MENU_REACTIONS.map((emoji) => (
                       <button
+                        key={emoji}
                         type="button"
-                        onClick={() => copyMessageText(msg.content)}
+                        onClick={() => toggleReaction(msg.id, emoji, 'user-current')}
                         className="reaction-emoji-btn"
-                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 2px' }}
-                        title="Copy text"
-                        aria-label="Copy text"
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
+                        aria-label={`React ${emoji}`}
                       >
-                        <Copy size={12} />
+                        {emoji}
                       </button>
-                    )}
+                    ))}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setEmojiPicker({ mode: 'react', messageId: msg.id, x: r.left, y: r.bottom + 6 });
+                      }}
+                      className="reaction-emoji-btn"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '0 2px' }}
+                      title="More reactions"
+                      aria-label="More reactions"
+                    >
+                      <PlusIcon size={14} />
+                    </button>
                   </div>
                 )}
 
@@ -1141,6 +1431,21 @@ export const PulseDesk: React.FC = () => {
                     position: 'relative',
                   }}
                 >
+                  {/* WhatsApp Web chevron: opens the message menu */}
+                  {isHovered && !msg.isDeleted && !msg.isUnavailable && (
+                    <button
+                      type="button"
+                      className="pulse-bubble-chevron"
+                      onClick={(e) => {
+                        const r = e.currentTarget.getBoundingClientRect();
+                        openMessageMenu(msg, isMe ? r.right - 200 : r.left, r.bottom + 4);
+                      }}
+                      title="Message options"
+                      aria-label="Message options"
+                    >
+                      <ChevronDown size={16} />
+                    </button>
+                  )}
                   {/* WhatsApp Top Triangular Corner Notch / Tail with continuous border */}
                   {isMe ? (
                     <span className="whatsapp-tail-out" aria-hidden="true">
@@ -1177,17 +1482,17 @@ export const PulseDesk: React.FC = () => {
                       style={{
                         fontSize: '12px',
                         fontWeight: 700,
-                        color:
-                          msg.senderName.includes('Sarah')
-                            ? 'var(--accent-primary)'
-                            : msg.senderName.includes('Alex')
-                            ? '#fbbf24'
-                            : '#f43f5e',
+                        color: senderColor(msg.senderId),
                         marginBottom: '3px',
                       }}
                     >
                       {msg.senderName}
                     </div>
+                  )}
+
+                  {/* Quoted message this one replies to (tap to jump to it) */}
+                  {msg.replyTo && !msg.isDeleted && (
+                    <ReplyQuote preview={msg.replyTo} onClick={msg.replyTo.unavailable ? undefined : () => jumpToMessage(msg.replyTo!.messageId)} />
                   )}
 
                   {/* Text Content */}
@@ -1359,6 +1664,8 @@ export const PulseDesk: React.FC = () => {
                       marginTop: '4px',
                     }}
                   >
+                    {msg.isPinned && <Pin size={10} color="var(--text-muted)" aria-label="Pinned" />}
+                    {msg.isStarred && <Star size={10} color="var(--text-muted)" fill="currentColor" aria-label="Starred" />}
                     <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                       {msg.timestamp}
                     </span>
@@ -1444,6 +1751,46 @@ export const PulseDesk: React.FC = () => {
         {/* ========================================================================= */}
         {/* 4. WHATSAPP WEB STYLE BOTTOM COMPOSER                                     */}
         {/* ========================================================================= */}
+        {editingMessage && (
+          <div className="pulse-reply-composer">
+            <div className="pulse-quote is-static">
+              <span className="pulse-quote-bar" style={{ background: OWN_QUOTE_COLOR }} />
+              <span className="pulse-quote-body">
+                <span className="pulse-quote-name" style={{ color: OWN_QUOTE_COLOR }}>
+                  Edit message
+                </span>
+                <span className="pulse-quote-text">
+                  <span>{editingMessage.content}</span>
+                </span>
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={cancelEdit}
+              style={{ padding: '6px', borderRadius: '50%', color: 'var(--text-muted)', flexShrink: 0 }}
+              title="Cancel editing (Esc)"
+              aria-label="Cancel editing"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
+        {replyingTo && !editingMessage && (
+          <div className="pulse-reply-composer">
+            <ReplyQuote preview={replyingTo} />
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setReplyingTo(null)}
+              style={{ padding: '6px', borderRadius: '50%', color: 'var(--text-muted)', flexShrink: 0 }}
+              title="Cancel reply (Esc)"
+              aria-label="Cancel reply"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
         <footer
           style={{
             padding: '10px 16px',
@@ -1544,10 +1891,19 @@ export const PulseDesk: React.FC = () => {
 
           {/* Emoji Smiley Button */}
           <button
-            onClick={() => setInputText((p) => p + ' 😊')}
+            onClick={(e) => {
+              if (emojiPicker?.mode === 'compose') {
+                setEmojiPicker(null);
+                return;
+              }
+              const r = e.currentTarget.getBoundingClientRect();
+              setEmojiPicker({ mode: 'compose', x: r.left, y: r.top - 430 });
+            }}
+            onMouseDown={(e) => e.preventDefault()} // keep the caret in the message box
             className="btn btn-ghost"
-            style={{ padding: '8px', borderRadius: '50%', color: 'var(--text-muted)' }}
+            style={{ padding: '8px', borderRadius: '50%', color: emojiPicker?.mode === 'compose' ? 'var(--accent-primary)' : 'var(--text-muted)' }}
             title="Emoji"
+            aria-label="Emoji"
           >
             <Smile size={19} />
           </button>
@@ -1565,6 +1921,7 @@ export const PulseDesk: React.FC = () => {
             }}
           >
             <textarea
+              ref={composerRef}
               rows={1}
               value={inputText}
               onChange={(e) => {
@@ -2330,6 +2687,71 @@ export const PulseDesk: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {messageMenu && (
+        <MessageMenu
+          msg={messageMenu.msg}
+          x={messageMenu.x}
+          y={messageMenu.y}
+          onClose={() => setMessageMenu(null)}
+          onReact={(emoji) => toggleReaction(messageMenu.msg.id, emoji, 'user-current')}
+          onMoreReactions={(x, y) => setEmojiPicker({ mode: 'react', messageId: messageMenu.msg.id, x, y })}
+          onReply={() => startReply(messageMenu.msg)}
+          onCopy={() => copyMessageText(messageMenu.msg.content)}
+          onStar={() => toggleStarMessage(messageMenu.msg.id)}
+          onPin={() => togglePinMessage(messageMenu.msg.id)}
+          onThread={() => setActiveThreadMessage(messageMenu.msg)}
+          onDownload={
+            messageMenu.msg.attachments?.[0]
+              ? () => void handleOpenAttachment(messageMenu.msg.attachments![0], true)
+              : undefined
+          }
+          onEdit={
+            messageMenu.msg.senderId === 'user-current' && messageMenu.msg.content && !messageMenu.msg.attachments?.length && !messageMenu.msg.voiceNote
+              ? () => startEdit(messageMenu.msg)
+              : undefined
+          }
+          // Only the sender can delete a message for everyone.
+          onDelete={messageMenu.msg.senderId === 'user-current' ? () => setConfirmDeleteMsg(messageMenu.msg) : undefined}
+        />
+      )}
+
+      {emojiPicker && (
+        <EmojiPicker
+          x={emojiPicker.x}
+          y={emojiPicker.y}
+          closeOnPick={emojiPicker.mode === 'react'}
+          onClose={() => setEmojiPicker(null)}
+          onPick={(emoji) => {
+            if (emojiPicker.mode === 'compose') insertEmoji(emoji);
+            else if (emojiPicker.messageId) toggleReaction(emojiPicker.messageId, emoji, 'user-current');
+          }}
+        />
+      )}
+
+      {confirmDeleteMsg && (
+        <div className="modal-overlay" onClick={() => setConfirmDeleteMsg(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>Delete for everyone?</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+              Everyone in this chat will see that the message was deleted.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '18px' }}>
+              <button className="btn btn-ghost" onClick={() => setConfirmDeleteMsg(null)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={() => {
+                  void deleteMessage(confirmDeleteMsg.id);
+                  setConfirmDeleteMsg(null);
+                }}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}

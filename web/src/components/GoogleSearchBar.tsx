@@ -164,8 +164,8 @@ export const GoogleSearchBar: React.FC = () => {
           <LogIn size={15} color="var(--accent-primary)" />
         ),
         action: () => {
-          dispatch(recordPunch({ punch_type: attendanceSummary?.punched_in ? 'out' : 'in', source: 'web' }));
           setIsOpen(false);
+          dispatch(recordPunch({ punch_type: attendanceSummary?.punched_in ? 'out' : 'in', source: 'web' })).catch(() => {});
         },
       });
 

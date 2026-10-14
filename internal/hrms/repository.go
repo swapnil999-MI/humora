@@ -3,6 +3,7 @@ package hrms
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,6 +15,12 @@ type Repository interface {
 	CreateEmployee(ctx context.Context, emp *Employee) error
 	GetEmployeeByID(ctx context.Context, tenantID, id uuid.UUID) (*Employee, error)
 	GetEmployeeByUserID(ctx context.Context, tenantID, userID uuid.UUID) (*Employee, error)
+	GetPunchDevice(ctx context.Context, tenantID, employeeID uuid.UUID) (*PunchDevice, error)
+	ListPunchDevices(ctx context.Context, tenantID uuid.UUID) ([]PunchDevice, error)
+	AllowPunchDevice(ctx context.Context, tenantID, employeeID, allowedBy uuid.UUID) error
+	BindPunchDeviceKey(ctx context.Context, tenantID, employeeID uuid.UUID, publicKey, label string) (bool, error)
+	DeletePunchDevice(ctx context.Context, tenantID, employeeID uuid.UUID) error
+	ClearEmployeeBiometricFace(ctx context.Context, tenantID, employeeID uuid.UUID) error
 	ListEmployees(ctx context.Context, tenantID uuid.UUID, search, deptID string, limit, offset int) ([]Employee, int64, error)
 	GetOrgHierarchy(ctx context.Context, tenantID uuid.UUID) ([]Employee, error)
 
@@ -25,7 +32,8 @@ type Repository interface {
 
 	CreateAttendancePunch(ctx context.Context, punch *AttendancePunch) error
 	GetLastPunch(ctx context.Context, tenantID, employeeID uuid.UUID) (*AttendancePunch, error)
-	GetTodayPunches(ctx context.Context, tenantID, employeeID uuid.UUID) ([]AttendancePunch, error)
+	GetTodayPunches(ctx context.Context, tenantID, employeeID uuid.UUID, dayStart time.Time) ([]AttendancePunch, error)
+	GetFirstEmployeeShift(ctx context.Context, tenantID, employeeID uuid.UUID) (*Shift, error)
 
 	GetLeaveType(ctx context.Context, tenantID, id uuid.UUID) (*LeaveType, error)
 	ListLeaveTypes(ctx context.Context, tenantID uuid.UUID) ([]LeaveType, error)
@@ -50,8 +58,9 @@ type Repository interface {
 
 	// Punches & Calendar Range
 	GetPunchesByDateRange(ctx context.Context, tenantID, employeeID uuid.UUID, start, end time.Time) ([]AttendancePunch, error)
-	GetTodayTeamPunches(ctx context.Context, tenantID uuid.UUID) ([]AttendancePunch, error)
+	GetTeamPunchesSince(ctx context.Context, tenantID uuid.UUID, since time.Time) ([]AttendancePunch, error)
 	GetApprovedLeavesByDateRange(ctx context.Context, tenantID, employeeID uuid.UUID, start, end time.Time) ([]LeaveRequest, error)
+	HasOverlappingLeave(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) (bool, error)
 
 	// Regularizations
 	CreateRegularization(ctx context.Context, reg *AttendanceRegularization) error
@@ -282,9 +291,9 @@ func (r *repository) CreateAttendancePunch(ctx context.Context, punch *Attendanc
 			id, tenant_id, employee_id, punch_type, punched_at, latitude, longitude,
 			accuracy_meters, location_id, is_geofence_verified, is_offline_signed,
 			offline_signature, source, is_face_verified, face_confidence, face_distance,
-			selfie_url, created_at
+			selfie_url, created_at, is_device_verified, device_challenge
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
 		)
 	`
 	if punch.ID == uuid.Nil {
@@ -297,8 +306,67 @@ func (r *repository) CreateAttendancePunch(ctx context.Context, punch *Attendanc
 		punch.Latitude, punch.Longitude, punch.AccuracyMeters, punch.LocationID,
 		punch.IsGeofenceVerified, punch.IsOfflineSigned, punch.OfflineSignature,
 		punch.Source, punch.IsFaceVerified, punch.FaceConfidence, punch.FaceDistance,
-		punch.SelfieURL, punch.CreatedAt,
+		punch.SelfieURL, punch.CreatedAt, punch.IsDeviceVerified, punch.DeviceChallenge,
 	)
+	return err
+}
+
+const punchDeviceColumns = `employee_id, tenant_id, COALESCE(public_key, '') AS public_key, device_label, allowed_at, registered_at`
+
+func (r *repository) GetPunchDevice(ctx context.Context, tenantID, employeeID uuid.UUID) (*PunchDevice, error) {
+	var d PunchDevice
+	err := r.db.GetContext(ctx, &d, `SELECT `+punchDeviceColumns+` FROM hrms_punch_devices WHERE tenant_id = $1 AND employee_id = $2`, tenantID, employeeID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (r *repository) ListPunchDevices(ctx context.Context, tenantID uuid.UUID) ([]PunchDevice, error) {
+	var out []PunchDevice
+	err := r.db.SelectContext(ctx, &out, `SELECT `+punchDeviceColumns+` FROM hrms_punch_devices WHERE tenant_id = $1`, tenantID)
+	return out, err
+}
+
+// AllowPunchDevice turns fingerprint punching on for an employee (no phone yet).
+func (r *repository) AllowPunchDevice(ctx context.Context, tenantID, employeeID, allowedBy uuid.UUID) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO hrms_punch_devices (employee_id, tenant_id, allowed_by, allowed_at)
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (employee_id) DO NOTHING
+	`, employeeID, tenantID, allowedBy)
+	return err
+}
+
+// BindPunchDeviceKey stores the phone key; false when fingerprint punching is not allowed.
+func (r *repository) BindPunchDeviceKey(ctx context.Context, tenantID, employeeID uuid.UUID, publicKey, label string) (bool, error) {
+	res, err := r.db.ExecContext(ctx, `
+		UPDATE hrms_punch_devices SET public_key = $1, device_label = $2, registered_at = NOW()
+		WHERE tenant_id = $3 AND employee_id = $4
+	`, publicKey, label, tenantID, employeeID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+func (r *repository) DeletePunchDevice(ctx context.Context, tenantID, employeeID uuid.UUID) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM hrms_punch_devices WHERE tenant_id = $1 AND employee_id = $2`, tenantID, employeeID)
+	return err
+}
+
+// ClearEmployeeBiometricFace removes the enrolled face template, so face punches fail until HR enrolls again.
+func (r *repository) ClearEmployeeBiometricFace(ctx context.Context, tenantID, employeeID uuid.UUID) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE hrms_employees
+		SET biometric_face_url = NULL, face_embedding = NULL, biometric_face_registered_at = NULL,
+		    biometric_sample_count = 0, updated_at = NOW()
+		WHERE tenant_id = $1 AND id = $2
+	`, tenantID, employeeID)
 	return err
 }
 
@@ -343,15 +411,35 @@ func (r *repository) GetLastPunch(ctx context.Context, tenantID, employeeID uuid
 	return &punch, nil
 }
 
-func (r *repository) GetTodayPunches(ctx context.Context, tenantID, employeeID uuid.UUID) ([]AttendancePunch, error) {
+// GetTodayPunches returns the employee's punches since dayStart (local midnight in their shift's zone).
+func (r *repository) GetTodayPunches(ctx context.Context, tenantID, employeeID uuid.UUID, dayStart time.Time) ([]AttendancePunch, error) {
 	var punches []AttendancePunch
 	query := fmt.Sprintf(`
 		SELECT %s FROM hrms_attendance_punches
-		WHERE tenant_id = $1 AND employee_id = $2 AND punched_at >= CURRENT_DATE
+		WHERE tenant_id = $1 AND employee_id = $2 AND punched_at >= $3
 		ORDER BY punched_at ASC
 	`, punchSelectColumns)
-	err := r.db.SelectContext(ctx, &punches, query, tenantID, employeeID)
+	err := r.db.SelectContext(ctx, &punches, query, tenantID, employeeID, dayStart)
 	return punches, err
+}
+
+// GetFirstEmployeeShift is the employee's earliest assigned shift (nil if they never had one).
+func (r *repository) GetFirstEmployeeShift(ctx context.Context, tenantID, employeeID uuid.UUID) (*Shift, error) {
+	var shift Shift
+	err := r.db.GetContext(ctx, &shift, `
+		SELECT s.* FROM hrms_shift_rosters r
+		JOIN hrms_shifts s ON r.shift_id = s.id
+		WHERE r.tenant_id = $1 AND r.employee_id = $2
+		ORDER BY r.effective_date ASC
+		LIMIT 1
+	`, tenantID, employeeID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &shift, nil
 }
 
 func (r *repository) GetLeaveType(ctx context.Context, tenantID, id uuid.UUID) (*LeaveType, error) {
@@ -480,15 +568,22 @@ func (r *repository) ListLeaveRequests(ctx context.Context, tenantID uuid.UUID, 
 	return requests, total, nil
 }
 
+// errAlreadyDecided covers requests that are missing, no longer pending (approving
+// twice would deduct leave twice) or belong to the approver themself.
+var errAlreadyDecided = errors.New("request not found, already decided, or it is your own request")
+
 func (r *repository) UpdateLeaveRequestStatus(ctx context.Context, tenantID, requestID uuid.UUID, status string, approverID uuid.UUID) (*LeaveRequest, error) {
 	var req LeaveRequest
 	query := `
 		UPDATE hrms_leave_requests
 		SET status = $1, approved_by = $2
-		WHERE tenant_id = $3 AND id = $4
+		WHERE tenant_id = $3 AND id = $4 AND status = 'pending' AND employee_id <> $2
 		RETURNING *
 	`
 	err := r.db.GetContext(ctx, &req, query, status, approverID, tenantID, requestID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errAlreadyDecided
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -524,13 +619,13 @@ func (r *repository) CreateShift(ctx context.Context, shift *Shift) error {
 	query := `
 		INSERT INTO hrms_shifts (
 			id, tenant_id, name, start_time, end_time, grace_minutes,
-			half_day_hours, full_day_hours, is_night_shift, night_shift_allowance, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			half_day_hours, full_day_hours, is_night_shift, night_shift_allowance, created_at, time_zone
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		shift.ID, shift.TenantID, shift.Name, shift.StartTime, shift.EndTime,
 		shift.GraceMinutes, shift.HalfDayHours, shift.FullDayHours,
-		shift.IsNightShift, shift.NightShiftAllowance, shift.CreatedAt,
+		shift.IsNightShift, shift.NightShiftAllowance, shift.CreatedAt, shift.TimeZone,
 	)
 	return err
 }
@@ -560,13 +655,13 @@ func (r *repository) UpdateShift(ctx context.Context, shift *Shift) error {
 		UPDATE hrms_shifts
 		SET name = $1, start_time = $2, end_time = $3, grace_minutes = $4,
 		    half_day_hours = $5, full_day_hours = $6, is_night_shift = $7,
-		    night_shift_allowance = $8
+		    night_shift_allowance = $8, time_zone = $11
 		WHERE tenant_id = $9 AND id = $10
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		shift.Name, shift.StartTime, shift.EndTime, shift.GraceMinutes,
 		shift.HalfDayHours, shift.FullDayHours, shift.IsNightShift,
-		shift.NightShiftAllowance, shift.TenantID, shift.ID,
+		shift.NightShiftAllowance, shift.TenantID, shift.ID, shift.TimeZone,
 	)
 	return err
 }
@@ -654,15 +749,28 @@ func (r *repository) GetPunchesByDateRange(ctx context.Context, tenantID, employ
 	return punches, err
 }
 
-func (r *repository) GetTodayTeamPunches(ctx context.Context, tenantID uuid.UUID) ([]AttendancePunch, error) {
+// GetTeamPunchesSince returns every punch in the organisation since the given instant.
+func (r *repository) GetTeamPunchesSince(ctx context.Context, tenantID uuid.UUID, since time.Time) ([]AttendancePunch, error) {
 	query := fmt.Sprintf(`
 		SELECT %s FROM hrms_attendance_punches
-		WHERE tenant_id = $1 AND punched_at >= CURRENT_DATE
+		WHERE tenant_id = $1 AND punched_at >= $2
 		ORDER BY punched_at ASC
 	`, punchSelectColumns)
 	var punches []AttendancePunch
-	err := r.db.SelectContext(ctx, &punches, query, tenantID)
+	err := r.db.SelectContext(ctx, &punches, query, tenantID, since)
 	return punches, err
+}
+
+// HasOverlappingLeave reports a pending or approved leave of the employee touching [from, to].
+func (r *repository) HasOverlappingLeave(ctx context.Context, tenantID, employeeID uuid.UUID, from, to time.Time) (bool, error) {
+	var exists bool
+	err := r.db.GetContext(ctx, &exists, `
+		SELECT EXISTS (
+			SELECT 1 FROM hrms_leave_requests
+			WHERE tenant_id = $1 AND employee_id = $2 AND status IN ('pending', 'approved')
+			  AND from_date <= $4 AND to_date >= $3
+		)`, tenantID, employeeID, from, to)
+	return exists, err
 }
 
 func (r *repository) GetApprovedLeavesByDateRange(ctx context.Context, tenantID, employeeID uuid.UUID, start, end time.Time) ([]LeaveRequest, error) {
@@ -761,11 +869,14 @@ func (r *repository) UpdateRegularizationStatus(ctx context.Context, tenantID, i
 	query := `
 		UPDATE hrms_attendance_regularizations
 		SET status = $1, approved_by = $2
-		WHERE tenant_id = $3 AND id = $4
+		WHERE tenant_id = $3 AND id = $4 AND status = 'pending' AND employee_id <> $2
 		RETURNING *
 	`
 	var reg AttendanceRegularization
 	err := r.db.GetContext(ctx, &reg, query, status, approverID, tenantID, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errAlreadyDecided
+	}
 	if err != nil {
 		return nil, err
 	}
